@@ -407,8 +407,8 @@ function sessionRestore(){
   return true;
 }
 const SYNC = {
-  cfg: Object.assign({key:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
-  busy:false, applying:false, timer:null, msg:'', msgType:'', conflict:false, serverDetected:false
+  cfg: Object.assign({key:'', user:'', hash:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
+  busy:false, applying:false, timer:null, msg:'', msgType:'', conflict:false, serverDetected:false, serverHasUsers:false
 };
 const KEYS = { customers:'ess_customers', products:'ess_products', sales:'ess_sales', users:'ess_users', categories:'ess_categories', subcategories:'ess_subcategories', orders:'ess_orders', prefs:'ess_prefs' };
 
@@ -1219,20 +1219,24 @@ let state = {
 let storageWarningShown = false;
 /* ================= sincronização com o servidor (api.php / MySQL) ================= */
 function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
-function syncEnabled(){ return !!SYNC.cfg.key; }
+function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
+function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
   return { users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
   try{
-    r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({action, key:SYNC.cfg.key}, extra||{}))});
+    r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.assign({action}, syncAuth(), extra||{}))});
   }catch(e){
     throw Object.assign(new Error('Sem conexão com o servidor. Verifique a internet e se o programa foi aberto pelo seu site (não como arquivo no computador).'), {code:'network'});
   }
   let j = null;
   try{ j = await r.json(); }catch(e){}
   if(!j) throw Object.assign(new Error('O servidor não respondeu como esperado (api.php ausente ou com erro de PHP). Código HTTP '+r.status+'.'), {code:'bad_response'});
+  if(j && j.code==='bad_key' && !SYNC.cfg.key && SYNC.cfg.user){   // conta não confere no servidor (apagada ou senha trocada): para de tentar até o próximo login
+    SYNC.cfg.user = ''; SYNC.cfg.hash = ''; syncSaveCfg();
+  }
   if(!r.ok || !j.ok) throw Object.assign(new Error(j.error || ('Erro HTTP '+r.status)), {code:j.code||'http', version:j.version});
   return j;
 }
@@ -1261,24 +1265,28 @@ async function syncPush(force, silent){
     if(state.currentUser && (state.tab==='usuarios' || state.tab==='servidor')) render();
   }
 }
+function syncApplyPulled(j){
+  const d = j.data || {};
+  SYNC.applying = true;
+  ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
+    state[k] = Array.isArray(d[k]) ? d[k] : [];
+    persist(k);
+  });
+  SYNC.applying = false;
+  if(state.currentUser){
+    const me = state.users.find(u=>u.id===state.currentUser.id);
+    if(me){ state.currentUser = me; sessionSave(me, state.tab); } else { state.currentUser = null; sessionClear(); }
+  }
+  SYNC.cfg.version = j.version; SYNC.cfg.dirty = false; SYNC.cfg.last = new Date().toISOString(); SYNC.conflict = false;
+  syncSaveCfg();
+}
 async function syncPull(silent){
   if(!syncEnabled() || SYNC.busy) return false;
   SYNC.busy = true;
   try{
     const j = await syncCall('pull');
-    const d = j.data || {};
-    SYNC.applying = true;
-    ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
-      state[k] = Array.isArray(d[k]) ? d[k] : [];
-      persist(k);
-    });
-    SYNC.applying = false;
-    if(state.currentUser){
-      const me = state.users.find(u=>u.id===state.currentUser.id);
-      if(me){ state.currentUser = me; sessionSave(me, state.tab); } else { state.currentUser = null; sessionClear(); }
-    }
-    SYNC.cfg.version = j.version; SYNC.cfg.dirty = false; SYNC.cfg.last = new Date().toISOString(); SYNC.conflict = false;
-    syncSaveCfg(); syncSetMsg('Dados baixados do servidor.', 'ok');
+    syncApplyPulled(j);
+    syncSetMsg('Dados baixados do servidor.', 'ok');
     if(!silent) notify.ok('Dados baixados do servidor.');
     return true;
   }catch(e){
@@ -1307,7 +1315,7 @@ async function syncCheckRemote(){
     if(j.version === SYNC.cfg.version) { if(SYNC.cfg.dirty) syncSchedulePush(); return; }
     if(SYNC.cfg.dirty){
       SYNC.conflict = true;
-      syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva na aba Usuários.', 'err');
+      syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva no menu Servidor.', 'err');
       notify.err('Conflito de sincronização. Abra o menu Servidor para resolver.');
       return;
     }
@@ -1315,28 +1323,46 @@ async function syncCheckRemote(){
   }catch(e){ /* sem conexão: tenta de novo no próximo ciclo */ }
 }
 async function syncDetectServer(){
-  /* sem chave salva: descobre se existe um api.php configurado neste site */
-  if(syncEnabled() || !/^https?:$/.test(location.protocol)) return;
+  /* sem usuários locais (aparelho novo): descobre se há um servidor e se ele já tem usuários cadastrados */
+  if(state.users.length || !/^https?:$/.test(location.protocol)) return;
   try{
-    const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'ping', key:''})});
+    const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'status'})});
     const j = await r.json();
-    if(j && j.code==='bad_key'){ SYNC.serverDetected = true; render(); }
+    if(j && j.ok){ SYNC.serverDetected = true; SYNC.serverHasUsers = !!j.hasUsers; render(); }
   }catch(e){}
+}
+/* login: confere usuário e senha direto no servidor (aparelho novo ou senha alterada em outro aparelho) */
+async function serverLogin(username, hash){
+  try{
+    const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'pull', key:'', user:username, hash})});
+    let j = null; try{ j = await r.json(); }catch(e){}
+    if(j && j.ok) return {ok:true, j};
+    return {ok:false, code:(j&&j.code)||'http'};
+  }catch(e){ return {ok:false, code:'network'}; }
+}
+/* depois de entrar (administrador ou usuário): liga a sincronização desta conta e atualiza com o servidor */
+async function afterLoginSync(u){
+  if(!/^https?:$/.test(location.protocol)) return;
+  if(!SYNC.cfg.key){ SYNC.cfg.user = u.username; SYNC.cfg.hash = u.passwordHash; syncSaveCfg(); }
+  if(!syncEnabled()) return;
+  try{ await syncStartup(true); }catch(e){}
+  render();
 }
 function syncStartTimers(){
   setInterval(syncCheckRemote, 30000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncCheckRemote(); });
   window.addEventListener('online', syncCheckRemote);
 }
-async function syncStartup(){
-  if(!(syncEnabled() && SYNC.cfg.auto)) return;
+async function syncStartup(force){
+  if(!(syncEnabled() && (SYNC.cfg.auto || force))) return;
   try{
     const j = await syncCall('ping');
+    if(j.empty && state.users.length){ await syncPush(true, true); return; }   // servidor vazio: envia os dados deste aparelho
     if(!SYNC.cfg.dirty && j.version !== SYNC.cfg.version){ await syncPull(true); }
     else if(SYNC.cfg.dirty && j.version === SYNC.cfg.version){ await syncPush(false, true); }
     else if(SYNC.cfg.dirty && j.version !== SYNC.cfg.version){
       SYNC.conflict = true;
-      syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva na aba Usuários.', 'err');
+      syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva no menu Servidor.', 'err');
       notify.err('Conflito de sincronização. Abra o menu Servidor para resolver.');
     }
   }catch(e){ syncSetMsg(e.message, 'err'); }
@@ -1478,7 +1504,7 @@ async function handleFileInput(t){
 function renderLogin(){
   const L = state.ui.login;
   const hasUsers = state.users.length>0;
-  const mode = L.mode || (hasUsers ? 'login' : 'setup');
+  const mode = L.mode || ((hasUsers || SYNC.serverHasUsers) ? 'login' : 'setup');
   const title = mode==='login' ? 'Entrar' : mode==='setup' ? 'Criar administrador' : 'Nova conta';
   return `
   <div class="login-wrap">
@@ -1517,12 +1543,6 @@ function renderLogin(){
           ${L.busy? 'Aguarde...' : mode==='login' ? 'Entrar' : mode==='setup' ? 'Criar conta e entrar' : 'Criar conta'}
         </button>
         ${mode==='login' ? `<p class="muted2" style="font-size:11.5px;text-align:center;margin-top:14px;">Novas contas são criadas por um administrador, no menu Usuários.</p>`:''}
-        ${(!syncEnabled() && SYNC.serverDetected) ? `
-        <div style="margin-top:16px;padding:12px;border:1px dashed var(--line);border-radius:10px;">
-          <div style="font-size:12.5px;margin-bottom:8px;"><b>Servidor encontrado.</b> Digite a senha de sincronização uma única vez para baixar seus dados automaticamente.</div>
-          <input id="login-synckey" type="password" autocomplete="off" placeholder="Senha de sincronização" data-field="ui.syncKey" data-enter-action="connectServerLogin" value="${esc(state.ui.syncKey||'')}">
-          <button class="btn btn-gold btn-block" style="margin-top:8px;" data-action="connectServerLogin">Conectar e baixar dados</button>
-        </div>` : `<button class="btn" style="width:100%;justify-content:center;margin-top:6px;color:var(--plum);font-size:12px;" data-action="connectServerLogin">${syncEnabled()?'Atualizar dados do servidor':'Já uso o servidor: conectar e baixar meus dados'}</button>`}
         ${(mode==='register'||mode==='setup') ? `<button class="btn" style="width:100%;justify-content:center;margin-top:14px;color:var(--plum);font-size:12px;" data-action="goLogin">Já tem usuário? Entre com sua senha</button>`:''}
       </div>
     </div>
@@ -1531,37 +1551,31 @@ function renderLogin(){
 
 const LOGIN_GUARD = {fails:0, until:0};
 const actions_login = {
-  async connectServerLogin(){
-    if(!syncEnabled()){
-      const k = (state.ui.syncKey && String(state.ui.syncKey).trim()) || prompt('Digite a senha de sincronização (SYNC_KEY do database.php no seu site):');
-      if(!k || !k.trim()) return;
-      SYNC.cfg.key = k.trim(); SYNC.cfg.version = 0; SYNC.cfg.dirty = false; syncSaveCfg();
-    } else if(SYNC.cfg.dirty && !confirm('Há alterações neste navegador ainda não enviadas. Baixar do servidor vai descartá-las. Continuar?')) return;
-    try{
-      const j = await syncCall('ping');
-      if(j.empty){ notify.info('O servidor ainda está vazio. Crie a conta de administrador e depois envie os dados pela aba Usuários.'); return; }
-      await syncPull(false);
-      state.ui.syncKey = undefined; render();
-    }catch(e){
-      if(e.code==='bad_key'){ SYNC.cfg.key=''; syncSaveCfg(); }
-      notify.err(e.message);
-    }
-  },
   toggleShowPw(){ state.ui.login.showPw = !state.ui.login.showPw; render(); },
   goRegister(){ if(state.users.length){ return; } state.ui.login = {mode:'setup',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   goLogin(){ state.ui.login = {mode:'login',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   async loginSubmit(){
     const L = state.ui.login;
     const hasUsers = state.users.length>0;
-    const mode = L.mode || (hasUsers?'login':'setup');
+    const mode = L.mode || ((hasUsers || SYNC.serverHasUsers)?'login':'setup');
     L.error='';
     if(mode==='login'){
       const wait = Math.ceil((LOGIN_GUARD.until - Date.now())/1000);
       if(wait>0){ L.error='Muitas tentativas erradas. Aguarde '+wait+'s para tentar de novo.'; render(); return; }
       if(!L.username.trim() || !L.password){ L.error='Informe usuário e senha.'; render(); return; }
-      if(!state.users.length){ L.error='Nenhum usuário cadastrado neste navegador. Crie o administrador ou conecte ao servidor.'; render(); return; }
       const hash = simpleHash(L.password);
-      const u = state.users.find(x=> x.username.toLowerCase()===L.username.trim().toLowerCase() && x.passwordHash===hash);
+      const uname = L.username.trim();
+      const findLocal = ()=> state.users.find(x=> x.username.toLowerCase()===uname.toLowerCase() && x.passwordHash===hash);
+      let u = findLocal();
+      if(!u && /^https?:$/.test(location.protocol)){
+        // aparelho novo ou senha alterada em outro aparelho: confere no servidor e baixa os dados
+        L.busy = true; render();
+        const r = await serverLogin(uname, hash);
+        L.busy = false;
+        if(r.ok){ syncApplyPulled(r.j); u = findLocal(); }
+        else if(r.code==='network' && !state.users.length){ L.error='Sem conexão com o servidor. Verifique a internet e tente de novo.'; render(); return; }
+      }
+      if(!u && !state.users.length){ L.error='Usuário ou senha inválidos.'; L.password=''; render(); return; }
       if(!u){
         LOGIN_GUARD.fails++;
         if(LOGIN_GUARD.fails>=5){ LOGIN_GUARD.until = Date.now()+30000; LOGIN_GUARD.fails=0; L.error='Muitas tentativas erradas. Aguarde 30s para tentar de novo.'; }
@@ -1573,6 +1587,7 @@ const actions_login = {
       state.tab='dashboard'; sessionSave(u,'dashboard');
       state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
       render();
+      afterLoginSync(u);   // atualiza com o servidor (administrador ou usuário)
       return;
     }
     if(!L.name.trim() || !L.username.trim() || !L.password){ L.error='Preencha todos os campos.'; render(); return; }
@@ -1587,6 +1602,7 @@ const actions_login = {
     state.tab='dashboard'; sessionSave(newUser,'dashboard');
     state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
     render();
+    afterLoginSync(newUser);
   }
 };
 
@@ -3509,6 +3525,7 @@ function renderServidorConexao(){
       Guarda os dados no banco MySQL do seu site para usar o mesmo cadastro em vários computadores e celulares.
       Funciona com o programa aberto pelo seu site, onde estão o <b>api.php</b> e o <b>database.php</b>.
     </p>
+    ${(!SYNC.cfg.key && SYNC.cfg.user) ? `<p class="muted" style="font-size:12.5px;margin-bottom:12px;">Este navegador sincroniza automaticamente com a conta <b>${esc(SYNC.cfg.user)}</b> ao entrar. A senha de sincronização abaixo é opcional.</p>` : ''}
     <label class="field"><span class="lbl">Senha de sincronização (SYNC_KEY do database.php)</span>
       <input id="sync-key" type="password" autocomplete="off" data-field="ui.syncKey" data-enter-action="syncConnect" value="${esc(keyVal)}" placeholder="a mesma senha que você definiu no database.php">
     </label>
@@ -3652,7 +3669,7 @@ const actions_usuarios = {
   },
   syncDisconnect(){
     if(!confirm('Desconectar do servidor? Os dados continuam salvos neste navegador e no servidor.')) return;
-    SYNC.cfg = {key:'', auto:true, version:0, dirty:false, last:''}; SYNC.conflict=false; SYNC.msg='';
+    SYNC.cfg = {key:'', user:'', hash:'', auto:true, version:0, dirty:false, last:''}; SYNC.conflict=false; SYNC.msg='';
     state.ui.syncKey = undefined; state.ui.syncAuto = undefined;
     syncSaveCfg(); render();
   },
@@ -4219,7 +4236,7 @@ function renderOrderDetailIfAny(){
 /* ================= actions dispatcher ================= */
 const actions = {
   goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
-  logout(){ sessionClear(); state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
+  logout(){ const _pend = (syncEnabled() && SYNC.cfg.dirty) ? syncPush(false,true) : Promise.resolve(); _pend.then(()=>{ if(!SYNC.cfg.key){ SYNC.cfg.user=''; SYNC.cfg.hash=''; syncSaveCfg(); } }); sessionClear(); state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },
   filterProductSubcategory(t){ state.ui.productSubcategory = t.dataset.sub||''; render(); },

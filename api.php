@@ -30,13 +30,6 @@ if(!is_array($req)) fail(400, 'Corpo da requisição inválido (JSON esperado).'
 $placeholder = (!defined('DB_NAME') || (strpos(DB_NAME, 'TROQUE') !== false && !getenv('ESSENCIA_DSN')) || !defined('SYNC_KEY') || strpos(SYNC_KEY, 'TROQUE') !== false || strlen(SYNC_KEY) < 8);
 if($placeholder) fail(503, 'Servidor ainda não configurado: preencha DB_NAME, DB_USER, DB_PASS e SYNC_KEY (mín. 8 caracteres) no database.php.', ['code'=>'not_configured']);
 
-/* ---- autenticação por chave ---- */
-$key = (string)($req['key'] ?? '');
-if(!hash_equals((string)SYNC_KEY, $key)){
-  usleep(800000); // freia tentativas de adivinhar a chave
-  fail(401, 'Chave de sincronização incorreta.', ['code'=>'bad_key']);
-}
-
 /* ---- conexão ---- */
 try{
   $pdo = db();
@@ -51,6 +44,32 @@ try{ $pdo->query('SELECT role FROM users LIMIT 1'); }
 catch(Throwable $e){
   try{ $pdo->exec("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'"); }
   catch(Throwable $e2){ $hasRole = false; }
+}
+
+/* ---- status público: aparelho novo descobre se o servidor já tem usuários (não revela mais nada) ---- */
+if((string)($req['action'] ?? '') === 'status'){
+  try{ $n = (int)$pdo->query('SELECT COUNT(*) AS n FROM users')->fetch()['n']; }catch(Throwable $e){ $n = 0; }
+  out(200, ['ok'=>true, 'hasUsers'=>($n > 0)]);
+}
+
+/* ---- autenticação: senha de sincronização OU usuário e senha de uma conta cadastrada ---- */
+$key = (string)($req['key'] ?? '');
+$authRole = null;
+if($key !== '' && hash_equals((string)SYNC_KEY, $key)){
+  $authRole = 'admin';
+}elseif(!empty($req['user']) && !empty($req['hash'])){
+  try{
+    $st = $pdo->prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)');
+    $st->execute([(string)$req['user']]);
+    $u = $st->fetch();
+    if($u && hash_equals((string)$u['password_hash'], (string)$req['hash'])){
+      $authRole = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
+    }
+  }catch(Throwable $e){}
+}
+if($authRole === null){
+  usleep(800000); // freia tentativas de adivinhar senha
+  fail(401, 'Senha de sincronização, usuário ou senha incorretos.', ['code'=>'bad_key']);
 }
 
 /* ---- utilidades ---- */
@@ -179,6 +198,7 @@ try{
       }
 
       foreach(['sale_items','sale_payments','sales','order_items','orders','products','subcategories','categories','customers','users'] as $t){
+        if($t === 'users' && $authRole !== 'admin') continue;   // conta 'user' não altera contas nem perfis
         $pdo->exec("DELETE FROM $t");
       }
 
@@ -187,7 +207,7 @@ try{
       $st = $ins($hasRole
         ? 'INSERT INTO users (id,name,username,password_hash,created_at,role) VALUES (?,?,?,?,?,?)'
         : 'INSERT INTO users (id,name,username,password_hash,created_at) VALUES (?,?,?,?,?)');
-      foreach($d['users'] as $u){
+      if($authRole === 'admin') foreach($d['users'] as $u){
         $row = [s($u['id']??''), s($u['name']??''), s($u['username']??''), s($u['passwordHash']??''), toDt($u['createdAt']??null) ?? gmdate('Y-m-d H:i:s')];
         if($hasRole) $row[] = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
         $st->execute($row);
