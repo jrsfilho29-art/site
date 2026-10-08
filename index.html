@@ -166,6 +166,10 @@
   .segbar button{border:none;background:none;padding:7px 15px;border-radius:7px;font-size:13px;cursor:pointer;color:var(--muted);font-weight:500;transition:all .12s ease;}
   .segbar button.on{background:var(--paper);color:var(--plum);box-shadow:0 1px 3px rgba(36,26,34,.12);font-weight:600;}
 
+  body.role-user [data-action="cancelSale"],body.role-user [data-action="cancelOrder"],body.role-user [data-action="deleteCliente"],body.role-user [data-action="deleteProduto"],body.role-user [data-action="deleteSelectedProducts"],body.role-user [data-action="deleteCategory"],body.role-user [data-action="deleteSubcategory"],body.role-user [data-action="openCategoriesManager"],body.role-user .admin-only{display:none !important;}
+  .role-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
+  .role-badge.admin{background:var(--tint-warm,#FDF0D2);color:var(--gold-deep);}
+  .role-badge.user{background:var(--tint);color:var(--plum);}
   .grid-split{grid-template-columns:1.6fr 1fr;}
   @media(max-width:860px){.grid-split{grid-template-columns:1fr;}}
   .selbox{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:6px;padding:4px 5px;display:flex;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12);}
@@ -378,6 +382,15 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
+/* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
+   Contas antigas, sem perfil, contam como administrador. */
+const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
+const ADMIN_TABS = ['relatorios','servidor','usuarios'];
+const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
+function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
+function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
+function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
+function adminCount(){ return state.users.filter(u=>roleOf(u)==='admin').length; }
 function sessionSave(u, tab){
   if(!u){ LS.set('ess_session', null); return; }
   LS.set('ess_session', { uid:u.id, pw:String(u.passwordHash||'').slice(0,12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 });
@@ -389,7 +402,7 @@ function sessionRestore(){
   const u = state.users.find(x=>x.id===ses.uid);
   if(!u || String(u.passwordHash||'').slice(0,12)!==ses.pw){ sessionClear(); return false; }   // usuário removido ou senha trocada
   state.currentUser = u;
-  if(ses.tab && typeof TAB_TITLES!=='undefined' && TAB_TITLES[ses.tab]) state.tab = ses.tab;
+  if(ses.tab && typeof TAB_TITLES!=='undefined' && TAB_TITLES[ses.tab] && canAccessTab(ses.tab)) state.tab = ses.tab;
   sessionSave(u, state.tab);   // renova o prazo
   return true;
 }
@@ -716,7 +729,7 @@ function buildDataSQL(){
   if(state.users.length){
     lines.push('-- usuários');
     state.users.forEach(u=>{
-      lines.push(`INSERT INTO users (id,name,username,password_hash,created_at) VALUES (${sqlStr(u.id)},${sqlStr(u.name)},${sqlStr(u.username)},${sqlStr(u.passwordHash)},${sqlDate(u.createdAt)});`);
+      lines.push(`INSERT INTO users (id,name,username,password_hash,created_at,role) VALUES (${sqlStr(u.id)},${sqlStr(u.name)},${sqlStr(u.username)},${sqlStr(u.passwordHash)},${sqlDate(u.createdAt)},${sqlStr(roleOf(u))});`);
     });
     lines.push('');
   }
@@ -1347,6 +1360,8 @@ function applyPrefs(){
 let _sessTab = null;
 function render(){
   applyPrefs();
+  if(state.currentUser && !canAccessTab(state.tab)) state.tab = 'dashboard';
+  document.body.classList.toggle('role-user', !!state.currentUser && !isAdmin());
   if(state.currentUser && _sessTab!==state.tab){ _sessTab = state.tab; sessionSave(state.currentUser, state.tab); }
   const active = document.activeElement;
   const activeId = active && active.id;
@@ -1396,6 +1411,7 @@ function attachDelegatedEvents(){
     if(!t) return;
     const action = t.dataset.action;
     if(!actions[action]) return;
+    if(state.currentUser && ADMIN_ACTIONS.has(action) && !isAdmin()){ notify.err('Somente administradores podem fazer isso.'); return; }
     try{ actions[action](t, e); }
     catch(err){ console.error('Action "'+action+'" failed:', err); notify.err('Não foi possível concluir essa ação. Tente novamente.'); }
   });
@@ -1500,7 +1516,7 @@ function renderLogin(){
         <button class="btn btn-gold btn-block" data-action="loginSubmit" ${L.busy?'disabled':''}>
           ${L.busy? 'Aguarde...' : mode==='login' ? 'Entrar' : mode==='setup' ? 'Criar conta e entrar' : 'Criar conta'}
         </button>
-        ${mode==='login' ? `<button class="btn" style="width:100%;justify-content:center;margin-top:14px;color:var(--plum);font-size:12px;" data-action="goRegister">Criar nova conta de funcionário</button>`:''}
+        ${mode==='login' ? `<p class="muted2" style="font-size:11.5px;text-align:center;margin-top:14px;">Novas contas são criadas por um administrador, no menu Usuários.</p>`:''}
         ${(!syncEnabled() && SYNC.serverDetected) ? `
         <div style="margin-top:16px;padding:12px;border:1px dashed var(--line);border-radius:10px;">
           <div style="font-size:12.5px;margin-bottom:8px;"><b>Servidor encontrado.</b> Digite a senha de sincronização uma única vez para baixar seus dados automaticamente.</div>
@@ -1532,7 +1548,7 @@ const actions_login = {
     }
   },
   toggleShowPw(){ state.ui.login.showPw = !state.ui.login.showPw; render(); },
-  goRegister(){ state.ui.login = {mode:'register',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
+  goRegister(){ if(state.users.length){ return; } state.ui.login = {mode:'setup',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   goLogin(){ state.ui.login = {mode:'login',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   async loginSubmit(){
     const L = state.ui.login;
@@ -1563,8 +1579,9 @@ const actions_login = {
     if(/\s/.test(L.username.trim())){ L.error='O usuário não pode conter espaços.'; render(); return; }
     if(L.password.length<4){ L.error='A senha deve ter ao menos 4 caracteres.'; render(); return; }
     if(L.password!==L.confirm){ L.error='As senhas não conferem.'; L.confirm=''; render(); return; }
+    if(state.users.length){ L.error='Novas contas são criadas por um administrador.'; render(); return; }
     if(state.users.some(u=>u.username.toLowerCase()===L.username.trim().toLowerCase())){ L.error='Esse usuário já existe.'; render(); return; }
-    const newUser = { id:uid('user'), name:L.name.trim(), username:L.username.trim(), passwordHash: simpleHash(L.password), createdAt:new Date().toISOString() };
+    const newUser = { id:uid('user'), name:L.name.trim(), username:L.username.trim(), passwordHash: simpleHash(L.password), createdAt:new Date().toISOString(), role:'admin' };
     state.users.push(newUser); persist('users');
     state.currentUser = newUser;
     state.tab='dashboard'; sessionSave(newUser,'dashboard');
@@ -1640,7 +1657,7 @@ function renderSidebar(){
       <div class="sub">gestão de perfumaria</div>
     </div>
     <nav>
-      ${items.map(([id,ic,label])=>{
+      ${items.filter(([id])=>canAccessTab(id)).map(([id,ic,label])=>{
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
@@ -1648,13 +1665,15 @@ function renderSidebar(){
       }).join('')}
     </nav>
     <div class="footer">
-      <div class="uname"><span class="avatar">${esc((state.currentUser.name||'?').trim().charAt(0).toUpperCase())}</span>${esc(state.currentUser.name)}</div>
+      <div class="uname"><span class="avatar">${esc((state.currentUser.name||'?').trim().charAt(0).toUpperCase())}</span><span style="display:flex;flex-direction:column;line-height:1.25;min-width:0;"><span>${esc(state.currentUser.name)}</span><span style="font-size:10.5px;opacity:.7;font-weight:400;">${ROLE_LABEL[roleOf(state.currentUser)]}</span></span></div>
+      <button class="logout" data-action="openMyPassword">${icon('key',13)} Minha senha</button>
       <button class="logout" data-action="logout">${icon('logout',13)} Sair</button>
     </div>
   </div>`;
 }
 
 function renderTab(){
+  if(!canAccessTab(state.tab)) state.tab = 'dashboard';
   switch(state.tab){
     case 'dashboard': return renderDashboard();
     case 'clientes': return renderClientes();
@@ -1945,7 +1964,7 @@ function renderProdutos(){
         <div class="dropdown-menu">
           <button class="dropdown-item" data-action="newProduto">${icon('plus',15)} Cadastrar produto</button>
           <div class="dropdown-sep"></div>
-          <label class="dropdown-item">${icon('upload',15)} Importar (CSV/Excel/HTML)
+          <label class="dropdown-item admin-only">${icon('upload',15)} Importar (CSV/Excel/HTML)
             <input type="file" accept=".csv,.xlsx,.xls,.html,.htm" style="display:none;" onchange="handleImportFileGlobal(this)">
           </label>
           <label class="dropdown-item">${icon('image',15)} Vincular fotos por nome
@@ -3415,43 +3434,38 @@ function renderRelatorios(){
 
 /* ================= usuarios ================= */
 function renderUsuarios(){
+  const admins = adminCount(), normals = state.users.length - admins;
+  const roleCard = (cls,title,items)=>`<div class="card" style="padding:14px 16px;"><span class="role-badge ${cls}">${title}</span><ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;" class="muted">${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
   return `
   <div class="flex-between flex-wrap mb2"><div>
       <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Usuários</h2>
-      <p class="muted">${state.users.length} conta(s) com acesso ao sistema</p>
+      <p class="muted">${admins} administrador(es) · ${normals} usuário(s)</p>
     </div>
     <button class="btn btn-gold" data-action="newUsuario">${icon('plus')} Novo usuário</button>
   </div>
-  <div class="table-wrap mb3"><table>
-    <thead><tr><th>Nome</th><th>Usuário</th><th style="text-align:right;">Ações</th></tr></thead>
-    <tbody>
-      ${state.users.map(u=>`
+  <div class="grid grid-2 mb2" style="max-width:860px;">
+    ${roleCard('admin','Administrador',['Acesso a tudo, inclusive Relatórios, Servidor e Usuários','Cria e gerencia usuários','Cancela vendas e pedidos, exclui cadastros, aplica inventário e faz backup'])}
+    ${roleCard('user','Usuário',['Vendas, Caixa, Pedidos, Clientes, Produtos, Estoque e Catálogo','Pode contar o estoque, mas não aplicar o ajuste','Não vê Relatórios, Servidor e Usuários, e não cancela nem exclui'])}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Nome</th><th>Usuário (login)</th><th>Perfil</th><th style="text-align:right;">Ações</th></tr></thead>
+      <tbody>
+        ${state.users.map(u=>`
         <tr>
           <td>${esc(u.name)} ${u.id===state.currentUser.id? '<span class="gold-c" style="font-size:11px;">(você)</span>':''}</td>
           <td class="muted">${esc(u.username)}</td>
+          <td><span class="role-badge ${roleOf(u)}">${ROLE_LABEL[roleOf(u)]}</span></td>
           <td style="text-align:right;white-space:nowrap;">
-            <button class="icon-btn plum" data-action="editUserName" data-id="${u.id}">${icon('edit')}</button>
-            <button class="icon-btn plum" data-action="openResetPw" data-id="${u.id}">${icon('key')}</button>
-            <button class="icon-btn danger-c" data-action="deleteUser" data-id="${u.id}">${icon('trash')}</button>
+            <button class="icon-btn plum" data-action="editUserName" data-id="${u.id}" title="Editar nome e perfil">${icon('edit')}</button>
+            <button class="icon-btn plum" data-action="openResetPw" data-id="${u.id}" title="Redefinir senha">${icon('key')}</button>
+            <button class="icon-btn danger-c" data-action="deleteUser" data-id="${u.id}" title="Excluir usuário">${icon('trash')}</button>
           </td>
         </tr>`).join('')}
-    </tbody>
-  </table></div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:10px;">Backup dos dados</h3>
-  <p class="muted" style="font-size:13px;margin-bottom:12px;max-width:520px;">
-    Os dados ficam salvos apenas neste navegador (localStorage). Se limpar o cache ou trocar de computador, os dados se perdem.
-    Exporte um backup regularmente e guarde o arquivo em um lugar seguro.
-  </p>
-  <div class="flex gap flex-wrap">
-    <button class="btn btn-ghost" data-action="exportBackup">${icon('download')} Exportar backup (.json)</button>
-    <label class="btn btn-ghost" style="cursor:pointer;">${icon('upload')} Importar backup
-      <input type="file" accept="application/json" style="display:none;" onchange="importBackupFile(this)">
-    </label>
+      </tbody>
+    </table>
   </div>
-  <div class="card" style="margin-top:26px;max-width:620px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-    <div><b>Servidor (Hostinger)</b><div class="muted" style="font-size:12.5px;margin-top:3px;">Sincronização, arquivo SQL, catálogo público e guia de instalação ficam no menu <b>Servidor</b>.</div></div>
-    <button class="btn btn-ghost" data-action="goTab" data-tab="servidor">${icon('cloud')} Abrir menu Servidor</button>
-  </div>
+  <p class="muted2" style="font-size:12px;margin-top:12px;max-width:640px;">Sempre precisa existir ao menos um administrador. Backup dos dados e sincronização ficam no menu <b>Servidor</b>.</p>
   `;
 }
 
@@ -3467,7 +3481,7 @@ function renderServidor(){
   const view = state.ui.servidorSubView || 'conexao';
   const st = syncStatus();
   const last = SYNC.cfg.last ? new Date(SYNC.cfg.last).toLocaleString('pt-BR') : 'nunca';
-  const tabs = [['conexao','Conexão'],['dados','Enviar e baixar'],['guia','Guia de instalação']];
+  const tabs = [['conexao','Conexão'],['dados','Enviar e baixar'],['backup','Backup'],['guia','Guia de instalação']];
   return `
   <div class="mb2">
     <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Servidor</h2>
@@ -3483,7 +3497,7 @@ function renderServidor(){
     ${tabs.map(([id,l])=>`<button class="${view===id?'on':''}" data-action="setServidorSubView" data-view="${id}">${l}</button>`).join('')}
   </div>
   ${SYNC.msg ? `<p class="${SYNC.msgType==='err'?'danger-c':'muted'}" style="font-size:13px;margin-bottom:14px;max-width:640px;">${esc(SYNC.msg)}</p>` : ''}
-  ${view==='dados' ? renderServidorDados() : view==='guia' ? renderServidorGuia() : renderServidorConexao()}
+  ${view==='dados' ? renderServidorDados() : view==='backup' ? renderServidorBackup() : view==='guia' ? renderServidorGuia() : renderServidorConexao()}
   `;
 }
 function renderServidorConexao(){
@@ -3555,6 +3569,19 @@ function renderServidorDados(){
       <button class="btn btn-ghost" data-action="copyCatalogLink">Copiar link</button>
     </div>
     <p class="muted2" style="font-size:11.5px;margin-top:10px;">Os produtos aparecem no catálogo depois de enviados ao servidor (a sincronização automática faz isso). Para um arquivo solto, use <a href="#" data-action="exportCatalogPage" style="color:inherit;">Gerar catalogo.html</a>.</p>
+  </div>`;
+}
+function renderServidorBackup(){
+  return `
+  <div class="card" style="padding:18px;max-width:720px;">
+    <b>Backup dos dados (arquivo .json)</b>
+    <p class="muted" style="font-size:13px;margin:6px 0 14px;">Os dados também ficam salvos neste navegador. Exporte um backup de vez em quando e guarde o arquivo em um lugar seguro. Importar um backup substitui todos os dados atuais.</p>
+    <div class="flex gap flex-wrap">
+      <button class="btn btn-gold" data-action="exportBackup">${icon('download')} Exportar backup (.json)</button>
+      <label class="btn btn-ghost" style="cursor:pointer;">${icon('upload')} Importar backup
+        <input type="file" accept="application/json" style="display:none;" onchange="importBackupFile(this)">
+      </label>
+    </div>
   </div>`;
 }
 function renderServidorGuia(){
@@ -3629,7 +3656,7 @@ const actions_usuarios = {
     state.ui.syncKey = undefined; state.ui.syncAuto = undefined;
     syncSaveCfg(); render();
   },
-  newUsuario(){ state.ui.modal = {type:'newUser', name:'', username:'', password:'', confirm:'', error:''}; render(); },
+  newUsuario(){ state.ui.modal = {type:'newUser', name:'', username:'', role:'user', password:'', confirm:'', error:''}; render(); },
   submitNewUser(){
     const m = state.ui.modal;
     m.error='';
@@ -3638,26 +3665,36 @@ const actions_usuarios = {
     if(m.password.length<4){ m.error='A senha deve ter ao menos 4 caracteres.'; render(); return; }
     if(m.password!==m.confirm){ m.error='As senhas não conferem.'; m.confirm=''; render(); return; }
     if(state.users.some(u=>u.username.toLowerCase()===m.username.trim().toLowerCase())){ m.error='Esse usuário já existe.'; render(); return; }
-    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: simpleHash(m.password), createdAt:new Date().toISOString() };
+    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: simpleHash(m.password), createdAt:new Date().toISOString(), role: m.role==='admin'?'admin':'user' };
     state.users.push(newUser); persist('users');
     state.ui.modal = null; render();
   },
-  editUserName(t){ const u = state.users.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'editUser', data:{id:u.id,name:u.name}}; render(); },
+  editUserName(t){ const u = state.users.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'editUser', data:{id:u.id,name:u.name,role:roleOf(u)}}; render(); },
+  openMyPassword(){ const u = state.currentUser; state.ui.modal = {type:'resetPw', userId:u.id, userName:u.name, self:true, cur:'', pw:'', pw2:''}; render(); },
   openResetPw(t){ const u = state.users.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'resetPw', userId:u.id, userName:u.name, pw:'', pw2:''}; render(); },
   deleteUser(t){
     if(t.dataset.id===state.currentUser.id){ notify.err('Você não pode excluir a própria conta enquanto está conectado.'); return; }
+    const target = state.users.find(u=>u.id===t.dataset.id);
+    if(target && roleOf(target)==='admin' && adminCount()<=1){ notify.err('Precisa existir ao menos um administrador.'); return; }
     if(!confirm('Excluir este usuário?')) return;
     state.users = state.users.filter(u=>u.id!==t.dataset.id); persist('users'); render();
   },
   submitEditUser(){
     const d = state.ui.modal.data;
     if(!d.name || !d.name.trim()){ notify.err('Informe o nome.'); return; }
-    state.users = state.users.map(u=> u.id===d.id ? {...u, name:d.name.trim()} : u); persist('users');
+    const cur = state.users.find(u=>u.id===d.id); const newRole = d.role==='user' ? 'user' : 'admin';
+    if(cur && roleOf(cur)==='admin' && newRole==='user' && adminCount()<=1){ notify.err('Precisa existir ao menos um administrador.'); return; }
+    state.users = state.users.map(u=> u.id===d.id ? {...u, name:d.name.trim(), role:newRole} : u); persist('users');
     if(state.currentUser && state.currentUser.id===d.id) state.currentUser = state.users.find(u=>u.id===d.id);
     state.ui.modal=null; render();
   },
   submitResetPw(){
     const m = state.ui.modal;
+    if(m.userId!==state.currentUser.id && !isAdmin()){ notify.err('Somente administradores podem redefinir a senha de outros usuários.'); return; }
+    if(m.self){
+      const me = state.users.find(u=>u.id===state.currentUser.id);
+      if(!me || simpleHash(m.cur||'')!==me.passwordHash){ notify.err('A senha atual não confere.'); return; }
+    }
     if(!m.pw || m.pw.length<4){ notify.err('A senha deve ter ao menos 4 caracteres.'); return; }
     if(m.pw!==m.pw2){ notify.err('As senhas não conferem.'); return; }
     state.users = state.users.map(u=> u.id===m.userId? {...u, passwordHash: simpleHash(m.pw)} : u); persist('users');
@@ -4084,10 +4121,18 @@ function renderAjusteModal(m){
   return modalWrap('Ajustar estoque · '+esc(p.name), body);
 }
 
+function roleSelectHTML(field, value, disabled){
+  return `<label class="field"><span class="lbl">Perfil</span>
+    <select data-field="${field}" ${disabled?'disabled':''}>
+      <option value="user" ${value==='user'?'selected':''}>Usuário (operação do dia a dia)</option>
+      <option value="admin" ${value==='admin'?'selected':''}>Administrador (acesso total)</option>
+    </select>${disabled?'<span class="hint">É o único administrador: não pode virar usuário.</span>':''}</label>`;
+}
 function renderNewUserModal(m){
   const body = `
     <label class="field"><span class="lbl">Nome</span><input id="newuser-name" data-field="ui.modal.name" value="${esc(m.name)}" autofocus data-enter-action="submitNewUser"></label>
-    <label class="field"><span class="lbl">Usuário</span><input id="newuser-username" data-field="ui.modal.username" value="${esc(m.username)}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-enter-action="submitNewUser"></label>
+    <label class="field"><span class="lbl">Usuário (login)</span><input id="newuser-username" data-field="ui.modal.username" value="${esc(m.username)}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-enter-action="submitNewUser"></label>
+    ${roleSelectHTML('ui.modal.role', m.role||'user', false)}
     <div class="grid grid-2">
       <label class="field"><span class="lbl">Senha</span><input id="newuser-password" type="password" autocomplete="new-password" data-field="ui.modal.password" value="${esc(m.password)}" data-enter-action="submitNewUser"></label>
       <label class="field"><span class="lbl">Confirmar senha</span><input id="newuser-confirm" type="password" autocomplete="new-password" data-field="ui.modal.confirm" value="${esc(m.confirm)}" data-enter-action="submitNewUser"></label>
@@ -4101,8 +4146,10 @@ function renderNewUserModal(m){
 }
 
 function renderEditUserModal(d){
+  const lastAdmin = roleOf(d)==='admin' && adminCount()<=1;
   const body = `
     <label class="field"><span class="lbl">Nome</span><input id="edituser-name" data-field="ui.modal.data.name" value="${esc(d.name)}" data-enter-action="submitEditUser"></label>
+    ${roleSelectHTML('ui.modal.data.role', roleOf(d), lastAdmin)}
     <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
       <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
       <button class="btn btn-gold" data-action="submitEditUser">${icon('save')} Salvar</button>
@@ -4112,13 +4159,14 @@ function renderEditUserModal(d){
 
 function renderResetPwModal(m){
   const body = `
+    ${m.self ? `<label class="field"><span class="lbl">Senha atual</span><input id="resetpw-0" type="password" autocomplete="current-password" data-field="ui.modal.cur" value="${esc(m.cur||'')}" data-enter-action="submitResetPw"></label>` : ''}
     <label class="field"><span class="lbl">Nova senha</span><input id="resetpw-1" type="password" autocomplete="new-password" data-field="ui.modal.pw" value="${esc(m.pw)}" data-enter-action="submitResetPw"></label>
     <label class="field"><span class="lbl">Confirmar nova senha</span><input id="resetpw-2" type="password" autocomplete="new-password" data-field="ui.modal.pw2" value="${esc(m.pw2)}" data-enter-action="submitResetPw"></label>
     <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
       <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
       <button class="btn btn-gold" data-action="submitResetPw">${icon('save')} Salvar</button>
     </div>`;
-  return modalWrap('Redefinir senha · '+esc(m.userName), body);
+  return modalWrap((m.self?'Minha senha':'Redefinir senha · '+esc(m.userName)), body);
 }
 
 /* sale detail modal rendered separately since it's not in state.ui.modal */
@@ -4170,7 +4218,7 @@ function renderOrderDetailIfAny(){
 
 /* ================= actions dispatcher ================= */
 const actions = {
-  goTab(t){ state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
   logout(){ sessionClear(); state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },

@@ -44,6 +44,15 @@ try{
   fail(500, 'Não foi possível conectar ao banco de dados. Confira DB_HOST, DB_NAME, DB_USER e DB_PASS no database.php.', ['code'=>'db_connect']);
 }
 
+/* ---- perfil dos usuários (admin / user): cria a coluna 'role' sozinho em bancos antigos.
+        Quem já existia antes vira 'admin', para ninguém perder acesso. ---- */
+$hasRole = true;
+try{ $pdo->query('SELECT role FROM users LIMIT 1'); }
+catch(Throwable $e){
+  try{ $pdo->exec("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'"); }
+  catch(Throwable $e2){ $hasRole = false; }
+}
+
 /* ---- utilidades ---- */
 function s($v){ return ($v === null) ? '' : (string)$v; }
 function sn($v){ return ($v === null || $v === '') ? null : (string)$v; }
@@ -89,7 +98,8 @@ try{
     $d = [];
     $d['users'] = array_map(fn($r)=>[
       'id'=>$r['id'], 'name'=>$r['name'], 'username'=>$r['username'],
-      'passwordHash'=>$r['password_hash'], 'createdAt'=>fromDt($r['created_at'])
+      'passwordHash'=>$r['password_hash'], 'createdAt'=>fromDt($r['created_at']),
+      'role'=>(($r['role'] ?? 'admin') === 'user' ? 'user' : 'admin')
     ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
 
     $d['customers'] = array_map(fn($r)=>[
@@ -174,9 +184,13 @@ try{
 
       $ins = fn($sql) => $pdo->prepare($sql);
 
-      $st = $ins('INSERT INTO users (id,name,username,password_hash,created_at) VALUES (?,?,?,?,?)');
+      $st = $ins($hasRole
+        ? 'INSERT INTO users (id,name,username,password_hash,created_at,role) VALUES (?,?,?,?,?,?)'
+        : 'INSERT INTO users (id,name,username,password_hash,created_at) VALUES (?,?,?,?,?)');
       foreach($d['users'] as $u){
-        $st->execute([s($u['id']??''), s($u['name']??''), s($u['username']??''), s($u['passwordHash']??''), toDt($u['createdAt']??null) ?? gmdate('Y-m-d H:i:s')]);
+        $row = [s($u['id']??''), s($u['name']??''), s($u['username']??''), s($u['passwordHash']??''), toDt($u['createdAt']??null) ?? gmdate('Y-m-d H:i:s')];
+        if($hasRole) $row[] = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
+        $st->execute($row);
       }
 
       $st = $ins('INSERT INTO customers (id,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?)');
