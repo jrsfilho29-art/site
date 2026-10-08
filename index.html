@@ -802,8 +802,8 @@ function buildCatalogPageHTML(list){
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px;}
   .card{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease;}
   .card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--plum);}
-  .imgwrap{height:210px;background:var(--tint);display:flex;align-items:center;justify-content:center;position:relative;}
-  .imgwrap img{width:100%;height:100%;object-fit:cover;}
+  .imgwrap{aspect-ratio:1/1;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+  .imgwrap img{width:100%;height:100%;object-fit:contain;display:block;}
   .noimg{color:var(--muted);font-size:12px;}
   .tag-soldout{position:absolute;top:8px;right:8px;background:#B83A57;color:#fff;font-size:11px;padding:3px 8px;border-radius:3px;}
   .info{padding:14px;text-align:center;}
@@ -825,6 +825,24 @@ function buildCatalogPageHTML(list){
   .catsec h3{font-size:14px;font-weight:600;color:var(--gold-deep);margin:20px 0 12px;display:flex;align-items:center;gap:8px;}
   .catsec h3 .count{font-size:11px;font-weight:600;color:var(--plum);background:var(--tint);padding:1px 7px;border-radius:3px;}
   .catsec h3:first-of-type{margin-top:4px;}
+  img{max-width:100%;}
+  @media (max-width:640px){
+    header{padding:28px 16px 26px;}
+    header h1{font-size:28px;letter-spacing:.12em;}
+    .wrap{padding:18px 12px 44px;}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+    .card:hover{transform:none;box-shadow:none;}
+    .info{padding:10px 8px 12px;}
+    .cat{font-size:11px;}
+    .name{font-size:13px;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em;}
+    .price{font-size:18px;}
+    .tag-soldout{top:6px;right:6px;font-size:10px;padding:2px 6px;}
+    .nav{padding:8px 12px;gap:6px;-webkit-overflow-scrolling:touch;}
+    .nav a{padding:8px 12px;font-size:13px;}
+    .catsec{scroll-margin-top:56px;margin-bottom:26px;}
+    .catsec h2{font-size:18px;}
+  }
+  @media (max-width:340px){.grid{grid-template-columns:1fr;}}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>
