@@ -453,11 +453,12 @@ function imageElToSquareDataURL(img, size){
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  const scale = Math.max(size/img.width, size/img.height);
-  const sw = size/scale, sh = size/scale;
-  const sx = (img.width-sw)/2, sy = (img.height-sh)/2;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
-  return canvas.toDataURL('image/jpeg',0.7);
+  // fundo branco (PNG transparente viraria preto em JPEG) e foto inteira, sem cortar
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size);
+  const scale = Math.min(size/img.width, size/img.height);
+  const dw = img.width*scale, dh = img.height*scale;
+  ctx.drawImage(img, (size-dw)/2, (size-dh)/2, dw, dh);
+  return canvas.toDataURL('image/jpeg',0.8);
 }
 
 function resizeImage(file, size){
@@ -804,6 +805,7 @@ function buildCatalogPageHTML(list){
   .card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--plum);}
   .imgwrap{aspect-ratio:1/1;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
   .imgwrap img{width:100%;height:100%;object-fit:contain;display:block;}
+  .imgwrap img{background:#fff;mix-blend-mode:multiply;}
   .noimg{color:var(--muted);font-size:12px;}
   .tag-soldout{position:absolute;top:8px;right:8px;background:#B83A57;color:#fff;font-size:11px;padding:3px 8px;border-radius:3px;}
   .info{padding:14px;text-align:center;}
