@@ -376,6 +376,23 @@ const LS = {
   get(k, def){ try{ const v = localStorage.getItem(k); return v===null? def : JSON.parse(v); }catch(e){ return def; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
+/* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
+const SESSION_DAYS = 30;
+function sessionSave(u, tab){
+  if(!u){ LS.set('ess_session', null); return; }
+  LS.set('ess_session', { uid:u.id, pw:String(u.passwordHash||'').slice(0,12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 });
+}
+function sessionClear(){ try{ localStorage.removeItem('ess_session'); }catch(e){} }
+function sessionRestore(){
+  const ses = LS.get('ess_session', null);
+  if(!ses || !ses.uid || !(ses.exp>Date.now())) return false;
+  const u = state.users.find(x=>x.id===ses.uid);
+  if(!u || String(u.passwordHash||'').slice(0,12)!==ses.pw){ sessionClear(); return false; }   // usuário removido ou senha trocada
+  state.currentUser = u;
+  if(ses.tab && typeof TAB_TITLES!=='undefined' && TAB_TITLES[ses.tab]) state.tab = ses.tab;
+  sessionSave(u, state.tab);   // renova o prazo
+  return true;
+}
 const SYNC = {
   cfg: Object.assign({key:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
   busy:false, applying:false, timer:null, msg:'', msgType:'', conflict:false, serverDetected:false
@@ -1245,7 +1262,7 @@ async function syncPull(silent){
     SYNC.applying = false;
     if(state.currentUser){
       const me = state.users.find(u=>u.id===state.currentUser.id);
-      if(me) state.currentUser = me; else state.currentUser = null;
+      if(me){ state.currentUser = me; sessionSave(me, state.tab); } else { state.currentUser = null; sessionClear(); }
     }
     SYNC.cfg.version = j.version; SYNC.cfg.dirty = false; SYNC.cfg.last = new Date().toISOString(); SYNC.conflict = false;
     syncSaveCfg(); syncSetMsg('Dados baixados do servidor.', 'ok');
@@ -1327,8 +1344,10 @@ function applyPrefs(){
   if(state.prefs && state.prefs.bgColor){ document.documentElement.style.setProperty('--cream', state.prefs.bgColor); }
   else { document.documentElement.style.removeProperty('--cream'); }
 }
+let _sessTab = null;
 function render(){
   applyPrefs();
+  if(state.currentUser && _sessTab!==state.tab){ _sessTab = state.tab; sessionSave(state.currentUser, state.tab); }
   const active = document.activeElement;
   const activeId = active && active.id;
   const activeField = (active && !active.id && active.dataset) ? active.dataset.field : null;
@@ -1526,7 +1545,7 @@ const actions_login = {
       }
       LOGIN_GUARD.fails=0; LOGIN_GUARD.until=0;
       state.currentUser = u;
-      state.tab='dashboard';
+      state.tab='dashboard'; sessionSave(u,'dashboard');
       state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
       render();
       return;
@@ -1539,7 +1558,7 @@ const actions_login = {
     const newUser = { id:uid('user'), name:L.name.trim(), username:L.username.trim(), passwordHash: simpleHash(L.password), createdAt:new Date().toISOString() };
     state.users.push(newUser); persist('users');
     state.currentUser = newUser;
-    state.tab='dashboard';
+    state.tab='dashboard'; sessionSave(newUser,'dashboard');
     state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
     render();
   }
@@ -3366,6 +3385,7 @@ const actions_usuarios = {
     if(m.pw!==m.pw2){ notify.err('As senhas não conferem.'); return; }
     state.users = state.users.map(u=> u.id===m.userId? {...u, passwordHash: simpleHash(m.pw)} : u); persist('users');
     if(state.currentUser && state.currentUser.id===m.userId) state.currentUser = state.users.find(u=>u.id===m.userId);
+    if(state.currentUser) sessionSave(state.currentUser, state.tab);
     state.ui.modal=null; render(); notify.ok('Senha alterada.');
   },
   async exportBackup(){
@@ -3873,8 +3893,8 @@ function renderOrderDetailIfAny(){
 
 /* ================= actions dispatcher ================= */
 const actions = {
-  goTab(t){ state.tab = t.dataset.tab; state.ui.addMenuOpen = false; render(); },
-  logout(){ state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
+  goTab(t){ state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  logout(){ sessionClear(); state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },
   filterProductSubcategory(t){ state.ui.productSubcategory = t.dataset.sub||''; render(); },
@@ -4016,6 +4036,7 @@ document.addEventListener('click', function(e){
 
 /* ================= init ================= */
 applyPrefs();
+sessionRestore();
 render();
 syncStartup().then(()=>{ if(!SYNC.busy) render(); });
 syncDetectServer();
