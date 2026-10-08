@@ -1065,6 +1065,59 @@ window.handleImportFileGlobal = async function(input){
   }
 };
 
+/* Troca por branco o fundo preto que encosta nas bordas da foto (ex.: PNG transparente salvo como JPEG).
+   Só age em quem tem borda escura; fotos com embalagem preta (preto no interior) não são tocadas. */
+function whitenBlackBackground(img, T){
+  T = T || 48;
+  const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d'); x.drawImage(img,0,0);
+  const id = x.getImageData(0,0,W,H), d = id.data;
+  const lum = i => d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11;
+  // quanto da borda é escura (decide se a foto é candidata)
+  let dark=0, n=0; const m = Math.max(2, Math.round(W*0.03));
+  for(let k=0;k<20;k++){
+    const y = Math.round((H-1)*(k+.5)/20), px = Math.round((W-1)*(k+.5)/20);
+    [[m,y],[W-1-m,y],[px,m],[px,H-1-m]].forEach(([a,b])=>{ n++; if(lum((b*W+a)*4)<40) dark++; });
+  }
+  const seen = new Uint8Array(W*H), st = [];
+  const push = (px,py)=>{ const k=py*W+px; if(seen[k]) return; if(lum(k*4)<T){ seen[k]=1; st.push(k); } };
+  for(let i=0;i<W;i++){ push(i,0); push(i,H-1); }
+  for(let j=0;j<H;j++){ push(0,j); push(W-1,j); }
+  while(st.length){
+    const k = st.pop(), px = k%W, py = (k-px)/W;
+    if(px>0) push(px-1,py); if(px<W-1) push(px+1,py); if(py>0) push(px,py-1); if(py<H-1) push(px,py+1);
+  }
+  let removed = 0; for(let k=0;k<W*H;k++) if(seen[k]) removed++;
+  for(let k=0;k<W*H;k++) if(seen[k]){ d[k*4]=d[k*4+1]=d[k*4+2]=255; }
+  for(let pass=0;pass<2;pass++){          // suaviza o contorno
+    const mark = [];
+    for(let py=1;py<H-1;py++) for(let px=1;px<W-1;px++){
+      const k = py*W+px; if(seen[k]) continue;
+      if((seen[k-1]||seen[k+1]||seen[k-W]||seen[k+W]) && lum(k*4)<110) mark.push(k);
+    }
+    for(const k of mark){
+      const a = Math.max(0,Math.min(1,(110-lum(k*4))/62))*0.85;
+      for(let c=0;c<3;c++) d[k*4+c] += (255-d[k*4+c])*a;
+      seen[k] = 1;
+    }
+  }
+  x.putImageData(id,0,0);
+  return { dataUrl: cv.toDataURL('image/jpeg',0.85), removed: removed/(W*H), edgeDark: dark/n };
+}
+async function scanBlackBackgrounds(){
+  const found = [];
+  for(const p of state.products){
+    if(!p.image || !/^data:image\//i.test(p.image)) continue;
+    try{
+      const img = new Image(); img.src = p.image; await img.decode();
+      const r = whitenBlackBackground(img);
+      if(r.edgeDark>=0.25 && r.removed>=0.05 && r.removed<=0.45) found.push({id:p.id, name:p.name, before:p.image, after:r.dataUrl, checked:true});
+    }catch(e){}
+  }
+  return found;
+}
+
 async function standardizeImportedImages(ids){
   let changed = false;
   for(const id of ids){
@@ -1869,6 +1922,7 @@ function renderProdutos(){
             <input type="file" accept="image/*" multiple webkitdirectory directory style="display:none;" onchange="handleBulkImagesGlobal(this)">
           </label>
           <button class="dropdown-item" data-action="openExportProducts">${icon('download',15)} Exportar produtos</button>
+          <button class="dropdown-item" data-action="openFixBlackBg">${icon('image',15)} Corrigir fundo preto das fotos</button>
           <div class="dropdown-sep"></div>
           <button class="dropdown-item" data-action="openCategoriesManager">${icon('edit',15)} Gerenciar categorias</button>
           <button class="dropdown-item" data-action="goTab" data-tab="catalogo">${icon('book',15)} Catálogo On</button>
@@ -2016,6 +2070,22 @@ const actions_produtos = {
   },
   editProduto(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'produto', data:{...p}}; render(); },
   setCatalogoSubView(t){ state.ui.catalogoSubView = t.dataset.view; render(); },
+  async openFixBlackBg(){
+    state.ui.addMenuOpen = false;
+    state.ui.modal = {type:'fixBg', scanning:true, items:[]}; render();
+    const items = await scanBlackBackgrounds();
+    if(state.ui.modal && state.ui.modal.type==='fixBg'){ state.ui.modal = {type:'fixBg', scanning:false, items}; render(); }
+  },
+  toggleFixBg(t){
+    const it = (state.ui.modal.items||[]).find(x=>x.id===t.dataset.id); if(it) it.checked = !it.checked; render();
+  },
+  applyFixBg(){
+    const items = (state.ui.modal.items||[]).filter(i=>i.checked); let n=0;
+    items.forEach(it=>{ const p = state.products.find(x=>x.id===it.id); if(p){ p.image = it.after; n++; } });
+    if(n){ persist('products'); }
+    state.ui.modal = null; render();
+    notify.ok(n+' foto(s) corrigida(s). O catálogo do site atualiza depois da sincronização.');
+  },
   async copyCatalogLink(){
     const url = /^https?:/i.test(location.protocol) ? new URL('catalogo.php', location.href).href : 'catalogo.php';
     try{ await navigator.clipboard.writeText(url); notify.ok('Link copiado: '+url); }catch(e){ notify.ok('Link do catálogo: '+url); }
@@ -3497,6 +3567,7 @@ function renderModal(){
   if(m.type==='invoiceOrder') return renderInvoiceOrderModal(m);
   if(m.type==='categories') return renderCategoriesModal(m);
   if(m.type==='exportProducts') return renderExportProductsModal(m);
+  if(m.type==='fixBg') return renderFixBgModal(m);
   return '';
 }
 
@@ -3525,6 +3596,27 @@ function renderClienteModal(d){
       <button class="btn btn-gold" data-action="submitCliente">${icon('save')} Salvar</button>
     </div>`;
   return modalWrap(d.id?'Editar cliente':'Novo cliente', body);
+}
+
+function renderFixBgModal(m){
+  const items = m.items || [];
+  const body = m.scanning ? `<p class="muted">Analisando as fotos...</p>` : items.length===0 ? `<p class="muted">Nenhuma foto com fundo preto nas bordas foi encontrada.</p>
+    <div class="flex gap" style="justify-content:flex-end;margin-top:14px;"><button class="btn btn-ghost" data-action="closeModal">Fechar</button></div>` : `
+    <p class="muted" style="font-size:13px;margin-bottom:12px;">Estas ${items.length} foto(s) têm faixas pretas nas bordas. À esquerda, a atual; à direita, com fundo branco. Desmarque as que preferir manter.</p>
+    <div style="display:grid;gap:10px;max-height:52vh;overflow:auto;">
+      ${items.map(it=>`
+      <label style="display:grid;grid-template-columns:auto 84px 84px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px;cursor:pointer;">
+        <input type="checkbox" data-action="toggleFixBg" data-id="${esc(it.id)}" ${it.checked?'checked':''}>
+        <img src="${it.before}" alt="antes" style="width:84px;height:84px;object-fit:contain;background:#fff;border:1px solid var(--line);">
+        <img src="${it.after}" alt="depois" style="width:84px;height:84px;object-fit:contain;background:#fff;border:1px solid var(--line);">
+        <span style="font-size:13px;font-weight:600;">${esc(it.name)}</span>
+      </label>`).join('')}
+    </div>
+    <div class="flex gap" style="justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
+      <button class="btn btn-gold" data-action="applyFixBg" ${items.some(i=>i.checked)?'':'disabled'}>Aplicar nas marcadas</button>
+    </div>`;
+  return modalWrap('Corrigir fundo preto das fotos', body, true);
 }
 
 function renderProdutoModal(d){
