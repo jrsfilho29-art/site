@@ -770,7 +770,7 @@ function buildCatalogPageHTML(list){
     return `<div class="card">
       <div class="imgwrap">${img}${soldOut}</div>
       <div class="info">
-        ${(p.brand||p.volume)? `<div class="cat">${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+'ml':''}</div>`:''}
+        ${(p.brand||p.volume)? `<div class="cat">${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':''):''}</div>`:''}
         <div class="name">${esc(p.name)}</div>
         <div class="price">${brl(p.salePrice)}</div>
       </div>
@@ -2016,6 +2016,10 @@ const actions_produtos = {
   },
   editProduto(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'produto', data:{...p}}; render(); },
   setCatalogoSubView(t){ state.ui.catalogoSubView = t.dataset.view; render(); },
+  async copyCatalogLink(){
+    const url = /^https?:/i.test(location.protocol) ? new URL('catalogo.php', location.href).href : 'catalogo.php';
+    try{ await navigator.clipboard.writeText(url); notify.ok('Link copiado: '+url); }catch(e){ notify.ok('Link do catálogo: '+url); }
+  },
   openCatalogPage(){
     let list = state.ui.catalogOnlyAvailable ? state.products.filter(p=>p.stock>0) : state.products;
     if(!state.ui.catalogShowInactive) list = list.filter(p=> p.active!==false);
@@ -2798,8 +2802,7 @@ function renderCatalogoVitrine(){
     </div>
   </div>
   <p class="muted2" style="font-size:11.5px;margin-bottom:16px;max-width:640px;">
-    "Gerar página pública" cria um arquivo <b>catalogo.html</b> com os produtos abaixo (respeitando os filtros acima) prontos para qualquer visitante ver — sem login.
-    Suba esse arquivo para o mesmo site do sistema (ao lado do index.html) sempre que quiser atualizar o que aparece publicamente.
+    No site, o endereço <b>catalogo.php</b> mostra este catálogo automaticamente a partir do banco (menu Servidor). "Gerar página pública" cria um arquivo <b>catalogo.html</b> avulso, caso queira hospedar em outro lugar.
   </p>
   ${list.length===0 ? emptyState(icon('book',26),'Catálogo vazio','Cadastre produtos com estoque para gerar o catálogo.') : `
   ${(()=>{ const st = catalogStructure(list); return `
@@ -3070,12 +3073,13 @@ function renderServidorDados(){
     <button class="btn btn-ghost" data-action="exportDataSQL">${icon('download')} Exportar dados em SQL</button>
   </div>
   <div class="card" style="padding:18px;max-width:720px;margin-top:16px;">
-    <b>Catálogo público do site</b>
-    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Gera o <b>catalogo.html</b> com os produtos do Catálogo On. Suba o arquivo para a pasta public_html, ao lado do index.html, sempre que quiser atualizar o que os clientes veem.</p>
+    <b>Catálogo público do site (automático)</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">O endereço <b>catalogo.php</b> monta o catálogo direto do banco de dados: produtos ativos e com estoque, organizados por categoria e subgrupo. Atualiza sozinho depois de cada sincronização, sem subir arquivo. Não mostra custo, estoque nem dados de clientes.</p>
     <div class="flex gap flex-wrap">
-      <button class="btn btn-ghost" data-action="openCatalogPage">${icon('book')} Abrir página</button>
-      <button class="btn btn-gold" data-action="exportCatalogPage">${icon('download')} Gerar catalogo.html</button>
+      <a class="btn btn-gold" href="catalogo.php" target="_blank" rel="noopener noreferrer">${icon('book')} Abrir catálogo do site</a>
+      <button class="btn btn-ghost" data-action="copyCatalogLink">Copiar link</button>
     </div>
+    <p class="muted2" style="font-size:11.5px;margin-top:10px;">Os produtos aparecem no catálogo depois de enviados ao servidor (a sincronização automática faz isso). Para um arquivo solto, use <a href="#" data-action="exportCatalogPage" style="color:inherit;">Gerar catalogo.html</a>.</p>
   </div>`;
 }
 function renderServidorGuia(){
@@ -3086,7 +3090,7 @@ function renderServidorGuia(){
     ['Envie os arquivos','No Gerenciador de Arquivos, coloque index.html, api.php e database.php na pasta public_html.'],
     ['Conecte o programa','Abra o seu site, entre no menu Servidor e digite a senha de sincronização na aba Conexão.'],
     ['Atualização automática (opcional)','No hPanel, em Avançado → Git, ligue o repositório jrsfilho29-art/site (branch main) à pasta public_html e ative a implantação automática. Assim cada atualização do programa chega ao site sozinha. O database.php fica só no servidor.'],
-    ['Publique o catálogo','Na aba Enviar e baixar, gere o catalogo.html e envie para public_html.'],
+    ['Catálogo público','Nada a fazer: o endereço seusite/catalogo.php mostra o catálogo direto do banco e atualiza sozinho. Divulgue esse link para os clientes.'],
     ['Use em outros aparelhos','Abra o site em outro computador ou celular. A tela de login detecta o servidor e pede a senha uma única vez.']
   ];
   return `
