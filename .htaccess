@@ -1,0 +1,4 @@
+# Bloqueia download direto de arquivos que não devem ser públicos
+<FilesMatch "\.(sql|md|sqlite)$">
+  Require all denied
+</FilesMatch>
