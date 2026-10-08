@@ -1404,6 +1404,15 @@ function attachDelegatedEvents(){
     const t = e.target;
     if(t.dataset.field){ try{ handleFieldInput(t); }catch(err){ console.error('Field input failed:', err); } }
   });
+  app.addEventListener('input', e => { const t = e.target; if(t.dataset && t.dataset.invCount!==undefined){ try{ invSetCount(t.dataset.invCount, t.value); }catch(err){ console.error(err); } } });
+  app.addEventListener('keydown', e => {
+    const t = e.target;
+    if(e.key==='Enter' && t.dataset && t.dataset.invCount!==undefined){
+      e.preventDefault();
+      const all = Array.prototype.slice.call(app.querySelectorAll('[data-inv-count]'));
+      const nxt = all[all.indexOf(t)+1]; if(nxt){ nxt.focus(); nxt.select && nxt.select(); }
+    }
+  });
   app.addEventListener('change', e => {
     const t = e.target;
     if(t.dataset.field){ try{ handleFieldInput(t); }catch(err){ console.error('Field change failed:', err); } }
@@ -2233,12 +2242,25 @@ const actions_produtos = {
 
 /* ================= estoque ================= */
 function renderEstoque(){
+  const view = state.ui.estoqueView==='inventario' ? 'inventario' : 'posicao';
+  return `
+  <div class="flex-between flex-wrap mb2" style="gap:12px;">
+    <div>
+      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Estoque</h2>
+      <p class="muted">${view==='inventario' ? 'Contagem física e conferência do estoque' : 'Organizado a partir dos produtos cadastrados'}</p>
+    </div>
+    <div class="segbar">
+      <button class="${view==='posicao'?'on':''}" data-action="setEstoqueView" data-view="posicao">${icon('warehouse',14)} Posição atual</button>
+      <button class="${view==='inventario'?'on':''}" data-action="setEstoqueView" data-view="inventario">${icon('clipboard',14)} Inventário${INV?' <span class="pill">em andamento</span>':''}</button>
+    </div>
+  </div>
+  ${view==='inventario' ? renderInventario() : renderEstoquePosicao()}`;
+}
+function renderEstoquePosicao(){
   const distinctInStock = state.products.filter(p=>p.stock>0).length;
   const totalCost = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
   const totalSale = state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
   return `
-  <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Estoque</h2>
-  <p class="muted mb2">Organizado a partir dos produtos cadastrados</p>
   <div class="grid grid-3 mb3">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Produtos em estoque</div><div class="serif" style="font-size:24px;color:var(--plum);">${distinctInStock}</div><div class="muted2" style="font-size:11px;margin-top:3px;">de ${state.products.length} cadastrado(s)</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor em estoque (custo)</div><div class="serif" style="font-size:24px;color:var(--plum);">${brl(totalCost)}</div></div>
@@ -2262,6 +2284,261 @@ function renderEstoque(){
   </table></div>`}
   `;
 }
+
+/* ================= inventário (contagem de estoque) ================= */
+let INV = LS.get('ess_inventory', null);          // contagem em andamento
+let INV_HIST = LS.get('ess_inv_hist', []);        // contagens já aplicadas
+function invSave(){ if(INV) LS.set('ess_inventory', INV); else { try{ localStorage.removeItem('ess_inventory'); }catch(e){} } }
+function invHistSave(){ LS.set('ess_inv_hist', INV_HIST.slice(0,30)); }
+function invFilters(){ return state.ui.invF || (state.ui.invF = {cat:'', zero:false, blind:false, q:'', show:'todos'}); }
+function invProducts(f){
+  f = f || invFilters();
+  return state.products.filter(p=> p.active!==false && (f.zero || p.stock>0) && (!f.cat || (p.category||'Sem categoria')===f.cat));
+}
+function invItemRows(ids){
+  // linhas na ordem categoria > subgrupo > nome (mesma do catálogo)
+  const list = state.products.filter(p=> ids.indexOf(p.id)>=0);
+  const out = [];
+  catalogStructure(list).forEach(g=> g.subs.forEach(sub=> sub.items.forEach(p=> out.push({p, cat:g.name, sub:sub.name}))));
+  return out;
+}
+function invSetCount(id, raw){
+  if(!INV) return;
+  const v = String(raw).trim();
+  if(v==='') delete INV.counts[id]; else { const n = parseInt(v,10); if(isNaN(n)||n<0) return; INV.counts[id] = n; }
+  invSave();
+  const it = INV.items.find(x=>x.id===id); const cell = document.getElementById('invdiff-'+id);
+  if(it && cell){ const c = INV.counts[id]; if(c===undefined){ cell.innerHTML = '<span class="muted2">—</span>'; } else { const d = c - it.sys; cell.innerHTML = d===0 ? '<span class="badge-ok">confere</span>' : `<span class="${d>0?'ok-c':'danger-c'}" style="font-weight:600;">${d>0?'+':''}${d}</span>`; } }
+  const sum = document.getElementById('inv-summary'); if(sum) sum.innerHTML = invSummaryHTML();
+}
+function invStats(){
+  const items = INV.items; let counted=0, diverg=0, net=0, netValue=0;
+  items.forEach(it=>{ const c = INV.counts[it.id]; if(c===undefined) return; counted++; const d = c-it.sys; if(d!==0){ diverg++; net+=d; const p = state.products.find(x=>x.id===it.id); netValue += d*((p&&p.costPrice)||0); } });
+  return {total:items.length, counted, pending:items.length-counted, diverg, net, netValue};
+}
+function invSummaryHTML(){
+  const st = invStats(); const pct = st.total? Math.round(st.counted/st.total*100) : 0;
+  const box = (l,v,sub)=>`<div class="card" style="padding:12px 14px;"><div class="muted" style="font-size:11px;">${l}</div><div class="serif" style="font-size:20px;color:var(--plum);">${v}</div>${sub?`<div class="muted2" style="font-size:11px;">${sub}</div>`:''}</div>`;
+  return `
+    <div class="grid mb2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+      ${box('Contados', st.counted+' de '+st.total, pct+'% concluído')}
+      ${box('Pendentes', st.pending, '')}
+      ${box('Divergências', `<span class="${st.diverg?'danger-c':''}">${st.diverg}</span>`, 'diferem do sistema')}
+      ${box('Diferença líquida', (st.net>0?'+':'')+st.net+' un.', 'a custo: '+brl(st.netValue))}
+    </div>
+    <div style="height:6px;background:var(--tint);border-radius:4px;overflow:hidden;margin-bottom:14px;"><div style="height:100%;width:${pct}%;background:var(--gold);"></div></div>`;
+}
+function invCatOptions(sel){
+  const names = []; state.categories.forEach(c=>{ if(c.name) names.push(c.name); });
+  state.products.forEach(p=>{ const n=p.category||'Sem categoria'; if(names.indexOf(n)<0) names.push(n); });
+  return `<option value="">Todas as categorias</option>` + names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('');
+}
+function renderInventario(){
+  const f = invFilters();
+  const hist = INV_HIST.length ? `
+    <h3 class="serif plum" style="font-size:18px;margin:26px 0 10px;">Contagens anteriores</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Data</th><th>Responsável</th><th style="text-align:right;">Itens contados</th><th style="text-align:right;">Ajustados</th><th style="text-align:right;">Diferença</th><th></th></tr></thead>
+      <tbody>${INV_HIST.map((h,i)=>`<tr>
+        <td class="muted" style="white-space:nowrap;">${fmtDate(h.appliedAt)}</td><td>${esc(h.by||'—')}</td>
+        <td style="text-align:right;">${h.counted}</td><td style="text-align:right;">${h.adjusted}</td>
+        <td style="text-align:right;" class="${h.net<0?'danger-c':h.net>0?'ok-c':''}">${h.net>0?'+':''}${h.net} un.</td>
+        <td style="text-align:right;"><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" data-action="printInvHistory" data-idx="${i}">${icon('printer',13)} Imprimir</button></td></tr>`).join('')}</tbody>
+    </table></div>` : '';
+
+  if(!INV){
+    const n = invProducts(f).length;
+    return `
+    <div class="card" style="padding:18px;max-width:760px;">
+      <b>Preparar a contagem</b>
+      <p class="muted" style="font-size:13px;margin:6px 0 14px;">Imprima a folha para contar à mão, ou inicie a contagem digital e digite o que encontrou. Em ambos os casos o estoque do sistema só muda quando você aplicar os ajustes.</p>
+      <div class="flex gap flex-wrap" style="align-items:end;margin-bottom:12px;">
+        <label class="field" style="margin-bottom:0;min-width:220px;"><span class="lbl">Categoria</span>
+          <select data-field="ui.invF.cat">${invCatOptions(f.cat)}</select></label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:6px;"><input type="checkbox" data-field="ui.invF.zero" ${f.zero?'checked':''}> incluir produtos zerados</label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:6px;"><input type="checkbox" data-field="ui.invF.blind" ${f.blind?'checked':''}> contagem cega (não mostra a quantidade do sistema na folha)</label>
+      </div>
+      <div class="muted2" style="font-size:12px;margin-bottom:12px;">${n} produto(s) nesta contagem.</div>
+      <div class="flex gap flex-wrap">
+        <button class="btn btn-gold" data-action="printCountSheet" ${n?'':'disabled'}>${icon('printer')} Imprimir folha de contagem</button>
+        <button class="btn btn-ghost" data-action="startInventory" ${n?'':'disabled'}>${icon('clipboard')} Iniciar contagem digital</button>
+      </div>
+    </div>${hist}`;
+  }
+
+  const q = (f.q||'').toLowerCase();
+  const rows = invItemRows(INV.items.map(i=>i.id)).filter(({p})=>{
+    const it = INV.items.find(x=>x.id===p.id); const c = INV.counts[p.id];
+    if(q && !((p.name||'')+' '+(p.sku||'')+' '+(p.brand||'')).toLowerCase().includes(q)) return false;
+    if(f.show==='pendentes' && c!==undefined) return false;
+    if(f.show==='divergentes' && (c===undefined || c===it.sys)) return false;
+    return true;
+  });
+  let lastCat = null;
+  const body = rows.map(({p,cat})=>{
+    const it = INV.items.find(x=>x.id===p.id); const c = INV.counts[p.id];
+    const head = cat!==lastCat ? `<tr><td colspan="5" style="background:var(--tint);font-weight:600;color:var(--plum);">${esc(cat)}</td></tr>` : ''; lastCat = cat;
+    const d = c===undefined ? null : c-it.sys;
+    return head + `<tr>
+      <td>${esc(p.name)}<div class="muted2" style="font-size:11px;">${esc([p.sku, p.brand].filter(Boolean).join(' · '))}</div></td>
+      <td style="text-align:right;">${it.sys}</td>
+      <td style="text-align:right;"><input type="number" min="0" step="1" inputmode="numeric" data-inv-count="${esc(p.id)}" value="${c===undefined?'':c}" style="width:84px;text-align:right;" aria-label="Contagem de ${esc(p.name)}"></td>
+      <td style="text-align:right;" id="invdiff-${esc(p.id)}">${d===null?'<span class="muted2">—</span>': d===0?'<span class="badge-ok">confere</span>':`<span class="${d>0?'ok-c':'danger-c'}" style="font-weight:600;">${d>0?'+':''}${d}</span>`}</td>
+      <td style="text-align:right;"><button class="btn" style="font-size:11px;color:var(--muted);padding:2px 6px;" data-action="invZero" data-id="${esc(p.id)}" title="Não encontrei nenhum: marcar 0">zero</button></td>
+    </tr>`;
+  }).join('');
+  return `
+  <div class="flex-between flex-wrap mb2" style="gap:10px;">
+    <div class="muted" style="font-size:13px;">Contagem iniciada em ${fmtDate(INV.startedAt)}${INV.by?' por '+esc(INV.by):''}. Os dados ficam salvos neste navegador.</div>
+    <div class="flex gap flex-wrap">
+      <button class="btn btn-ghost" data-action="printInvResult">${icon('printer')} Imprimir conferência</button>
+      <button class="btn btn-ghost" data-action="exportInvCSV">${icon('download')} Exportar CSV</button>
+    </div>
+  </div>
+  <div id="inv-summary">${invSummaryHTML()}</div>
+  <div class="flex gap flex-wrap mb2" style="align-items:center;">
+    <input placeholder="Buscar produto, código ou marca..." data-field="ui.invF.q" value="${esc(f.q||'')}" style="max-width:300px;flex:1;min-width:180px;">
+    <div class="segbar">${[['todos','Todos'],['pendentes','Pendentes'],['divergentes','Divergentes']].map(([k,l])=>`<button class="${(f.show||'todos')===k?'on':''}" data-action="setInvShow" data-show="${k}">${l}</button>`).join('')}</div>
+  </div>
+  ${rows.length===0 ? emptyState(icon('search',26),'Nada para mostrar','Ajuste a busca ou o filtro.') : `
+  <div class="table-wrap"><table>
+    <thead><tr><th>Produto</th><th style="text-align:right;">Sistema</th><th style="text-align:right;">Contado</th><th style="text-align:right;">Diferença</th><th></th></tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`}
+  <div class="flex gap flex-wrap" style="margin-top:16px;justify-content:space-between;">
+    <button class="btn btn-ghost danger-c" data-action="cancelInventory">Cancelar contagem</button>
+    <button class="btn btn-gold" data-action="applyInventory">${icon('check')} Aplicar ajustes ao estoque</button>
+  </div>${hist}`;
+}
+
+/* impressão via iframe oculto (não depende de pop-up liberado) */
+function printHTML(html){
+  const fr = document.createElement('iframe');
+  fr.setAttribute('aria-hidden','true');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(fr);
+  const doc = fr.contentDocument || fr.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ notify.err('Não foi possível abrir a impressão. Tente de novo.'); } setTimeout(()=>{ try{ fr.remove(); }catch(e){} }, 60000); }, 350);
+}
+function invPrintCSS(){
+  return `@page{size:A4;margin:12mm 10mm;}
+  *{box-sizing:border-box;} body{font-family:'Segoe UI',system-ui,Arial,sans-serif;font-size:11.5px;color:#111;margin:0;}
+  h1{font-size:18px;margin:0;letter-spacing:.06em;} .sub{color:#555;font-size:11px;margin:2px 0 10px;}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;border:1px solid #999;padding:8px 10px;margin-bottom:10px;font-size:11px;}
+  .meta span b{display:inline-block;min-width:60px;} .line{display:inline-block;border-bottom:1px solid #000;min-width:150px;height:13px;vertical-align:bottom;}
+  h2{font-size:13px;margin:14px 0 4px;padding:3px 6px;background:#e8e8ee;border-left:4px solid #17204A;break-after:avoid;}
+  h3{font-size:11.5px;margin:8px 0 3px;color:#444;break-after:avoid;}
+  table{width:100%;border-collapse:collapse;margin-bottom:4px;}
+  th{background:#f2f2f2;text-align:left;font-size:10.5px;border:1px solid #888;padding:4px 5px;}
+  td{border:1px solid #888;padding:0 5px;height:8.2mm;vertical-align:middle;} tr{break-inside:avoid;}
+  td.n{text-align:right;width:62px;} td.box{width:80px;} td.obs{width:26%;} td.sku{width:78px;color:#444;font-size:10.5px;} td.i{width:26px;text-align:center;color:#666;}
+  .sm{color:#666;font-size:10px;} .neg{color:#b00020;font-weight:700;} .pos{color:#0a6b3d;font-weight:700;}
+  .sign{display:flex;gap:30px;margin-top:26px;font-size:11px;break-inside:avoid;} .sign div{flex:1;border-top:1px solid #000;padding-top:3px;text-align:center;}
+  .foot{margin-top:8px;color:#666;font-size:10px;}`;
+}
+function invPrintDoc(title, bodyHTML){
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${invPrintCSS()}</style></head><body>${bodyHTML}</body></html>`;
+}
+function invGroupedTable(rows, cols, rowFn){
+  // rows: [{p,cat,sub,...}] ja ordenadas; agrupa por categoria > subgrupo
+  let html = '', lastCat=null, lastSub=null, open=false, idx=0;
+  const closeT = ()=>{ if(open){ html += '</tbody></table>'; open=false; } };
+  rows.forEach(r=>{
+    if(r.cat!==lastCat){ closeT(); html += `<h2>${esc(r.cat)}</h2>`; lastCat=r.cat; lastSub=null; }
+    if(r.sub!==lastSub || !open){ closeT(); if(r.sub) html += `<h3>${esc(r.sub)}</h3>`; html += `<table><thead><tr>${cols.map(c=>`<th${c.cls?` class="${c.cls}"`:''}${c.w?` style="width:${c.w}"`:''}>${c.t}</th>`).join('')}</tr></thead><tbody>`; open=true; lastSub=r.sub; }
+    html += rowFn(r, ++idx);
+  });
+  closeT();
+  return html;
+}
+function invHeaderHTML(title, note, extraMeta){
+  const now = new Date();
+  return `<h1>ESSÊNCIA · ${esc(title)}</h1><div class="sub">${esc(note||'')}</div>
+  <div class="meta"><span><b>Data:</b> ${now.toLocaleDateString('pt-BR')}</span><span><b>Impresso:</b> ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>${extraMeta||''}</div>`;
+}
+
+const actions_inventario = {
+  setEstoqueView(t){ state.ui.estoqueView = t.dataset.view; render(); },
+  setInvShow(t){ invFilters().show = t.dataset.show; render(); },
+  startInventory(){
+    const f = invFilters(); const list = invProducts(f);
+    if(!list.length){ notify.err('Nenhum produto para contar com esse filtro.'); return; }
+    INV = { startedAt:new Date().toISOString(), by:(state.currentUser&&state.currentUser.name)||'', cat:f.cat||'', items:list.map(p=>({id:p.id, sys:p.stock})), counts:{} };
+    invSave(); state.ui.invF.q=''; state.ui.invF.show='todos'; render();
+  },
+  invZero(t){ invSetCount(t.dataset.id, '0'); const inp = document.querySelector('[data-inv-count="'+t.dataset.id.replace(/"/g,'')+'"]'); if(inp) inp.value = '0'; },
+  cancelInventory(){
+    if(!INV) return;
+    if(!confirm('Cancelar a contagem em andamento? O que foi digitado será descartado. O estoque não será alterado.')) return;
+    INV = null; invSave(); render();
+  },
+  applyInventory(){
+    if(!INV) return;
+    const st = invStats();
+    if(st.counted===0){ notify.err('Nenhum item foi contado ainda.'); return; }
+    const changes = INV.items.filter(it=> INV.counts[it.id]!==undefined && state.products.some(p=>p.id===it.id));
+    const toAdjust = changes.filter(it=>{ const p = state.products.find(x=>x.id===it.id); return p.stock !== INV.counts[it.id]; });
+    const msg = 'Aplicar a contagem ao estoque?\n\n'+st.counted+' item(ns) contado(s), '+toAdjust.length+' será(ão) ajustado(s).'+(st.pending?'\n'+st.pending+' item(ns) não contado(s) ficam como estão.':'')+'\n\nEsta ação altera o estoque dos produtos.';
+    if(!confirm(msg)) return;
+    const entry = { appliedAt:new Date().toISOString(), startedAt:INV.startedAt, by:(state.currentUser&&state.currentUser.name)||INV.by||'', counted:st.counted, adjusted:toAdjust.length, net:0, lines:[] };
+    toAdjust.forEach(it=>{
+      const p = state.products.find(x=>x.id===it.id); const c = INV.counts[it.id];
+      entry.lines.push({id:p.id, name:p.name, sku:p.sku||'', category:p.category||'Sem categoria', before:p.stock, after:c, diff:c-p.stock});
+      entry.net += c-p.stock; p.stock = c;
+    });
+    if(toAdjust.length) persist('products');
+    INV_HIST.unshift(entry); invHistSave();
+    INV = null; invSave(); render();
+    notify.ok('Inventário aplicado: '+toAdjust.length+' produto(s) ajustado(s).');
+  },
+  printCountSheet(){
+    const f = invFilters(); const list = invProducts(f);
+    if(!list.length){ notify.err('Nenhum produto para imprimir.'); return; }
+    const rows = invItemRows(list.map(p=>p.id));
+    const blind = !!f.blind;
+    const cols = [{t:'#',cls:'i'},{t:'Código',cls:'sku'},{t:'Produto'}].concat(blind?[]:[{t:'Sistema',cls:'n'}]).concat([{t:'Contagem',cls:'box'},{t:'Observação',cls:'obs'}]);
+    const tbl = invGroupedTable(rows, cols, (r,i)=>`<tr><td class="i">${i}</td><td class="sku">${esc(r.p.sku||'')}</td><td>${esc(r.p.name)}${(r.p.brand||r.p.volume)?`<div class="sm">${esc([r.p.brand, r.p.volume&&/^\d+$/.test(String(r.p.volume).trim())?r.p.volume+'ml':r.p.volume].filter(Boolean).join(' · '))}</div>`:''}</td>${blind?'':`<td class="n">${r.p.stock}</td>`}<td class="box"></td><td class="obs"></td></tr>`);
+    const total = list.reduce((a,p)=>a+p.stock,0);
+    const html = invPrintDoc('Folha de contagem', invHeaderHTML('Inventário de estoque','Folha de contagem física'+(f.cat?' · '+f.cat:''),
+      `<span><b>Local/Setor:</b> <span class="line"></span></span>`)
+      + tbl
+      + `<div class="foot">${list.length} produto(s)${blind?' · contagem cega':' · total no sistema: '+total+' un.'}</div>`
+      + `<div class="sign"><div>Contado por</div><div>Conferido por</div><div>Data</div></div>`);
+    printHTML(html);
+  },
+  printInvResult(){
+    if(!INV) return;
+    const rows = invItemRows(INV.items.map(i=>i.id));
+    const cols = [{t:'#',cls:'i'},{t:'Código',cls:'sku'},{t:'Produto'},{t:'Sistema',cls:'n'},{t:'Contado',cls:'n'},{t:'Diferença',cls:'n'},{t:'Observação',cls:'obs'}];
+    const tbl = invGroupedTable(rows, cols, (r,i)=>{ const it = INV.items.find(x=>x.id===r.p.id); const c = INV.counts[r.p.id]; const d = c===undefined?null:c-it.sys;
+      return `<tr><td class="i">${i}</td><td class="sku">${esc(r.p.sku||'')}</td><td>${esc(r.p.name)}</td><td class="n">${it.sys}</td><td class="n">${c===undefined?'':c}</td><td class="n ${d>0?'pos':d<0?'neg':''}">${d===null?'':(d>0?'+':'')+d}</td><td class="obs"></td></tr>`; });
+    const st = invStats();
+    const html = invPrintDoc('Conferência de inventário', invHeaderHTML('Conferência de inventário','Contagem iniciada em '+fmtDate(INV.startedAt),
+      `<span><b>Responsável:</b> ${esc(INV.by||'')}</span>`)
+      + tbl
+      + `<div class="foot">${st.counted} de ${st.total} contado(s) · ${st.diverg} divergência(s) · diferença líquida ${st.net>0?'+':''}${st.net} un.</div>`
+      + `<div class="sign"><div>Contado por</div><div>Conferido por</div><div>Data</div></div>`);
+    printHTML(html);
+  },
+  printInvHistory(t){
+    const h = INV_HIST[parseInt(t.dataset.idx,10)]; if(!h) return;
+    const rows = h.lines.map(l=>({p:{id:l.id,name:l.name,sku:l.sku}, cat:l.category, sub:'', l}));
+    const cols = [{t:'#',cls:'i'},{t:'Código',cls:'sku'},{t:'Produto'},{t:'Antes',cls:'n'},{t:'Contado',cls:'n'},{t:'Diferença',cls:'n'}];
+    const tbl = rows.length ? invGroupedTable(rows, cols, (r,i)=>`<tr><td class="i">${i}</td><td class="sku">${esc(r.l.sku)}</td><td>${esc(r.l.name)}</td><td class="n">${r.l.before}</td><td class="n">${r.l.after}</td><td class="n ${r.l.diff>0?'pos':'neg'}">${r.l.diff>0?'+':''}${r.l.diff}</td></tr>`) : '<p>Nenhum ajuste foi necessário: todas as quantidades conferiam.</p>';
+    printHTML(invPrintDoc('Inventário aplicado', invHeaderHTML('Inventário aplicado','Aplicado em '+fmtDate(h.appliedAt),`<span><b>Responsável:</b> ${esc(h.by||'')}</span>`) + tbl
+      + `<div class="foot">${h.counted} contado(s) · ${h.adjusted} ajustado(s) · diferença líquida ${h.net>0?'+':''}${h.net} un.</div>`));
+  },
+  async exportInvCSV(){
+    if(!INV) return;
+    const q = v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const lines = [['Categoria','Subgrupo','Código','Produto','Sistema','Contado','Diferença'].map(q).join(';')];
+    invItemRows(INV.items.map(i=>i.id)).forEach(r=>{ const it = INV.items.find(x=>x.id===r.p.id); const c = INV.counts[r.p.id];
+      lines.push([r.cat, r.sub, r.p.sku||'', r.p.name, it.sys, c===undefined?'':c, c===undefined?'':c-it.sys].map(q).join(';')); });
+    await saveFile('inventario-'+todayISO()+'.csv', new Blob(['\uFEFF'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+    notify.ok('Arquivo CSV gerado.');
+  }
+};
 
 const actions_estoque = {
   openAjuste(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'ajuste', productId:p.id, delta:''}; render(); },
@@ -2819,7 +3096,7 @@ const actions_pedidos = {
       if(!p){ shortages.push(i.name+' (produto não existe mais)'); }
       else if(p.stock<i.qty){ shortages.push(i.name+' (estoque atual: '+p.stock+', pedido: '+i.qty+')'); }
     });
-    if(shortages.length && !confirm('Estoque insuficiente para faturar integralmente este pedido:\\n\\n'+shortages.join('\\n')+'\\n\\nContinuar mesmo assim? O estoque pode ficar negativo para esses itens.')) return;
+    if(shortages.length && !confirm('Estoque insuficiente para faturar integralmente este pedido:\n\n'+shortages.join('\n')+'\n\nContinuar mesmo assim? O estoque pode ficar negativo para esses itens.')) return;
     state.ui.orderDetail = null;
     state.ui.modal = { type:'invoiceOrder', orderId:order.id, payments:[{method:'Dinheiro', amount:String(order.total)}] };
     render();
@@ -4005,6 +4282,7 @@ const actions = {
   ...actions_clientes,
   ...actions_produtos,
   ...actions_estoque,
+  ...actions_inventario,
   ...actions_vendas,
   ...actions_pedidos,
   ...actions_usuarios
