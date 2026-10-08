@@ -1165,7 +1165,7 @@ async function syncPush(force, silent){
     if(e.code==='conflict'){
       SYNC.conflict = true;
       syncSetMsg('Conflito: o servidor tem dados diferentes dos deste navegador. Use "Baixar do servidor" (descarta o que há aqui) ou "Sobrescrever servidor" (descarta o que há lá).', 'err');
-      notify.err('Conflito de sincronização. Abra a aba Usuários para resolver.');
+      notify.err('Conflito de sincronização. Abra o menu Servidor para resolver.');
     } else {
       syncSetMsg(e.message, 'err');
       if(!silent) notify.err(e.message);
@@ -1223,7 +1223,7 @@ async function syncCheckRemote(){
     if(SYNC.cfg.dirty){
       SYNC.conflict = true;
       syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva na aba Usuários.', 'err');
-      notify.err('Conflito de sincronização. Abra a aba Usuários para resolver.');
+      notify.err('Conflito de sincronização. Abra o menu Servidor para resolver.');
       return;
     }
     if(await syncPull(true)) notify.info('Dados atualizados do servidor.');
@@ -1252,7 +1252,7 @@ async function syncStartup(){
     else if(SYNC.cfg.dirty && j.version !== SYNC.cfg.version){
       SYNC.conflict = true;
       syncSetMsg('Conflito: há alterações neste navegador e o servidor também mudou. Resolva na aba Usuários.', 'err');
-      notify.err('Conflito de sincronização. Abra a aba Usuários para resolver.');
+      notify.err('Conflito de sincronização. Abra o menu Servidor para resolver.');
     }
   }catch(e){ syncSetMsg(e.message, 'err'); }
 }
@@ -1263,7 +1263,7 @@ function persist(key){
   if(key!=='prefs' && !SYNC.applying) syncSchedulePush();
   if(!ok && !storageWarningShown){
     storageWarningShown = true;
-    notify.err('Atenção: não foi possível salvar os dados neste navegador (o armazenamento local pode estar desativado, cheio, ou em modo de navegação privada). As alterações feitas agora podem se perder ao fechar a página. Exporte um backup pela aba Usuários assim que possível.');
+    notify.err('Atenção: não foi possível salvar os dados neste navegador (o armazenamento local pode estar desativado, cheio, ou em modo de navegação privada). As alterações feitas agora podem se perder ao fechar a página. Exporte um backup pela aba Usuários (ou envie ao servidor pelo menu Servidor) assim que possível.');
   }
 }
 
@@ -2969,13 +2969,9 @@ function renderUsuarios(){
     <label class="btn btn-ghost" style="cursor:pointer;">${icon('upload')} Importar backup
       <input type="file" accept="application/json" style="display:none;" onchange="importBackupFile(this)">
     </label>
-    <button class="btn btn-gold" data-action="exportDataSQL">${icon('download')} Exportar dados em SQL (Hostinger)</button>
   </div>
-  <p class="muted2" style="font-size:11.5px;margin-top:10px;max-width:560px;">
-    O arquivo .sql gerado contém todos os seus dados atuais prontos para importar no banco MySQL da Hostinger (pelo phpMyAdmin), usando a mesma estrutura do schema.sql.
-  </p>
   <div class="card" style="margin-top:26px;max-width:620px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-    <div><b>Sincronização com o servidor (Hostinger)</b><div class="muted" style="font-size:12.5px;margin-top:3px;">Agora tem um menu próprio: <b>Servidor</b>.</div></div>
+    <div><b>Servidor (Hostinger)</b><div class="muted" style="font-size:12.5px;margin-top:3px;">Sincronização, arquivo SQL, catálogo público e guia de instalação ficam no menu <b>Servidor</b>.</div></div>
     <button class="btn btn-ghost" data-action="goTab" data-tab="servidor">${icon('cloud')} Abrir menu Servidor</button>
   </div>
   `;
@@ -3072,6 +3068,14 @@ function renderServidorDados(){
     <b>Arquivo SQL para o phpMyAdmin</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Gera um .sql com todos os dados atuais, para importar no banco depois do schema.sql.</p>
     <button class="btn btn-ghost" data-action="exportDataSQL">${icon('download')} Exportar dados em SQL</button>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;margin-top:16px;">
+    <b>Catálogo público do site</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Gera o <b>catalogo.html</b> com os produtos do Catálogo On. Suba o arquivo para a pasta public_html, ao lado do index.html, sempre que quiser atualizar o que os clientes veem.</p>
+    <div class="flex gap flex-wrap">
+      <button class="btn btn-ghost" data-action="openCatalogPage">${icon('book')} Abrir página</button>
+      <button class="btn btn-gold" data-action="exportCatalogPage">${icon('download')} Gerar catalogo.html</button>
+    </div>
   </div>`;
 }
 function renderServidorGuia(){
@@ -3081,6 +3085,8 @@ function renderServidorGuia(){
     ['Preencha o database.php','Abra o arquivo num editor de texto e preencha DB_NAME, DB_USER e DB_PASS. A SYNC_KEY é a senha de sincronização, e você pode trocá-la.'],
     ['Envie os arquivos','No Gerenciador de Arquivos, coloque index.html, api.php e database.php na pasta public_html.'],
     ['Conecte o programa','Abra o seu site, entre no menu Servidor e digite a senha de sincronização na aba Conexão.'],
+    ['Atualização automática (opcional)','No hPanel, em Avançado → Git, ligue o repositório jrsfilho29-art/site (branch main) à pasta public_html e ative a implantação automática. Assim cada atualização do programa chega ao site sozinha. O database.php fica só no servidor.'],
+    ['Publique o catálogo','Na aba Enviar e baixar, gere o catalogo.html e envie para public_html.'],
     ['Use em outros aparelhos','Abra o site em outro computador ou celular. A tela de login detecta o servidor e pede a senha uma única vez.']
   ];
   return `
