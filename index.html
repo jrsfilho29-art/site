@@ -83,7 +83,7 @@
   .sidebar .footer .logout{color:#B79EC9;font-size:11.5px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;transition:color .12s ease;letter-spacing:.3px;}
   .sidebar .footer .logout:hover{color:var(--gold-soft);}
 
-  .main{flex:1;padding:28px 36px;max-width:1220px;margin-left:216px;}
+  .main{flex:1;min-width:0;padding:28px 36px;max-width:1220px;margin-left:216px;}
   h2.serif{letter-spacing:.2px;}
   .badge-danger{font-size:10.5px;padding:3px 9px;color:var(--danger);background:#F6E7E7;border-radius:12px;font-weight:600;letter-spacing:.2px;}
   .badge-ok{font-size:10.5px;padding:3px 9px;color:var(--ok);background:#EAF2EC;border-radius:12px;font-weight:600;letter-spacing:.2px;}
@@ -388,7 +388,9 @@ const CATEGORY_SUGGESTIONS = ['Perfume Masculino','Perfume Feminino','Perfume Un
 
 function uid(p){ return (p||'id')+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,8); }
 function brl(v){ return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
-function todayISO(){ return new Date().toISOString().slice(0,10); }
+function localDay(iso){ const d = iso instanceof Date ? iso : new Date(iso); const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+function todayISO(){ return localDay(new Date()); }
+function daysAgoISO(n){ const d=new Date(); d.setDate(d.getDate()-n); return localDay(d); }
 function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -1176,7 +1178,7 @@ let state = {
     pedido: { id:null, orderNumber:'', customerId:'', search:'', cart:[], discount:0, shipping:0, expectedDate:'', notes:'' },
     orderStatusFilter:'', orderQuery:'', orderDetail:null,
     caixaFrom: todayISO(), caixaTo: todayISO(),
-    relFrom: (()=>{ const d=new Date(); d.setDate(d.getDate()-30); return d.toISOString().slice(0,10); })(),
+    relFrom: daysAgoISO(30),
     relTo: todayISO(),
     modal: null, // {type, data, ...}
     saleDetail: null,
@@ -1645,7 +1647,7 @@ function renderTab(){
 function renderDashboard(){
   const activeSales = state.sales.filter(s=>s.status!=='cancelada');
   const today = todayISO();
-  const salesToday = activeSales.filter(s=>s.date.slice(0,10)===today);
+  const salesToday = activeSales.filter(s=>localDay(s.date)===today);
   const revenueToday = salesToday.reduce((a,s)=>a+s.total,0);
   const lowStock = state.products.filter(p=>p.stock<=(p.minStock||0));
   const stockValue = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
@@ -1659,8 +1661,8 @@ function renderDashboard(){
   const days = [];
   for(let i=6;i>=0;i--){
     const d = new Date(); d.setDate(d.getDate()-i);
-    const key = d.toISOString().slice(0,10);
-    const dayTotal = activeSales.filter(s=>s.date.slice(0,10)===key).reduce((a,s)=>a+s.total,0);
+    const key = localDay(d);
+    const dayTotal = activeSales.filter(s=>localDay(s.date)===key).reduce((a,s)=>a+s.total,0);
     days.push({key, label:d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''), total:dayTotal});
   }
   const maxDay = Math.max(1, ...days.map(d=>d.total));
@@ -1668,16 +1670,16 @@ function renderDashboard(){
 
   // --- month to date vs previous month same period ---
   const now = new Date();
-  const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  const monthSales = activeSales.filter(s=> s.date.slice(0,10)>=mStart);
+  const mStart = localDay(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthSales = activeSales.filter(s=> localDay(s.date)>=mStart);
   const monthRevenue = monthSales.reduce((a,s)=>a+s.total,0);
   const ticket = monthSales.length ? monthRevenue/monthSales.length : 0;
 
   // --- top products (last 30 days) ---
   const d30 = new Date(); d30.setDate(d30.getDate()-30);
-  const from30 = d30.toISOString().slice(0,10);
+  const from30 = localDay(d30);
   const rank = {};
-  activeSales.filter(s=>s.date.slice(0,10)>=from30).forEach(s=> s.items.forEach(i=>{
+  activeSales.filter(s=>localDay(s.date)>=from30).forEach(s=> s.items.forEach(i=>{
     rank[i.name] = rank[i.name] || {qty:0, rev:0};
     rank[i.name].qty += i.qty; rank[i.name].rev += i.subtotal;
   }));
@@ -2256,19 +2258,34 @@ const actions_estoque = {
 };
 
 /* ================= vendas ================= */
+function vendaFilters(){ return state.ui.vf || (state.ui.vf = {q:'',status:'',method:'',from:'',to:''}); }
+function salesSummary(from,to){
+  const list = state.sales.filter(x=> x.status!=='cancelada' && localDay(x.date)>=from && localDay(x.date)<=to);
+  const total = list.reduce((acc,x)=>acc+x.total,0);
+  return {count:list.length, total, avg: list.length? total/list.length : 0};
+}
 function renderVendas(){
-  const concluded = state.sales.filter(s=>s.status!=='cancelada').length;
+  const today = todayISO(), monthStart = today.slice(0,8)+'01';
+  const hoje = salesSummary(today,today), mes = salesSummary(monthStart,today);
+  const view = state.ui.vendaView==='lista' ? 'lista' : 'nova';
+  const kpi = (label,val,sub)=>`<div class="card kpi" style="padding:14px 16px;"><div class="klabel">${label}</div><div class="kval">${val}</div><div class="muted" style="font-size:12px;margin-top:2px;">${sub}</div></div>`;
   return `
-  <div class="flex-between flex-wrap mb2"><div>
+  <div class="flex-between flex-wrap mb2" style="gap:12px;">
+    <div>
       <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Vendas</h2>
-      <p class="muted">${concluded} venda(s) concluída(s)</p>
+      <p class="muted">Registre vendas e consulte o histórico</p>
     </div>
-    <div class="flex gap">
-      <button class="btn ${state.ui.vendaView==='nova'?'btn-gold':'btn-ghost'}" data-action="setVendaView" data-view="nova">${icon('plus')} Nova venda</button>
-      <button class="btn ${state.ui.vendaView==='lista'?'btn-gold':'btn-ghost'}" data-action="setVendaView" data-view="lista">${icon('cart')} Todas as vendas</button>
+    <div class="segbar">
+      <button class="${view==='nova'?'on':''}" data-action="setVendaView" data-view="nova">${icon('plus',14)} Nova venda</button>
+      <button class="${view==='lista'?'on':''}" data-action="setVendaView" data-view="lista">${icon('cart',14)} Histórico (${state.sales.length})</button>
     </div>
   </div>
-  ${state.ui.vendaView==='nova' ? renderNovaVenda() : renderListaVendas()}
+  <div class="grid mb2" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
+    ${kpi('Hoje', brl(hoje.total), hoje.count+' venda(s)')}
+    ${kpi('No mês', brl(mes.total), mes.count+' venda(s)')}
+    ${kpi('Ticket médio do mês', brl(mes.avg), 'por venda')}
+  </div>
+  ${view==='nova' ? renderNovaVenda() : renderListaVendas()}
   `;
 }
 
@@ -2282,7 +2299,7 @@ function renderNovaVenda(){
   const results = V.search.length>0 ? state.products.filter(p=> p.active!==false && p.name.toLowerCase().includes(V.search.toLowerCase())).slice(0,6) : [];
 
   return `
-  <div class="grid" style="grid-template-columns:3fr 2fr;">
+  <div class="grid grid-split">
     <div>
       <div class="card mb2">
         <label class="field"><span class="lbl">Cliente</span>
@@ -2347,41 +2364,97 @@ function renderNovaVenda(){
             ${V.payments.length>1? `<button class="icon-btn danger-c" data-action="removePayment" data-idx="${idx}">${icon('close')}</button>`:''}
           </div>`).join('')}
         <button class="btn" style="color:var(--plum);font-size:12px;padding:4px 0;" data-action="addPayment">+ adicionar forma de pagamento</button>
+        ${(Math.abs(diff)>0.009 && V.payments.length===1 && total>0) ? `<button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;margin-left:8px;" data-action="fillPaymentTotal">usar valor total</button>` : ''}
         <div class="${Math.abs(diff)>0.009?'danger-c':'ok-c'}" style="font-size:12px;margin:12px 0;">
           ${Math.abs(diff)>0.009 ? 'Faltam '+brl(diff)+' para completar o pagamento' : 'Pagamento completo'}
         </div>
         <button class="btn btn-gold btn-block" data-action="finalizarVenda">${icon('check')} Finalizar venda</button>
+        ${V.cart.length>0 ? `<button class="btn btn-block" style="color:var(--muted);font-size:12px;margin-top:6px;" data-action="clearCart">Limpar carrinho</button>` : ''}
       </div>
     </div>
   </div>`;
 }
 
+function filteredSales(){
+  const f = vendaFilters(); const q = (f.q||'').trim().toLowerCase();
+  return state.sales.filter(x=>{
+    if(f.status==='concluida' && x.status==='cancelada') return false;
+    if(f.status==='cancelada' && x.status!=='cancelada') return false;
+    if(f.method && !x.payments.some(p=>p.method===f.method)) return false;
+    const day = localDay(x.date);
+    if(f.from && day<f.from) return false;
+    if(f.to && day>f.to) return false;
+    if(q && !((x.customerName||'').toLowerCase().includes(q) || x.items.some(i=>(i.name||'').toLowerCase().includes(q)))) return false;
+    return true;
+  }).sort((a,b)=> new Date(b.date)-new Date(a.date));
+}
 function renderListaVendas(){
   if(state.sales.length===0) return emptyState(icon('cart',26),'Nenhuma venda registrada','Registre a primeira venda para vê-la aqui.');
+  const f = vendaFilters();
+  const list = filteredSales();
+  const ok = list.filter(x=>x.status!=='cancelada');
+  const total = ok.reduce((a,x)=>a+x.total,0);
+  const hasFilter = f.q||f.status||f.method||f.from||f.to;
+  const itemsText = x=>{ const n=x.items.length; if(!n) return '—'; const first=esc(x.items[0].name||''); return n===1 ? first : first+' <span class="muted">+ '+(n-1)+'</span>'; };
   return `
+  <div class="card mb2" style="padding:14px;">
+    <div class="flex gap flex-wrap" style="align-items:end;">
+      <label class="field" style="margin-bottom:0;flex:1;min-width:200px;"><span class="lbl">Buscar</span>
+        <input placeholder="Cliente ou produto..." data-field="ui.vf.q" value="${esc(f.q)}"></label>
+      <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.vf.from" value="${f.from}"></label>
+      <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.vf.to" value="${f.to}"></label>
+      <label class="field" style="margin-bottom:0;"><span class="lbl">Pagamento</span>
+        <select data-field="ui.vf.method"><option value="">Todos</option>${PAYMENT_METHODS.map(m=>`<option value="${m}" ${f.method===m?'selected':''}>${m}</option>`).join('')}</select></label>
+      <div class="segbar">
+        ${[['','Todas'],['concluida','Concluídas'],['cancelada','Canceladas']].map(([v,l])=>`<button class="${(f.status||'')===v?'on':''}" data-action="setVendaStatusFilter" data-status="${v}">${l}</button>`).join('')}
+      </div>
+      ${hasFilter? `<button class="btn btn-ghost" data-action="clearVendaFilters">Limpar filtros</button>`:''}
+    </div>
+  </div>
+  <div class="flex-between flex-wrap" style="margin-bottom:8px;font-size:13px;">
+    <span class="muted">${list.length} venda(s) encontrada(s)</span>
+    <span>Total das concluídas: <b class="plum">${brl(total)}</b></span>
+  </div>
+  ${list.length===0 ? emptyState(icon('search',26),'Nada encontrado','Ajuste os filtros para ver outras vendas.') : `
   <div class="table-wrap"><table>
-    <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th style="text-align:right;">Total</th><th style="text-align:center;">Status</th><th style="text-align:right;">Ações</th></tr></thead>
+    <thead><tr><th>Data</th><th>Cliente</th><th>Produtos</th><th>Pagamento</th><th style="text-align:right;">Total</th><th style="text-align:center;">Status</th><th style="text-align:right;">Ações</th></tr></thead>
     <tbody>
-      ${state.sales.map(s=>`
+      ${list.map(s=>`
         <tr style="opacity:${s.status==='cancelada'?0.5:1};">
           <td class="muted" style="white-space:nowrap;">${fmtDate(s.date)}</td>
           <td>${esc(s.customerName)}</td>
-          <td class="plum" style="cursor:pointer;" data-action="viewSale" data-id="${s.id}">${s.items.length} item(ns)</td>
-          <td>${s.payments.map(p=>p.method).join(', ')}</td>
-          <td style="text-align:right;">${brl(s.total)}</td>
+          <td class="plum" style="cursor:pointer;" data-action="viewSale" data-id="${s.id}">${itemsText(s)}</td>
+          <td>${[...new Set(s.payments.map(p=>p.method))].join(', ')}</td>
+          <td style="text-align:right;white-space:nowrap;">${brl(s.total)}</td>
           <td style="text-align:center;">${s.status==='cancelada'? `<span class="badge-danger">cancelada</span>` : `<span class="badge-ok">concluída</span>`}</td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="btn" style="color:var(--plum);font-size:12px;text-decoration:underline;padding:0;margin-right:10px;" data-action="viewSale" data-id="${s.id}">detalhes</button>
             <button class="icon-btn plum" data-action="printReceipt" data-id="${s.id}" title="Imprimir recibo">${icon('printer')}</button>
-            ${s.status!=='cancelada'? `<button class="icon-btn danger-c" data-action="cancelSale" data-id="${s.id}">${icon('xcircle')}</button>`:''}
+            ${s.status!=='cancelada'? `<button class="icon-btn danger-c" data-action="cancelSale" data-id="${s.id}" title="Cancelar venda">${icon('xcircle')}</button>`:''}
           </td>
         </tr>`).join('')}
     </tbody>
-  </table></div>`;
+  </table></div>`}`;
 }
 
 const actions_vendas = {
   setVendaView(t){ state.ui.vendaView = t.dataset.view; render(); },
+  setCaixaRange(t){
+    const k=t.dataset.range, today=todayISO();
+    if(k==='hoje'){ state.ui.caixaFrom=today; state.ui.caixaTo=today; }
+    else if(k==='7d'){ state.ui.caixaFrom=daysAgoISO(6); state.ui.caixaTo=today; }
+    else if(k==='mes'){ state.ui.caixaFrom=today.slice(0,8)+'01'; state.ui.caixaTo=today; }
+    render();
+  },
+  filterCaixaMethod(t){ const m=t.dataset.method||''; state.ui.caixaMethod = (state.ui.caixaMethod===m)?'':m; render(); },
+  setVendaStatusFilter(t){ vendaFilters().status = t.dataset.status||''; render(); },
+  clearVendaFilters(){ state.ui.vf = {q:'',status:'',method:'',from:'',to:''}; render(); },
+  clearCart(){ if(!state.ui.venda.cart.length) return; if(!confirm('Esvaziar o carrinho?')) return; state.ui.venda.cart = []; render(); },
+  fillPaymentTotal(){
+    const V = state.ui.venda; const sub = V.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
+    const total = Math.max(0, sub - computeDiscountAmount(sub, V.discount, V.discountType));
+    if(V.payments.length===1){ V.payments[0].amount = total.toFixed(2); render(); }
+  },
   addToCart(t){
     const p = state.products.find(x=>x.id===t.dataset.id);
     if(!p){ return; }
@@ -2458,7 +2531,7 @@ const actions_vendas = {
   printReceipt(t){ printReceipt(t.dataset.id); },
   async exportSalesCSV(){
     const f=state.ui.relFrom, to=state.ui.relTo;
-    const list = state.sales.filter(s=>s.status!=='cancelada' && s.date.slice(0,10)>=f && s.date.slice(0,10)<=to);
+    const list = state.sales.filter(s=>s.status!=='cancelada' && localDay(s.date)>=f && localDay(s.date)<=to);
     if(!list.length){ notify.err('Nenhuma venda no período selecionado.'); return; }
     const rows=[['Data','Cliente','Produto','Qtd','Preco Unit','Subtotal','Desconto Venda','Total Venda','Pagamento']];
     list.forEach(s=> s.items.forEach(i=> rows.push([
@@ -2910,40 +2983,76 @@ function renderCatalogoProdutos(){
 }
 
 /* ================= caixa ================= */
+function caixaRangeKey(from,to){
+  const t = todayISO();
+  if(from===t && to===t) return 'hoje';
+  if(from===daysAgoISO(6) && to===t) return '7d';
+  if(from===t.slice(0,8)+'01' && to===t) return 'mes';
+  return '';
+}
 function renderCaixa(){
   const from = state.ui.caixaFrom, to = state.ui.caixaTo;
-  const filtered = state.sales.filter(s=> s.status!=='cancelada' && s.date.slice(0,10)>=from && s.date.slice(0,10)<=to);
+  const inRange = s=> localDay(s.date)>=from && localDay(s.date)<=to;
+  const filtered = state.sales.filter(s=> s.status!=='cancelada' && inRange(s));
+  const canceled = state.sales.filter(s=> s.status==='cancelada' && inRange(s)).length;
   const byMethod = {}; PAYMENT_METHODS.forEach(m=>byMethod[m]=0);
   filtered.forEach(s=> s.payments.forEach(p=>{ byMethod[p.method]=(byMethod[p.method]||0)+p.amount; }));
-  const grandTotal = Object.values(byMethod).reduce((a,v)=>a+v,0);
+  const methods = Object.keys(byMethod);
+  const grandTotal = methods.reduce((a,m)=>a+byMethod[m],0);
+  const fiado = byMethod['Fiado']||0;
+  const received = grandTotal - fiado;
+  const mFilter = state.ui.caixaMethod || '';
   const rows = [];
   filtered.forEach(s=> s.payments.forEach(p=> rows.push({date:s.date, customer:s.customerName, method:p.method, amount:p.amount})));
   rows.sort((a,b)=> new Date(b.date)-new Date(a.date));
+  const shown = mFilter ? rows.filter(r=>r.method===mFilter) : rows;
+  const shownTotal = shown.reduce((a,r)=>a+r.amount,0);
+  const rk = caixaRangeKey(from,to);
+  const quick = [['hoje','Hoje'],['7d','7 dias'],['mes','Este mês']];
 
   return `
-  <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Caixa</h2>
-  <p class="muted mb2">Movimentações por forma de pagamento</p>
+  <div class="mb2">
+    <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Caixa</h2>
+    <p class="muted">Entradas por forma de pagamento</p>
+  </div>
   <div class="flex gap flex-wrap mb2" style="align-items:end;">
+    <div class="segbar">
+      ${quick.map(([k,l])=>`<button class="${rk===k?'on':''}" data-action="setCaixaRange" data-range="${k}">${l}</button>`).join('')}
+    </div>
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.caixaFrom" value="${from}"></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.caixaTo" value="${to}"></label>
   </div>
-  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));" class="mb2">
-    ${PAYMENT_METHODS.map(m=>`
-      <div class="card" style="padding:12px;">
+  <div class="banner-plum mb2" style="flex-wrap:wrap;gap:14px;">
+    <div>
+      <div style="color:#D8C7E0;font-size:13px;">Recebido no período</div>
+      <div class="serif" style="font-size:28px;color:var(--gold-soft);line-height:1.2;">${brl(received)}</div>
+    </div>
+    <div style="text-align:right;font-size:13px;color:#D8C7E0;line-height:1.7;">
+      ${filtered.length} venda(s) · Total vendido <b style="color:#fff;">${brl(grandTotal)}</b><br>
+      A receber (fiado) <b style="color:var(--gold-soft);">${brl(fiado)}</b>${canceled? `<br>${canceled} cancelada(s) fora do total`:''}
+    </div>
+  </div>
+  <div class="filterbar-label" style="margin-bottom:6px;">Por forma de pagamento <span style="text-transform:none;letter-spacing:0;font-weight:400;">· toque para filtrar a lista</span></div>
+  <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(118px,1fr));">
+    ${methods.map(m=>{ const pct = grandTotal>0 ? Math.round(byMethod[m]/grandTotal*100) : 0; const on = mFilter===m;
+      return `<div class="card" role="button" tabindex="0" data-action="filterCaixaMethod" data-method="${esc(m)}" style="padding:12px;cursor:pointer;${on?'border-color:var(--plum);box-shadow:3px 3px 0 var(--plum);':''}${byMethod[m]===0&&!on?'opacity:.6;':''}">
         <div class="muted" style="font-size:11px;margin-bottom:4px;">${m}</div>
         <div class="serif" style="font-size:17px;color:var(--plum);">${brl(byMethod[m])}</div>
-      </div>`).join('')}
+        <div style="height:4px;background:var(--tint);border-radius:3px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--gold);"></div></div>
+        <div class="muted2" style="font-size:11px;margin-top:3px;">${pct}% do total</div>
+      </div>`; }).join('')}
   </div>
-  <div class="banner-plum mb3">
-    <span style="color:#D8C7E0;font-size:14px;">Total do período · ${filtered.length} venda(s)</span>
-    <span class="serif" style="font-size:20px;color:var(--gold-soft);">${brl(grandTotal)}</span>
+  <div class="flex-between flex-wrap" style="margin-bottom:8px;">
+    <h3 class="serif plum" style="font-size:18px;margin:0;">Movimentações${mFilter? ' · '+esc(mFilter):''}</h3>
+    ${mFilter? `<button class="btn btn-ghost" data-action="filterCaixaMethod" data-method="">Mostrar todas as formas</button>`:''}
   </div>
-  ${rows.length===0 ? emptyState(icon('wallet',26),'Sem movimentações','Nenhum pagamento registrado nesse período.') : `
+  ${shown.length===0 ? emptyState(icon('wallet',26),'Sem movimentações','Nenhum pagamento registrado nesse período.') : `
   <div class="table-wrap"><table>
     <thead><tr><th>Data</th><th>Cliente</th><th>Forma</th><th style="text-align:right;">Valor</th></tr></thead>
-    <tbody>${rows.map(r=>`
-      <tr><td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td><td>${esc(r.customer)}</td><td>${r.method}</td><td style="text-align:right;">${brl(r.amount)}</td></tr>
+    <tbody>${shown.map(r=>`
+      <tr><td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td><td>${esc(r.customer)}</td><td>${r.method}${r.method==='Fiado'?' <span class="badge-danger" style="margin-left:4px;">a receber</span>':''}</td><td style="text-align:right;white-space:nowrap;">${brl(r.amount)}</td></tr>
     `).join('')}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600;padding:10px 12px;">Total listado (${shown.length})</td><td style="text-align:right;font-weight:600;padding:10px 12px;white-space:nowrap;">${brl(shownTotal)}</td></tr></tfoot>
   </table></div>`}
   `;
 }
@@ -2951,7 +3060,7 @@ function renderCaixa(){
 /* ================= relatorios ================= */
 function renderRelatorios(){
   const from = state.ui.relFrom, to = state.ui.relTo;
-  const filtered = state.sales.filter(s=> s.status!=='cancelada' && s.date.slice(0,10)>=from && s.date.slice(0,10)<=to);
+  const filtered = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
   const productCost = {}; state.products.forEach(p=> productCost[p.id]=p.costPrice);
   let revenue=0, cost=0; const perProduct = {};
   filtered.forEach(s=> s.items.forEach(i=>{
