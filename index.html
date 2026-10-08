@@ -1538,12 +1538,6 @@ function renderSidebar(){
     </div>
     <nav>
       ${items.map(([id,ic,label])=>{
-        if(id==='catalogo'){
-          return `
-          <a href="catalogo.html" target="_blank" rel="noopener noreferrer" class="navitem" title="Abre a página pública do catálogo (gere/atualize dentro da aba Catálogo On)">
-            <span class="navicon">${icon(ic,16)}</span><span>${label}</span>
-          </a>`;
-        }
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
@@ -2002,6 +1996,15 @@ const actions_produtos = {
   },
   editProduto(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'produto', data:{...p}}; render(); },
   setCatalogoSubView(t){ state.ui.catalogoSubView = t.dataset.view; render(); },
+  openCatalogPage(){
+    let list = state.ui.catalogOnlyAvailable ? state.products.filter(p=>p.stock>0) : state.products;
+    if(!state.ui.catalogShowInactive) list = list.filter(p=> p.active!==false);
+    if(!list.length){ notify.err('Nenhum produto para incluir na página pública.'); return; }
+    const url = URL.createObjectURL(new Blob([buildCatalogPageHTML(list)], {type:'text/html;charset=utf-8;'}));
+    const w = window.open(url, '_blank');
+    if(!w) notify.err('O navegador bloqueou a nova aba. Permita pop-ups ou use "Gerar página pública".');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  },
   async exportCatalogPage(){
     let list = state.ui.catalogOnlyAvailable ? state.products.filter(p=>p.stock>0) : state.products;
     if(!state.ui.catalogShowInactive) list = list.filter(p=> p.active!==false);
@@ -2770,6 +2773,7 @@ function renderCatalogoVitrine(){
         <input type="checkbox" data-field="ui.catalogShowInactive" ${state.ui.catalogShowInactive?'checked':''}> mostrar inativos
       </label>
       <button class="btn btn-ghost" onclick="window.print()">${icon('printer')} Imprimir</button>
+      <button class="btn btn-ghost" data-action="openCatalogPage">${icon('book')} Abrir página</button>
       <button class="btn btn-gold" data-action="exportCatalogPage">${icon('download')} Gerar página pública</button>
     </div>
   </div>
