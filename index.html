@@ -3451,6 +3451,7 @@ function renderRelatorios(){
   <div class="flex gap flex-wrap mb3" style="align-items:end;">
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.relFrom" value="${from}"></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.relTo" value="${to}"></label>
+    <button class="btn btn-gold" data-action="printRelatorio">${icon('printer')} Imprimir relatório</button>
   </div>
   <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
   <div class="grid" style="grid-template-columns:repeat(4,1fr);" class="mb3">
@@ -3657,6 +3658,34 @@ function renderServidorGuia(){
   </div>`;
 }
 
+const actions_relatorios = {
+  printRelatorio(){
+    const from=state.ui.relFrom, to=state.ui.relTo;
+    const sales = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
+    const pc={}; state.products.forEach(p=>pc[p.id]=p.costPrice);
+    let revenue=0,cost=0; const per={};
+    sales.forEach(s=>s.items.forEach(i=>{ revenue+=i.subtotal; const c=(pc[i.productId]??0)*i.qty; cost+=c;
+      const o=per[i.name]=per[i.name]||{qty:0,revenue:0,cost:0}; o.qty+=i.qty;o.revenue+=i.subtotal;o.cost+=c; }));
+    const disc=sales.reduce((a,s)=>a+(s.discount||0),0), profit=revenue-cost-disc, margin=revenue>0?profit/revenue*100:0;
+    const rows=Object.entries(per).sort((a,b)=>b[1].qty-a[1].qty);
+    const low=state.products.filter(p=>p.stock<=(p.minStock||0));
+    const sv=state.products.reduce((a,p)=>a+p.stock*p.costPrice,0), ss=state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
+    const d=x=>x.split('-').reverse().join('/');
+    const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório ${d(from)} a ${d(to)}</title><style>${invPrintCSS()}
+      td{height:auto;padding:4px 5px;} td.r,th.r{text-align:right;} .kpis{display:flex;gap:8px;margin:8px 0 6px;} .kpis div{flex:1;border:1px solid #888;padding:6px 8px;} .kpis small{display:block;color:#555;font-size:10px;} .kpis b{font-size:14px;}
+      tfoot td{font-weight:700;background:#f2f2f2;}</style></head><body>
+      <h1>ESSÊNCIA · RELATÓRIO</h1><div class="sub">Período: ${d(from)} a ${d(to)} · Emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(state.currentUser.name)}</div>
+      <h2>Lucratividade</h2>
+      <div class="kpis"><div><small>Vendas</small><b>${sales.length}</b></div><div><small>Receita</small><b>${brl(revenue)}</b></div><div><small>Custo</small><b>${brl(cost)}</b></div><div><small>Descontos</small><b>${brl(disc)}</b></div><div><small>Lucro líquido</small><b class="${profit>=0?'pos':'neg'}">${brl(profit)}</b></div><div><small>Margem</small><b>${margin.toFixed(1)}%</b></div></div>
+      <h2>Vendas por produto</h2>
+      ${rows.length?`<table><thead><tr><th>Produto</th><th class="r">Qtd.</th><th class="r">Receita</th><th class="r">Lucro</th></tr></thead><tbody>${rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="r">${v.qty}</td><td class="r">${brl(v.revenue)}</td><td class="r">${brl(v.revenue-v.cost)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${rows.reduce((a,[,v])=>a+v.qty,0)}</td><td class="r">${brl(revenue)}</td><td class="r">${brl(revenue-cost)}</td></tr></tfoot></table>`:'<p class="sm">Sem vendas no período.</p>'}
+      <h2>Estoque</h2>
+      <div class="kpis"><div><small>Valor (custo)</small><b>${brl(sv)}</b></div><div><small>Valor (venda)</small><b>${brl(ss)}</b></div><div><small>Produtos em alerta</small><b>${low.length}</b></div></div>
+      ${low.length?`<table><thead><tr><th>Produto em alerta</th><th class="r">Estoque</th><th class="r">Mínimo</th></tr></thead><tbody>${low.map(p=>`<tr><td>${esc(p.name)}</td><td class="r neg">${p.stock}</td><td class="r">${p.minStock||0}</td></tr>`).join('')}</tbody></table>`:''}
+      </body></html>`;
+    printHTML(html);
+  }
+};
 const actions_usuarios = {
   async syncConnect(){
     const key = String(state.ui.syncKey!==undefined?state.ui.syncKey:SYNC.cfg.key).trim();
@@ -4387,6 +4416,7 @@ const actions = {
   ...actions_inventario,
   ...actions_vendas,
   ...actions_pedidos,
+  ...actions_relatorios,
   ...actions_usuarios
 };
 
