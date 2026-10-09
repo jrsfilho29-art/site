@@ -2008,7 +2008,7 @@ function renderProdutos(){
     </div>
     <div class="flex gap flex-wrap">
       <div class="dropdown">
-        <button class="btn btn-gold" data-action="toggleAddMenu">${icon('plus')} Adicionar produto ${icon('chart',11)}</button>
+        <button class="btn btn-gold" data-action="toggleAddMenu">${icon('plus')} Cadastrar produto ${icon('chart',11)}</button>
         ${state.ui.addMenuOpen ? `
         <div class="dropdown-menu">
           <button class="dropdown-item" data-action="newProduto">${icon('plus',15)} Cadastrar produto</button>
@@ -4186,7 +4186,7 @@ function renderProdutoModal(d){
       <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
       <button class="btn btn-gold" data-action="submitProduto">${icon('save')} Salvar produto</button>
     </div>`;
-  return modalWrap(d.id?'Editar produto':'Novo produto', body, true);
+  return modalWrap(d.id?'Editar produto':'Cadastrar produto', body, true);
 }
 
 function renderAjusteModal(m){
