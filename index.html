@@ -1542,7 +1542,6 @@ function renderLogin(){
         <button class="btn btn-gold btn-block" data-action="loginSubmit" ${L.busy?'disabled':''}>
           ${L.busy? 'Aguarde...' : mode==='login' ? 'Entrar' : mode==='setup' ? 'Criar conta e entrar' : 'Criar conta'}
         </button>
-        ${mode==='login' ? `<p class="muted2" style="font-size:11.5px;text-align:center;margin-top:14px;">Novas contas são criadas por um administrador, no menu Usuários.</p>`:''}
         ${(mode==='register'||mode==='setup') ? `<button class="btn" style="width:100%;justify-content:center;margin-top:14px;color:var(--plum);font-size:12px;" data-action="goLogin">Já tem usuário? Entre com sua senha</button>`:''}
       </div>
     </div>
