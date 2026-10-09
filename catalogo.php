@@ -157,8 +157,8 @@ header('X-Content-Type-Options: nosniff');
     .catsec h2{font-size:18px;}
   }
   /* compacto + categorias separadas */
-  .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
-  .imgwrap{aspect-ratio:1/1;max-height:150px;}
+  .grid{grid-template-columns:repeat(auto-fill,150px);justify-content:start;gap:12px;}
+  .imgwrap{aspect-ratio:1/1;}
   .info{padding:9px 10px 11px;}
   .name{font-size:13px;line-height:1.3;margin-bottom:4px;}
   .price{font-size:17px;}
@@ -166,8 +166,7 @@ header('X-Content-Type-Options: nosniff');
   .catsec h2{background:var(--plum);color:#fff;border-bottom:3px solid var(--gold);margin:0 -16px 16px;padding:12px 16px;font-size:19px;}
   .catsec h2 .count{background:var(--gold);color:var(--plum);}
   @media (max-width:640px){
-    .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
-    .imgwrap{max-height:110px;}
+    .grid{grid-template-columns:repeat(3,minmax(0,1fr));justify-content:stretch;gap:8px;}
     .info{padding:6px 6px 8px;}
     .name{font-size:11.5px;min-height:2.6em;}
     .price{font-size:14px;}
