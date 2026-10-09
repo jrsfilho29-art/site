@@ -170,6 +170,11 @@
   .role-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
   .role-badge.admin{background:var(--tint-warm,#FDF0D2);color:var(--gold-deep);}
   .role-badge.user{background:var(--tint);color:var(--plum);}
+  .sthumb{display:inline-block;flex-shrink:0;border-radius:6px;border:1px solid var(--line);background:#fff;object-fit:contain;vertical-align:middle;}
+  .sthumb.none{display:inline-flex;align-items:center;justify-content:center;color:var(--muted2,#9aa0c0);background:var(--tint);}
+  .prodcell{display:flex;align-items:center;gap:10px;min-width:0;}
+  tr.catrow td{background:var(--tint);font-weight:600;color:var(--plum);padding:8px 12px;}
+  tr.subrow td{background:#F7F7FC;font-size:12px;font-weight:600;color:var(--gold-deep);padding:5px 12px 5px 20px;}
   .grid-split{grid-template-columns:1.6fr 1fr;}
   @media(max-width:860px){.grid-split{grid-template-columns:1fr;}}
   .selbox{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:6px;padding:4px 5px;display:flex;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12);}
@@ -1861,6 +1866,11 @@ const actions_clientes = {
 };
 
 /* ================= produtos ================= */
+function thumbHTML(p, size){
+  size = size || 40;
+  const st = `width:${size}px;height:${size}px;`;
+  return p && p.image ? `<img class="sthumb" src="${esc(p.image)}" alt="" loading="lazy" style="${st}">` : `<span class="sthumb none" style="${st}" aria-hidden="true">${icon('image',Math.round(size*0.45))}</span>`;
+}
 function vialHTML(p){
   const min = p.minStock||0;
   const cap = (p.maxStock!=null && p.maxStock>0) ? p.maxStock : Math.max(min*3, 10, p.stock);
@@ -2302,18 +2312,22 @@ function renderEstoquePosicao(){
   </div>
   ${state.products.length===0 ? emptyState(icon('warehouse',26),'Estoque vazio','Cadastre produtos para que o estoque seja organizado automaticamente.') : `
   <div class="table-wrap"><table>
-    <thead><tr><th>Produto</th><th>Categoria</th><th style="text-align:right;">Estoque atual</th><th style="text-align:right;">Disponível</th><th style="text-align:right;">Mínimo</th><th style="text-align:right;">Máximo</th><th style="text-align:center;">Situação</th><th style="text-align:right;">Ajustar</th></tr></thead>
+    <thead><tr><th>Produto</th><th style="text-align:right;">Estoque atual</th><th style="text-align:right;">Disponível</th><th style="text-align:right;">Mínimo</th><th style="text-align:right;">Máximo</th><th style="text-align:center;">Situação</th><th style="text-align:right;">Ajustar</th></tr></thead>
     <tbody>
-      ${state.products.map(p=>{ const low = p.stock<=(p.minStock||0); return `
+      ${catalogStructure(state.products).map(g=>{
+        const units = g.subs.reduce((a,sb)=>a+sb.items.reduce((x,p)=>x+p.stock,0),0);
+        return `<tr class="catrow"><td colspan="7">${esc(g.name)} <span class="pill">${g.count} produto(s)</span> <span class="muted" style="font-weight:400;font-size:12px;margin-left:6px;">${units} un. em estoque</span></td></tr>` +
+        g.subs.map(sb=> (sb.name? `<tr class="subrow"><td colspan="7">${esc(sb.name)} · ${sb.items.length}</td></tr>`:'') + sb.items.map(p=>{ const low = p.stock<=(p.minStock||0); return `
         <tr>
-          <td>${esc(p.name)}</td><td class="muted">${esc(p.category)||'—'}</td>
+          <td><div class="prodcell">${thumbHTML(p,42)}<div style="min-width:0;"><div>${esc(p.name)}</div>${(p.brand||p.sku)?`<div class="muted2" style="font-size:11px;">${esc([p.brand,p.sku].filter(Boolean).join(' · '))}</div>`:''}</div></div></td>
           <td style="text-align:right;white-space:nowrap;">${vialHTML(p)}${p.stock}</td>
           <td style="text-align:right;" class="${p.stock>0?'ok-c':'danger-c'}">${p.stock>0? p.stock : 'indisponível'}</td>
           <td style="text-align:right;" class="muted">${p.minStock||0}</td>
           <td style="text-align:right;" class="muted">${p.maxStock!=null? p.maxStock : '—'}</td>
           <td style="text-align:center;"><span class="${low?'badge-danger':'badge-ok'}">${low?'repor':'ok'}</span></td>
           <td style="text-align:right;"><button class="icon-btn plum" data-action="openAjuste" data-id="${p.id}">${icon('edit')}</button></td>
-        </tr>`;}).join('')}
+        </tr>`;}).join('')).join('');
+      }).join('')}
     </tbody>
   </table></div>`}
   `;
@@ -2414,7 +2428,7 @@ function renderInventario(){
     const head = cat!==lastCat ? `<tr><td colspan="5" style="background:var(--tint);font-weight:600;color:var(--plum);">${esc(cat)}</td></tr>` : ''; lastCat = cat;
     const d = c===undefined ? null : c-it.sys;
     return head + `<tr>
-      <td>${esc(p.name)}<div class="muted2" style="font-size:11px;">${esc([p.sku, p.brand].filter(Boolean).join(' · '))}</div></td>
+      <td><div class="prodcell">${thumbHTML(p,40)}<div style="min-width:0;"><div>${esc(p.name)}</div><div class="muted2" style="font-size:11px;">${esc([p.sku, p.brand].filter(Boolean).join(' · '))}</div></div></div></td>
       <td style="text-align:right;">${it.sys}</td>
       <td style="text-align:right;"><input type="number" min="0" step="1" inputmode="numeric" data-inv-count="${esc(p.id)}" value="${c===undefined?'':c}" style="width:84px;text-align:right;" aria-label="Contagem de ${esc(p.name)}"></td>
       <td style="text-align:right;" id="invdiff-${esc(p.id)}">${d===null?'<span class="muted2">—</span>': d===0?'<span class="badge-ok">confere</span>':`<span class="${d>0?'ok-c':'danger-c'}" style="font-weight:600;">${d>0?'+':''}${d}</span>`}</td>
