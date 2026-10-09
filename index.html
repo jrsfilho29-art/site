@@ -1707,7 +1707,7 @@ function renderSidebar(){
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
-        </div>${id==='produtos' ? `
+        </div>${id==='produtos' && state.tab==='produtos' && state.ui.prodSubOpen ? `
         <label class="navitem subitem"><span class="navicon">${icon('image',14)}</span><span>Vincular fotos por nome</span>
           <input type="file" accept="image/*" multiple webkitdirectory directory style="display:none;" onchange="handleBulkImagesGlobal(this)">
         </label>
@@ -4302,7 +4302,7 @@ function renderOrderDetailIfAny(){
 
 /* ================= actions dispatcher ================= */
 const actions = {
-  goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } { const nt=t.dataset.tab; state.ui.prodSubOpen = (nt==='produtos') ? !(state.tab==='produtos' && state.ui.prodSubOpen) : false; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
   logout(){ const _pend = (syncEnabled() && SYNC.cfg.dirty) ? syncPush(false,true) : Promise.resolve(); _pend.then(()=>{ if(!SYNC.cfg.key){ SYNC.cfg.user=''; SYNC.cfg.hash=''; syncSaveCfg(); } }); sessionClear(); window._loginFaded = false; clearTimeout(window._loginFadeT); window._loginFadeT = null; state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },
