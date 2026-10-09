@@ -73,6 +73,9 @@
   .sidebar .brand .name{font-size:23px;color:var(--gold-soft);font-family:var(--serif);letter-spacing:.4px;}
   .sidebar .brand .sub{font-size:10.5px;color:#B79EC9;margin-top:3px;text-transform:uppercase;letter-spacing:.8px;}
   .sidebar nav{flex:1;padding:14px 0;}
+  .kpi-link{cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}
+  .kpi-link:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(23,32,74,.14);}
+  .kpi-link.on{outline:2px solid var(--gold);}
   .navitem.subitem{padding:7px 12px 7px 40px;font-size:12px;margin-top:-2px;line-height:1.25;}
   .navitem.subitem .navicon{opacity:.8;}
   .navitem{display:flex;align-items:center;gap:11px;padding:10.5px 22px;color:#D8C7E0;font-size:13.5px;cursor:pointer;border-right:3px solid transparent;transition:background-color .12s ease,color .12s ease;}
@@ -2972,10 +2975,10 @@ function renderPedidos(){
     </div>
   </div>
   <div class="grid grid-4 mb3">
-    <div class="card kpi"><div class="klabel">Pendentes</div><div class="kval" style="font-size:22px;">${pending.length}</div><div class="muted2" style="font-size:12px;margin-top:4px;">${brl(pendingValue)} em aberto</div></div>
-    <div class="card kpi"><div class="klabel">Faturados no mês</div><div class="kval" style="font-size:22px;">${invoicedThisMonth.length}</div><div class="muted2" style="font-size:12px;margin-top:4px;">${brl(invoicedValue)}</div></div>
-    <div class="card kpi"><div class="klabel">Rascunhos</div><div class="kval" style="font-size:22px;">${state.orders.filter(o=>o.status==='Rascunho').length}</div></div>
-    <div class="card kpi"><div class="klabel">Cancelados</div><div class="kval" style="font-size:22px;">${state.orders.filter(o=>o.status==='Cancelado').length}</div></div>
+    <div class="card kpi kpi-link ${state.ui.pedidoView==='lista'&&state.ui.orderStatusFilter==='Pendente'?'on':''}" data-action="kpiOrders" data-status="Pendente" title="Ver pedidos pendentes"><div class="klabel">Pendentes</div><div class="kval" style="font-size:22px;">${pending.length}</div><div class="muted2" style="font-size:12px;margin-top:4px;">${brl(pendingValue)} em aberto</div></div>
+    <div class="card kpi kpi-link ${state.ui.pedidoView==='lista'&&state.ui.orderStatusFilter==='Faturado'&&state.ui.orderMonth?'on':''}" data-action="kpiOrders" data-status="Faturado" data-month="1" title="Ver pedidos faturados neste mês"><div class="klabel">Faturados no mês</div><div class="kval" style="font-size:22px;">${invoicedThisMonth.length}</div><div class="muted2" style="font-size:12px;margin-top:4px;">${brl(invoicedValue)}</div></div>
+    <div class="card kpi kpi-link ${state.ui.pedidoView==='lista'&&state.ui.orderStatusFilter==='Rascunho'?'on':''}" data-action="kpiOrders" data-status="Rascunho" title="Ver rascunhos"><div class="klabel">Rascunhos</div><div class="kval" style="font-size:22px;">${state.orders.filter(o=>o.status==='Rascunho').length}</div></div>
+    <div class="card kpi kpi-link ${state.ui.pedidoView==='lista'&&state.ui.orderStatusFilter==='Cancelado'?'on':''}" data-action="kpiOrders" data-status="Cancelado" title="Ver pedidos cancelados"><div class="klabel">Cancelados</div><div class="kval" style="font-size:22px;">${state.orders.filter(o=>o.status==='Cancelado').length}</div></div>
   </div>
   ${state.ui.pedidoView==='nova' ? renderNovoPedido() : renderListaPedidos()}
   `;
@@ -3058,6 +3061,7 @@ function renderListaPedidos(){
   const list = state.orders
     .filter(o=> !q || (o.orderNumber+o.customerName).toLowerCase().includes(q))
     .filter(o=> !statusFilter || o.status===statusFilter)
+    .filter(o=> !(state.ui.orderMonth && statusFilter==='Faturado') || (o.invoicedAt||o.createdAt||'').slice(0,7)===todayISO().slice(0,7))
     .slice().sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
   return `
   <div class="flex gap flex-wrap mb2" style="align-items:center;">
@@ -3068,6 +3072,7 @@ function renderListaPedidos(){
       <button class="${!statusFilter?'on':''}" data-action="filterOrderStatus" data-status="">Todos</button>
       ${ORDER_STATUSES.map(s=>`<button class="${statusFilter===s?'on':''}" data-action="filterOrderStatus" data-status="${s}">${s}</button>`).join('')}
     </div>
+    ${(state.ui.orderMonth && statusFilter==='Faturado') ? `<span class="role-badge user" style="cursor:pointer;" data-action="filterOrderStatus" data-status="Faturado" title="Mostrar de todos os meses">somente deste mês ✕</span>` : ''}
   </div>
   ${list.length===0 ? emptyState(icon('clipboard',26),'Nenhum pedido encontrado','Crie um novo pedido de venda para vê-lo aqui.') : `
   <div class="table-wrap"><table>
@@ -3157,7 +3162,8 @@ const actions_pedidos = {
     state.ui.pedidoView = 'nova';
     render();
   },
-  filterOrderStatus(t){ state.ui.orderStatusFilter = t.dataset.status||''; render(); },
+  filterOrderStatus(t){ state.ui.orderStatusFilter = t.dataset.status||''; state.ui.orderMonth = false; render(); },
+  kpiOrders(t){ state.ui.orderStatusFilter = t.dataset.status||''; state.ui.orderMonth = !!t.dataset.month; state.ui.orderQuery = ''; state.ui.pedidoView = 'lista'; render(); setTimeout(()=>{ const el=document.querySelector('.table-wrap'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },30); },
   viewOrder(t){ state.ui.orderDetail = state.orders.find(o=>o.id===t.dataset.id); render(); },
   closeOrderDetail(){ state.ui.orderDetail=null; render(); },
   invoiceOrder(t){
