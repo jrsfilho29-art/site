@@ -1784,6 +1784,11 @@ function renderDashboard(){
   const topMax = top.length ? top[0][1].rev : 1;
 
   return `
+  <div class="flex gap flex-wrap mb3">
+    <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
+    <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
+    <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
+  </div>
   <div class="grid grid-4 mb3">
     ${cards.map(([label,val,sub,ic])=>`
       <div class="card kpi">
@@ -1840,11 +1845,7 @@ function renderDashboard(){
         </div>`).join('')}
     </div>
   </div>`:''}
-  <div class="flex gap flex-wrap">
-    <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
-    <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
-    <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
-  </div>`;
+  `;
 }
 
 /* ================= clientes ================= */
