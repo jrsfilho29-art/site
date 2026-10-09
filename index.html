@@ -73,6 +73,8 @@
   .sidebar .brand .name{font-size:23px;color:var(--gold-soft);font-family:var(--serif);letter-spacing:.4px;}
   .sidebar .brand .sub{font-size:10.5px;color:#B79EC9;margin-top:3px;text-transform:uppercase;letter-spacing:.8px;}
   .sidebar nav{flex:1;padding:14px 0;}
+  .navitem.subitem{padding:7px 12px 7px 40px;font-size:12px;margin-top:-2px;line-height:1.25;}
+  .navitem.subitem .navicon{opacity:.8;}
   .navitem{display:flex;align-items:center;gap:11px;padding:10.5px 22px;color:#D8C7E0;font-size:13.5px;cursor:pointer;border-right:3px solid transparent;transition:background-color .12s ease,color .12s ease;}
   .navitem:hover{background:rgba(255,255,255,.05);color:#F1E5DB;}
   .navitem.active{background:linear-gradient(90deg, rgba(228,207,160,.16), var(--gold-soft));color:var(--plum-dark);font-weight:600;border-right:3px solid var(--gold);}
@@ -1705,7 +1707,11 @@ function renderSidebar(){
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
-        </div>`;
+        </div>${id==='produtos' ? `
+        <label class="navitem subitem"><span class="navicon">${icon('image',14)}</span><span>Vincular fotos por nome</span>
+          <input type="file" accept="image/*" multiple webkitdirectory directory style="display:none;" onchange="handleBulkImagesGlobal(this)">
+        </label>
+        <div class="navitem subitem" data-action="openFixBlackBg"><span class="navicon">${icon('image',14)}</span><span>Corrigir fundo preto das imagens</span></div>` : ''}`;
       }).join('')}
     </nav>
     <div class="footer">
@@ -2016,11 +2022,7 @@ function renderProdutos(){
           <label class="dropdown-item admin-only">${icon('upload',15)} Importar (CSV/Excel/HTML)
             <input type="file" accept=".csv,.xlsx,.xls,.html,.htm" style="display:none;" onchange="handleImportFileGlobal(this)">
           </label>
-          <label class="dropdown-item">${icon('image',15)} Vincular fotos por nome
-            <input type="file" accept="image/*" multiple webkitdirectory directory style="display:none;" onchange="handleBulkImagesGlobal(this)">
-          </label>
           <button class="dropdown-item" data-action="openExportProducts">${icon('download',15)} Exportar produtos</button>
-          <button class="dropdown-item" data-action="openFixBlackBg">${icon('image',15)} Corrigir fundo preto das fotos</button>
           <div class="dropdown-sep"></div>
           <button class="dropdown-item" data-action="openCategoriesManager">${icon('edit',15)} Gerenciar categorias</button>
         </div>` : ''}
