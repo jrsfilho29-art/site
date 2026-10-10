@@ -2052,8 +2052,8 @@ function renderProductCard(p, sel){
           </label>
         </div>
         <div style="padding:12px;">
-          <div class="gold-c" style="font-size:11px;">${esc(p.category)||'Sem categoria'}${p.volume? ' · '+esc(p.volume)+'ml':''}</div>
-          <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${pcode(p)}${esc(p.name)}</div>
+          ${p.volume? `<div class="gold-c" style="font-size:11px;">${esc(p.volume)}ml</div>`:''}
+          <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${esc(p.name)}</div>
           ${p.brand? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand)}</div>`:'<div style="margin-bottom:4px;"></div>'}
           ${state.prefs.showPrices!==false ? `
           <div>
