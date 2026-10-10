@@ -1552,6 +1552,15 @@ function render(){
       </div>`;
     return;
   }
+  /* Campos numéricos viram texto com teclado numérico: assim o navegador não perde o cursor nem o ponto decimal enquanto se digita */
+  app.querySelectorAll('input[type=number][data-field]').forEach(function(inp){
+    const st = inp.getAttribute('step');
+    inp.dataset.num = (st && st!=='1') ? 'dec' : 'int';
+    inp.setAttribute('inputmode', inp.dataset.num==='dec' ? 'decimal' : 'numeric');
+    inp.setAttribute('autocomplete','off');
+    inp.type = 'text';
+    inp.value = inp.getAttribute('value') || '';   /* o valor digitado (ex.: "10.") não pode ser descartado como número inválido */
+  });
   attachDelegatedEvents();
 
   if(activeId || activeField){
@@ -1562,6 +1571,10 @@ function render(){
     if(el){
       el.focus();
       if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd);}catch(e){} }
+      else if(el.tagName==='INPUT' && el.type==='number'){
+        /* campos numéricos não expõem a posição do cursor: sem isso ele voltava para o início a cada tecla */
+        try{ const t0 = el.type; el.type = 'text'; const n = el.value.length; el.setSelectionRange(n, n); el.type = t0; }catch(e){}
+      }
     }
   }
   window.scrollTo(0, scrollY);
@@ -1626,6 +1639,14 @@ function setPath(obj, path, val){
 function handleFieldInput(t){
   const path = t.dataset.field;
   let val = t.type==='checkbox' ? t.checked : t.value;
+  if(t.dataset.num){
+    /* aceita vírgula ou ponto; só dígitos e um separador decimal */
+    let v = String(val).replace(',', '.');
+    v = t.dataset.num==='dec' ? v.replace(/[^0-9.]/g,'').replace(/^(\d*\.\d*).*$/s, function(m,g){ return g; }) : v.replace(/[^0-9]/g,'');
+    if(t.dataset.num==='dec'){ const i = v.indexOf('.'); if(i>=0) v = v.slice(0,i+1) + v.slice(i+1).replace(/\./g,''); }
+    if(v !== t.value){ const pos = t.selectionStart; t.value = v; try{ t.setSelectionRange(Math.min(pos==null?v.length:pos, v.length), Math.min(pos==null?v.length:pos, v.length)); }catch(e){} }
+    val = v;
+  }
   setPath(state, path, val);
   if(path.indexOf('prefs.')===0){ persist('prefs'); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
