@@ -42,7 +42,7 @@ if(isset($_GET['img'])){
 try{
   $cats = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
   $subs = $pdo->query('SELECT name, category FROM subcategories ORDER BY name')->fetchAll();
-  $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume FROM products WHERE active = 1 AND stock > 0')->fetchAll();
+  $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll();
 }catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
 
 $coll = class_exists('Collator') ? new Collator('pt_BR') : null;
@@ -89,7 +89,9 @@ function card($p){
   $vol = trim((string)$p['volume']); if($vol !== '' && is_numeric($vol)) $vol .= 'ml';
   $brand = trim((string)$p['brand']);
   $meta = ($brand !== '' || $vol !== '') ? '<div class="cat">'.e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol).'</div>' : '';
-  return '<div class="card"><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div></div></div>';
+  $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
+  $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div></div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -175,6 +177,21 @@ header('X-Content-Type-Options: nosniff');
     .catsec h2{margin:0 -10px 12px;padding:10px 12px;font-size:16px;}
   }
   @media (max-width:340px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  /* detalhe do produto */
+  .card{cursor:pointer;}
+  .lb{position:fixed;inset:0;z-index:50;background:rgba(13,18,48,.72);display:none;align-items:center;justify-content:center;padding:16px;}
+  .lb.on{display:flex;}
+  .lb-box{position:relative;background:#fff;border-radius:10px;max-width:760px;width:100%;max-height:92vh;overflow:auto;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);box-shadow:0 30px 80px rgba(0,0,0,.45);}
+  .lb-img{background:#fff;display:flex;align-items:center;justify-content:center;padding:14px;min-height:280px;border-right:1px solid var(--line);}
+  .lb-img img{width:100%;max-height:70vh;object-fit:contain;display:block;}
+  .lb-info{padding:26px 24px 24px;}
+  .lb-brand{font-size:12px;color:var(--gold-deep);letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px;}
+  .lb-name{font-size:21px;font-weight:600;color:var(--plum);line-height:1.25;margin-bottom:10px;}
+  .lb-price{font-size:26px;font-weight:300;color:var(--plum);margin-bottom:14px;}
+  .lb-desc{font-size:14px;line-height:1.6;color:var(--ink);white-space:pre-line;border-top:1px solid var(--line);padding-top:14px;}
+  .lb-desc.empty{color:var(--muted);font-style:italic;}
+  .lb-x{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:var(--plum);color:#fff;font-size:20px;line-height:1;cursor:pointer;z-index:2;}
+  @media (max-width:640px){.lb{padding:0;align-items:flex-end;}.lb-box{grid-template-columns:1fr;max-height:94vh;border-radius:14px 14px 0 0;}.lb-img{min-height:0;border-right:none;border-bottom:1px solid var(--line);}.lb-img img{max-height:44vh;}.lb-info{padding:18px 16px 22px;}.lb-name{font-size:18px;}}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>
@@ -201,5 +218,29 @@ header('X-Content-Type-Options: nosniff');
 <?php endforeach; endif; ?>
   </div>
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
+<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div></div></div></div>
+<script>
+(function(){
+  var lb=document.getElementById('lb');if(!lb)return;
+  function $(i){return document.getElementById(i);}
+  function open(c){
+    var ci=c.querySelector('.imgwrap img'),s=ci?ci.getAttribute('src'):'',im=$('lb-i');
+    if(s){im.src=s;im.alt=c.getAttribute('data-name')||'';im.parentNode.style.display='';}else{im.removeAttribute('src');im.parentNode.style.display='none';}
+    $('lb-b').textContent=c.getAttribute('data-meta')||'';
+    $('lb-n').textContent=c.getAttribute('data-name')||'';
+    $('lb-p').textContent=c.getAttribute('data-price')||'';
+    var d=c.getAttribute('data-desc')||'',de=$('lb-d');
+    de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
+    lb.className='lb on';document.body.style.overflow='hidden';
+  }
+  function close(){lb.className='lb';document.body.style.overflow='';}
+  document.addEventListener('click',function(e){
+    var c=e.target.closest&&e.target.closest('.card[data-name]');
+    if(c&&!lb.contains(e.target)){open(c);return;}
+    if(e.target===lb||(e.target.closest&&e.target.closest('.lb-x')))close();
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+})();
+</script>
 </body>
 </html>
