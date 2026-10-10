@@ -1483,10 +1483,12 @@ function searchProducts(q, limit){
     if(p.active===false) return;
     const code = String(p.sku||'').trim().toLowerCase(), name = String(p.name||'').toLowerCase();
     let sc = 0;
-    if(code && code===q) sc = 100;
-    else if(isNum && /^\d+$/.test(code) && parseInt(code,10)===qn) sc = 95;    /* "1" encontra 0001 */
-    else if(code && code.startsWith(q)) sc = 80;
-    else if(code && q.length>=2 && code.includes(q)) sc = 60;
+    /* códigos numéricos (0001...) e com letras (A001...) não se misturam: número só acha número, letras só acham letras */
+    const codeNum = /^\d+$/.test(code), sameKind = !!code && (codeNum === isNum);
+    if(sameKind && code===q) sc = 100;
+    else if(sameKind && isNum && parseInt(code,10)===qn) sc = 95;    /* "1" encontra 0001 */
+    else if(sameKind && code.startsWith(q)) sc = 80;
+    else if(sameKind && q.length>=2 && code.includes(q)) sc = 60;
     else if(name.includes(q)) sc = 40;
     if(sc) scored.push({p,sc});
   });
