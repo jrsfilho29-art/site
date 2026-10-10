@@ -55,6 +55,14 @@ catch(Throwable $e){
   catch(Throwable $e2){ $hasRole = false; }
 }
 
+/* ---- código do cliente: cria a coluna 'code' sozinho em bancos antigos ---- */
+$hasCustCode = true;
+try{ $pdo->query('SELECT code FROM customers LIMIT 1'); }
+catch(Throwable $e){
+  try{ $pdo->exec("ALTER TABLE customers ADD COLUMN code VARCHAR(20) NOT NULL DEFAULT ''"); }
+  catch(Throwable $e2){ $hasCustCode = false; }
+}
+
 /* ---- status público: aparelho novo descobre se o servidor já tem usuários (não revela mais nada) ---- */
 if((string)($req['action'] ?? '') === 'status'){
   try{ $n = (int)$pdo->query('SELECT COUNT(*) AS n FROM users')->fetch()['n']; }catch(Throwable $e){ $n = 0; }
@@ -131,7 +139,7 @@ try{
     ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
 
     $d['customers'] = array_map(fn($r)=>[
-      'id'=>$r['id'], 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
+      'id'=>$r['id'], 'code'=>s($r['code'] ?? ''), 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
       'cpf'=>s($r['cpf']), 'address'=>s($r['address']), 'notes'=>s($r['notes']), 'createdAt'=>fromDt($r['created_at'])
     ], rows($pdo, 'SELECT * FROM customers ORDER BY name'));
 
@@ -222,9 +230,13 @@ try{
         $st->execute($row);
       }
 
-      $st = $ins('INSERT INTO customers (id,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?)');
+      $st = $ins($hasCustCode
+        ? 'INSERT INTO customers (id,code,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?)'
+        : 'INSERT INTO customers (id,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?)');
       foreach($d['customers'] as $c){
-        $st->execute([s($c['id']??''), s($c['name']??''), s($c['phone']??''), s($c['email']??''), s($c['cpf']??''), s($c['address']??''), s($c['notes']??''), toDt($c['createdAt']??null) ?? gmdate('Y-m-d H:i:s')]);
+        $row = [s($c['id']??''), s($c['name']??''), s($c['phone']??''), s($c['email']??''), s($c['cpf']??''), s($c['address']??''), s($c['notes']??''), toDt($c['createdAt']??null) ?? gmdate('Y-m-d H:i:s')];
+        if($hasCustCode) array_splice($row, 1, 0, [mb_substr(s($c['code']??''), 0, 20)]);
+        $st->execute($row);
       }
 
       $st = $ins('INSERT INTO categories (id,name) VALUES (?,?)');

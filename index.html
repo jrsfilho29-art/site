@@ -782,7 +782,7 @@ function buildDataSQL(){
   if(state.customers.length){
     lines.push('-- clientes');
     state.customers.forEach(c=>{
-      lines.push(`INSERT INTO customers (id,name,phone,email,cpf,address,notes,created_at) VALUES (${sqlStr(c.id)},${sqlStr(c.name)},${sqlStr(c.phone)},${sqlStr(c.email)},${sqlStr(c.cpf)},${sqlStr(c.address)},${sqlStr(c.notes)},${sqlDate(c.createdAt)});`);
+      lines.push(`INSERT INTO customers (id,code,name,phone,email,cpf,address,notes,created_at) VALUES (${sqlStr(c.id)},${sqlStr(c.code||'')},${sqlStr(c.name)},${sqlStr(c.phone)},${sqlStr(c.email)},${sqlStr(c.cpf)},${sqlStr(c.address)},${sqlStr(c.notes)},${sqlDate(c.createdAt)});`);
     });
     lines.push('');
   }
@@ -1375,6 +1375,7 @@ function syncApplyPulled(j){
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
     state[k] = Array.isArray(d[k]) ? d[k] : [];
     if(k==='products' && ensureProductCodes()) codesAdded = true;
+    if(k==='customers' && ensureCustomerCodes()) codesAdded = true;
     persist(k);
   });
   SYNC.applying = false;
@@ -1496,6 +1497,20 @@ function searchProducts(q, limit){
   scored.sort((a,b)=> b.sc-a.sc || String(a.p.name).localeCompare(String(b.p.name),'pt-BR'));
   return scored.slice(0, limit||6).map(x=>x.p);
 }
+/* Código sequencial dos clientes: 0001, 0002, ... (campo "code") */
+function nextCustomerCode(){
+  let max = 0;
+  state.customers.forEach(c=>{ const k = String(c.code||'').trim(); if(/^\d+$/.test(k)){ const n = parseInt(k,10); if(n>max) max=n; } });
+  return String(max+1).padStart(4,'0');
+}
+function ensureCustomerCodes(){
+  const missing = state.customers.map((c,i)=>({c,i})).filter(x=>!String(x.c.code||'').trim());
+  if(!missing.length) return false;
+  missing.sort((a,b)=> String(a.c.createdAt||'9999').localeCompare(String(b.c.createdAt||'9999')) || a.i-b.i);
+  missing.forEach(x=>{ x.c.code = nextCustomerCode(); });
+  return true;
+}
+function ccode(c){ return c && c.code ? `<b class="pcode">${esc(c.code)}</b>` : ''; }
 function nextProductCode(){
   let max = 0;
   state.products.forEach(p=>{ const c = String(p.sku||'').trim(); if(/^\d+$/.test(c)){ const n = parseInt(c,10); if(n>max) max=n; } });
@@ -1510,6 +1525,7 @@ function ensureProductCodes(){
 }
 function persist(key){
   if(key==='products') ensureProductCodes();
+  if(key==='customers') ensureCustomerCodes();
   const map = {customers:KEYS.customers, products:KEYS.products, sales:KEYS.sales, users:KEYS.users, categories:KEYS.categories, subcategories:KEYS.subcategories, orders:KEYS.orders, prefs:KEYS.prefs};
   const ok = LS.set(map[key], state[key]);
   if(key!=='prefs' && !SYNC.applying) syncSchedulePush();
@@ -1790,7 +1806,7 @@ function renderGlobalResults(){
   const q = (state.ui.globalQuery||'').trim().toLowerCase();
   if(q.length<2) return '';
   const prods = state.products.filter(p=>(p.name+' '+(p.category||'')+' '+(p.sku||'')).toLowerCase().includes(q)).slice(0,4);
-  const clis = state.customers.filter(c=>(c.name+' '+(c.phone||'')).toLowerCase().includes(q)).slice(0,3);
+  const clis = state.customers.filter(c=>((c.code||'')+' '+c.name+' '+(c.phone||'')).toLowerCase().includes(q)).slice(0,3);
   if(!prods.length && !clis.length) return `<div class="search-results"><div class="search-result-item" style="cursor:default;color:var(--muted2);">Nenhum resultado</div></div>`;
   return `<div class="search-results">
     ${prods.map(p=>`<div class="search-result-item" data-action="gotoProduct" data-id="${p.id}">
@@ -1983,7 +1999,7 @@ function renderDashboard(){
 /* ================= clientes ================= */
 function renderClientes(){
   const q = state.ui.clientQuery.toLowerCase();
-  const list = state.customers.filter(c=> (c.name+c.phone+c.email+c.cpf).toLowerCase().includes(q));
+  const list = state.customers.filter(c=> ((c.code||'')+' '+c.name+c.phone+c.email+c.cpf).toLowerCase().includes(q));
   return `
   <div class="flex-between flex-wrap mb2"><div>
       <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Clientes</h2>
@@ -1992,15 +2008,15 @@ function renderClientes(){
     <button class="btn btn-gold" data-action="newCliente">${icon('plus')} Novo cliente</button>
   </div>
   <div class="relative mb2" style="max-width:320px;">
-    <input placeholder="Buscar cliente..." data-field="ui.clientQuery" value="${esc(state.ui.clientQuery)}">
+    <input placeholder="Buscar cliente por código ou nome..." data-field="ui.clientQuery" value="${esc(state.ui.clientQuery)}">
   </div>
   ${list.length===0 ? emptyState(icon('users',26),'Nenhum cliente','Cadastre o primeiro cliente da loja para começar a vincular vendas.') : `
   <div class="table-wrap"><table>
-    <thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>CPF</th><th style="text-align:right;">Ações</th></tr></thead>
+    <thead><tr><th>Código</th><th>Nome</th><th>Telefone</th><th>E-mail</th><th>CPF</th><th style="text-align:right;">Ações</th></tr></thead>
     <tbody>
       ${list.map(c=>`
         <tr>
-          <td>${esc(c.name)}</td><td class="muted">${esc(c.phone)||'—'}</td><td class="muted">${esc(c.email)||'—'}</td><td class="muted">${esc(c.cpf)||'—'}</td>
+          <td>${ccode(c)||'—'}</td><td>${esc(c.name)}</td><td class="muted">${esc(c.phone)||'—'}</td><td class="muted">${esc(c.email)||'—'}</td><td class="muted">${esc(c.cpf)||'—'}</td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="icon-btn plum" data-action="viewCustomer" data-id="${c.id}" title="Histórico de compras">${icon('chart')}</button>
             <button class="icon-btn plum" data-action="editCliente" data-id="${c.id}">${icon('edit')}</button>
@@ -2013,7 +2029,7 @@ function renderClientes(){
 }
 
 const actions_clientes = {
-  newCliente(){ state.ui.modal = {type:'cliente', data:{id:null,name:'',phone:'',email:'',cpf:'',address:'',notes:''}}; render(); },
+  newCliente(){ state.ui.modal = {type:'cliente', data:{id:null,code:nextCustomerCode(),name:'',phone:'',email:'',cpf:'',address:'',notes:''}}; render(); },
   editCliente(t){ const c = state.customers.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'cliente', data:{...c}}; render(); },
   deleteCliente(t){
     if(!confirm('Excluir este cliente?')) return;
@@ -2808,7 +2824,7 @@ function renderNovaVenda(){
         <label class="field"><span class="lbl">Cliente</span>
           <select data-field="ui.venda.customerId">
             <option value="">Consumidor Final</option>
-            ${state.customers.map(c=>`<option value="${c.id}" ${V.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+            ${state.customers.map(c=>`<option value="${c.id}" ${V.customerId===c.id?'selected':''}>${c.code?esc(c.code)+' · ':''}${esc(c.name)}</option>`).join('')}
           </select>
         </label>
         <div class="relative">
@@ -3133,7 +3149,7 @@ function renderNovoPedido(){
         <label class="field"><span class="lbl">Cliente</span>
           <select data-field="ui.pedido.customerId">
             <option value="">Consumidor Final</option>
-            ${state.customers.map(c=>`<option value="${c.id}" ${P.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+            ${state.customers.map(c=>`<option value="${c.id}" ${P.customerId===c.id?'selected':''}>${c.code?esc(c.code)+' · ':''}${esc(c.name)}</option>`).join('')}
           </select>
         </label>
         <div class="relative">
@@ -4258,6 +4274,7 @@ function modalWrap(title, body, wide){
 
 function renderClienteModal(d){
   const body = `
+    <label class="field"><span class="lbl">Código</span><input data-field="ui.modal.data.code" value="${esc(d.code||'')}" style="max-width:140px;"></label>
     <label class="field"><span class="lbl">Nome completo</span><input id="cli-name" data-field="ui.modal.data.name" value="${esc(d.name)}"></label>
     <div class="grid grid-2">
       <label class="field"><span class="lbl">Telefone</span><input data-field="ui.modal.data.phone" value="${esc(d.phone)}"></label>
@@ -4596,7 +4613,8 @@ document.addEventListener('click', function(e){
 /* ================= init ================= */
 applyPrefs();
 sessionRestore();
-if(ensureProductCodes()) persist('products');   /* dá código 0001, 0002... aos produtos que ainda não têm */
+if(ensureProductCodes()) persist('products');
+if(ensureCustomerCodes()) persist('customers');   /* dá código 0001, 0002... aos produtos que ainda não têm */
 render();
 syncStartup().then(()=>{ if(!SYNC.busy) render(); });
 syncDetectServer();
