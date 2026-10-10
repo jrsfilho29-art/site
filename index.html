@@ -3066,7 +3066,7 @@ function nextOrderNumber(){
   return 'PED-' + String(n).padStart(4,'0');
 }
 function emptyPedido(){
-  return { id:null, orderNumber:'', customerId:'', search:'', cart:[], discount:0, shipping:0, expectedDate:'', notes:'' };
+  return { id:null, orderNumber:'', customerId:'', search:'', cart:[], discount:0, discountType:'value', shipping:0, expectedDate:'', notes:'' };
 }
 
 function renderPedidos(){
@@ -3099,7 +3099,7 @@ function renderNovoPedido(){
   const P = state.ui.pedido;
   const editing = !!P.id;
   const subtotal = P.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
-  const discount = Math.max(0, parseFloat(P.discount)||0);
+  const discount = +computeDiscountAmount(subtotal, P.discount, P.discountType).toFixed(2);
   const shipping = Math.max(0, parseFloat(P.shipping)||0);
   const total = Math.max(0, subtotal - discount + shipping);
   const results = searchProducts(P.search);
@@ -3156,7 +3156,16 @@ function renderNovoPedido(){
     <div>
       <div class="card">
         <div class="flex-between" style="font-size:14px;margin-bottom:8px;"><span class="muted">Subtotal</span><span>${brl(subtotal)}</span></div>
-        <label class="field"><span class="lbl">Desconto (R$)</span><input type="number" step="0.01" min="0" data-field="ui.pedido.discount" value="${esc(P.discount)}"></label>
+        <label class="field"><span class="lbl">Desconto</span>
+          <div class="flex gap">
+            <input type="number" step="0.01" min="0" style="flex:1;" data-field="ui.pedido.discount" value="${esc(P.discount)}">
+            <div class="segbar">
+              <button class="${P.discountType!=='percent'?'on':''}" data-action="setPedidoDiscountType" data-type="value">R$</button>
+              <button class="${P.discountType==='percent'?'on':''}" data-action="setPedidoDiscountType" data-type="percent">%</button>
+            </div>
+          </div>
+          ${P.discountType==='percent' ? `<span class="hint">${Math.min(Math.max(0,parseFloat(P.discount)||0),100)}% = ${brl(discount)}</span>` : ''}
+        </label>
         <label class="field"><span class="lbl">Frete (R$)</span><input type="number" step="0.01" min="0" data-field="ui.pedido.shipping" value="${esc(P.shipping)}"></label>
         <div class="flex-between serif" style="font-size:20px;margin-bottom:16px;color:var(--plum);"><span>Total</span><span>${brl(total)}</span></div>
         <button class="btn btn-ghost btn-block" style="margin-bottom:8px;" data-action="savePedido" data-status="Rascunho">${icon('save')} Salvar como rascunho</button>
@@ -3233,7 +3242,7 @@ const actions_pedidos = {
     const status = t.dataset.status;
     if(P.cart.length===0){ notify.err('Adicione ao menos um produto ao pedido.'); return; }
     const subtotal = P.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
-    const discount = Math.max(0, parseFloat(P.discount)||0);
+    const discount = +computeDiscountAmount(subtotal, P.discount, P.discountType).toFixed(2);
     const shipping = Math.max(0, parseFloat(P.shipping)||0);
     const total = Math.max(0, subtotal - discount + shipping);
     const customer = state.customers.find(c=>c.id===P.customerId);
@@ -3262,13 +3271,14 @@ const actions_pedidos = {
     state.ui.pedidoView = 'lista';
     render();
   },
+  setPedidoDiscountType(t){ state.ui.pedido.discountType = t.dataset.type; render(); },
   editPedido(t){
     const o = state.orders.find(x=>x.id===t.dataset.id);
     if(!o) return;
     state.ui.pedido = {
       id:o.id, orderNumber:o.orderNumber, customerId:o.customerId||'', search:'',
       cart: o.items.map(i=>({productId:i.productId, name:i.name, qty:i.qty, unitPrice:i.unitPrice})),
-      discount:o.discount||0, shipping:o.shipping||0, expectedDate:o.expectedDate||'', notes:o.notes||''
+      discount:o.discount||0, discountType:'value', shipping:o.shipping||0, expectedDate:o.expectedDate||'', notes:o.notes||''
     };
     state.ui.pedidoView = 'nova';
     render();
