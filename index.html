@@ -117,7 +117,7 @@
 
   .relative{position:relative;}
   .search-results{position:absolute;left:0;right:0;margin-top:5px;z-index:10;background:var(--paper);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 10px 24px rgba(36,26,34,.12);}
-  .search-result-item{padding:9px 13px;display:flex;justify-content:space-between;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--line);transition:background-color .1s ease;}
+  .search-result-item{padding:9px 13px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--line);transition:background-color .1s ease;}
   .search-result-item:hover{background:#FBF4E7;}
 
   .flex{display:flex;}
@@ -2756,7 +2756,7 @@ function renderNovaVenda(){
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="addToCart" data-id="${p.id}">
-                <span>${esc(p.name)}</span><span class="muted">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
@@ -2768,8 +2768,8 @@ function renderNovaVenda(){
           <tbody>
             ${V.cart.map(i=>`
               <tr>
-                <td>${esc(i.name)}</td>
-                <td style="text-align:center;">
+                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${esc(i.name)}</span></div></td>
+                <td style="text-align:center;white-space:nowrap;">
                   <button class="icon-btn" data-action="cartQtyDec" data-id="${i.productId}">${icon('minus')}</button>
                   <span style="display:inline-block;min-width:20px;text-align:center;">${i.qty}</span>
                   <button class="icon-btn" data-action="cartQtyInc" data-id="${i.productId}">${icon('plus')}</button>
@@ -3079,7 +3079,7 @@ function renderNovoPedido(){
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="pedidoAddToCart" data-id="${p.id}">
-                <span>${esc(p.name)}</span><span class="muted">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
@@ -3091,8 +3091,8 @@ function renderNovoPedido(){
           <tbody>
             ${P.cart.map(i=>`
               <tr>
-                <td>${esc(i.name)}</td>
-                <td style="text-align:center;">
+                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${esc(i.name)}</span></div></td>
+                <td style="text-align:center;white-space:nowrap;">
                   <button class="icon-btn" data-action="pedidoQtyDec" data-id="${i.productId}">${icon('minus',12)}</button>
                   <span style="display:inline-block;min-width:20px;text-align:center;">${i.qty}</span>
                   <button class="icon-btn" data-action="pedidoQtyInc" data-id="${i.productId}">${icon('plus',12)}</button>
