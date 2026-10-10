@@ -511,10 +511,17 @@ function simpleHash(str){
 
 /* All product images are standardized to a fixed square thumbnail (center-cropped)
    so every registered product has images of the same size, and stored files stay small. */
-const THUMB_SIZE = 220;
+const THUMB_SIZE = 480;          /* resolução das fotos novas (antes 220) */
+const THUMB_SIZE_MIN = 220;      /* usada quando o armazenamento do navegador está quase cheio */
+function lsUsage(){ let n=0; try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); n += k.length + (localStorage.getItem(k)||'').length; } }catch(e){} return n; }
+function encodeCanvas(canvas){
+  try{ const w = canvas.toDataURL('image/webp',0.84); if(w.indexOf('data:image/webp')===0) return w; }catch(e){}
+  return canvas.toDataURL('image/jpeg',0.88);
+}
 
 function imageElToSquareDataURL(img, size){
-  size = size || THUMB_SIZE;
+  size = size || (lsUsage() > 3300000 ? THUMB_SIZE_MIN : THUMB_SIZE);   /* protege o limite de ~5 MB do navegador */
+  size = Math.max(64, Math.min(size, Math.max(img.width, img.height)));  /* nunca aumenta foto pequena */
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
@@ -522,8 +529,9 @@ function imageElToSquareDataURL(img, size){
   ctx.fillStyle = '#fff'; ctx.fillRect(0,0,size,size);
   const scale = Math.min(size/img.width, size/img.height);
   const dw = img.width*scale, dh = img.height*scale;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, (size-dw)/2, (size-dh)/2, dw, dh);
-  return canvas.toDataURL('image/jpeg',0.8);
+  return encodeCanvas(canvas);
 }
 
 function resizeImage(file, size){
@@ -549,7 +557,10 @@ async function standardizeAllProductImages(){
       const dataUrl = await new Promise((resolve,reject)=>{
         const img = new Image();
         if(/^https?:\/\//i.test(p.image)) img.crossOrigin = 'anonymous';
-        img.onload = () => { try{ resolve(imageElToSquareDataURL(img)); }catch(err){ reject(err); } };
+        img.onload = () => { try{
+          /* foto já quadrada e dentro do tamanho: mantém (evita recomprimir e perder qualidade) */
+          if(/^data:image\//i.test(p.image) && img.width===img.height && img.width<=THUMB_SIZE) return resolve(p.image);
+          resolve(imageElToSquareDataURL(img)); }catch(err){ reject(err); } };
         img.onerror = reject;
         img.src = p.image;
       });
@@ -1226,7 +1237,7 @@ function whitenBlackBackground(img, T){
     }
   }
   x.putImageData(id,0,0);
-  return { dataUrl: cv.toDataURL('image/jpeg',0.85), removed: removed/(W*H), edgeDark: dark/n };
+  return { dataUrl: cv.toDataURL('image/jpeg',0.9), removed: removed/(W*H), edgeDark: dark/n };
 }
 async function scanBlackBackgrounds(){
   const found = [];
