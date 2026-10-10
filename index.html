@@ -988,8 +988,9 @@ function buildCatalogPageHTML(list){
   document.addEventListener('click',function(e){
     var c=e.target.closest&&e.target.closest('.card[data-name]');
     if(c&&!lb.contains(e.target)){open(c);return;}
-    if(e.target===lb||(e.target.closest&&e.target.closest('.lb-x')))close();
+    if((e.target===lb&&(!window._lbd||window._lbd===lb))||(e.target.closest&&e.target.closest('.lb-x')))close();
   });
+  document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
 })();
 <\/script>
@@ -1639,6 +1640,8 @@ function attachDelegatedEvents(){
   if(listenersAttached) return;
   listenersAttached = true;
   const app = document.getElementById('app');
+  app.addEventListener('mousedown', e => { window._mdTarget = e.target; }, true);
+  document.addEventListener('click', () => { setTimeout(()=>{ window._mdTarget = undefined; }, 0); }, true);
 
   app.addEventListener('click', e => {
     const t = e.target.closest('[data-action]');
@@ -4632,7 +4635,11 @@ const actions = {
   toggleMenu(){ state.ui.menuOpen = !state.ui.menuOpen; render(); },
   gotoProduct(t){ const p=state.products.find(x=>x.id===t.dataset.id); state.ui.globalQuery=''; state.tab='produtos'; state.ui.productQuery = p? p.name : ''; render(); },
   gotoCustomer(t){ const c=state.customers.find(x=>x.id===t.dataset.id); state.ui.globalQuery=''; state.tab='clientes'; state.ui.clientQuery = c? c.name : ''; render(); },
-  closeModalOverlay(t,e){ if(e.target===t){ state.ui.modal=null; render(); } },
+  closeModalOverlay(t,e){
+    /* só fecha se o clique COMEÇOU e terminou no fundo escuro (arrastar para selecionar texto e soltar fora não fecha a janela) */
+    const startedOutside = (window._mdTarget===undefined || window._mdTarget===t);
+    if(e.target===t && startedOutside){ state.ui.modal=null; render(); }
+  },
   ...actions_login,
   ...actions_clientes,
   ...actions_produtos,

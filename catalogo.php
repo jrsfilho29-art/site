@@ -245,8 +245,9 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   document.addEventListener('click',function(e){
     var c=e.target.closest&&e.target.closest('.card[data-name]');
     if(c&&!lb.contains(e.target)){open(c);return;}
-    if(e.target===lb||(e.target.closest&&e.target.closest('.lb-x')))close();
+    if((e.target===lb&&(!window._lbd||window._lbd===lb))||(e.target.closest&&e.target.closest('.lb-x')))close();
   });
+  document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
 })();
 </script>
