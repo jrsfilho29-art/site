@@ -8,10 +8,13 @@
    ?img=ID entrega a foto do produto (com cache).
    ============================================================ */
 $dbFile = __DIR__ . '/database.php';
+$WHATSAPP = '';  /* número da loja com DDI+DDD, só dígitos (ex.: 5511999998888). Ou defina CATALOG_WHATSAPP no database.php */
 function plain($code, $msg){ http_response_code($code); header('Content-Type: text/html; charset=utf-8'); header('Cache-Control: no-store');
   echo '<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Catálogo</title><body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#5A6088">'.htmlspecialchars($msg).'</body>'; exit; }
 if(!is_file($dbFile)) plain(503, 'Catálogo indisponível no momento.');
 require $dbFile;
+if(defined('CATALOG_WHATSAPP') && $WHATSAPP === '') $WHATSAPP = (string)CATALOG_WHATSAPP;
+$WHATSAPP = preg_replace('/\D/', '', (string)$WHATSAPP);
 function e($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 try { $pdo = db(); } catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
@@ -96,7 +99,11 @@ function card($p){
   $meta = '<div class="cat">'.(($brand !== '' || $vol !== '') ? e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol) : '&nbsp;').'</div>';
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
-  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div></div></div>';
+  global $WHATSAPP;
+  $btn = $WHATSAPP !== ''
+    ? '<a class="buy wa" target="_blank" rel="noopener" href="https://wa.me/'.e($WHATSAPP).'?text='.rawurlencode('Olá! Tenho interesse neste perfume: '.$p['name'].' ('.brl($p['sale_price']).')').'">Pedir no WhatsApp</a>'
+    : '<span class="buy">Ver detalhes</span>';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -222,6 +229,60 @@ header('X-Content-Type-Options: nosniff');
   .lb-info{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
   .lb-desc{flex:1;min-height:0;overflow-y:auto;}
   @media (max-width:640px){.lb-box{height:68vh;grid-template-rows:minmax(0,38%) minmax(0,1fr);}.lb-img img{max-height:100%;height:100%;}}
+
+  /* ===== layout vitrine de loja ===== */
+  body{background:#F7F5F0;}
+  header{padding:38px 20px 30px;border-bottom:none;}
+  header p{color:var(--gold-soft);letter-spacing:.2em;text-transform:uppercase;font-size:12px;margin-top:6px;}
+  .hero-tools{position:relative;max-width:560px;margin:22px auto 0;display:flex;flex-direction:column;gap:12px;align-items:stretch;}
+  .search{position:relative;}
+  .search input{width:100%;font:inherit;font-size:15px;padding:13px 18px 13px 44px;border-radius:999px;border:2px solid transparent;background:#fff;color:var(--ink);outline:none;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  .search input:focus{border-color:var(--gold);}
+  .search svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted);pointer-events:none;}
+  .cta-wa{display:inline-flex;align-items:center;justify-content:center;gap:8px;align-self:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:14px;padding:10px 22px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+  .nav{top:0;justify-content:flex-start;gap:8px;padding:12px 20px;background:rgba(247,245,240,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);box-shadow:0 4px 14px rgba(13,18,48,.06);scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav a{border-radius:999px;border:1px solid var(--line);background:#fff;padding:8px 16px;font-size:13.5px;white-space:nowrap;}
+  .nav a.on{background:var(--plum);border-color:var(--plum);color:#fff;}
+  .nav a.on span{color:var(--gold-soft);}
+  .wrap{padding-top:24px;}
+  .catsec{background:none;border:none;border-radius:0;padding:0;margin-bottom:38px;overflow:visible;}
+  .catsec h2{background:none;color:var(--plum);border:none;margin:0 0 16px;padding:0 0 12px;font-size:24px;position:relative;}
+  .catsec h2::after{content:'';position:absolute;left:0;bottom:0;width:54px;height:3px;background:var(--gold);border-radius:2px;}
+  .catsec h2 .count{background:var(--tint);color:var(--plum);border-radius:999px;}
+  .catsec h3{margin:22px 0 12px;color:var(--gold-deep);text-transform:uppercase;letter-spacing:.08em;font-size:12.5px;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));justify-content:stretch;gap:20px;}
+  .card{border:none;border-radius:18px;box-shadow:0 2px 6px rgba(13,18,48,.06),0 10px 24px rgba(13,18,48,.07);}
+  .card:hover{transform:translateY(-4px);box-shadow:0 6px 12px rgba(13,18,48,.08),0 18px 36px rgba(13,18,48,.14);}
+  .imgwrap{border-bottom:none;background:#fff;padding:10px;}
+  .info{padding:4px 16px 16px;text-align:left;}
+  .cat{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+  .name{font-size:15px;min-height:2.6em;}
+  .price{font-size:22px;font-weight:600;color:var(--plum);margin:8px 0 12px;}
+  .buy{display:block;text-align:center;text-decoration:none;font-size:13.5px;font-weight:600;padding:10px 12px;border-radius:999px;background:var(--plum);color:#fff;border:none;cursor:pointer;}
+  .buy:hover{background:var(--plum-dark);}
+  .buy.wa{background:#25D366;color:#073B1B;}
+  .buy.wa:hover{background:#1FB85A;}
+  .noresult{display:none;text-align:center;color:var(--muted);padding:50px 20px;}
+  .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:13px;padding:10px;border-radius:999px;}
+  .lb-box{border-radius:18px;}
+  @media (max-width:640px){
+    header{padding:24px 14px 20px;}
+    .hero-tools{margin-top:16px;}
+    .nav{padding:10px 12px;}
+    .wrap{padding:16px 12px 44px;}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .card{border-radius:14px;}
+    .card:hover{transform:none;}
+    .info{padding:2px 10px 12px;}
+    .cat{display:block;font-size:10.5px;}
+    .name{font-size:13px;min-height:2.6em;}
+    .price{font-size:17px;margin:6px 0 10px;}
+    .buy{font-size:12.5px;padding:9px 8px;}
+    .catsec h2{font-size:20px;}
+    .lb-box{border-radius:18px 18px 0 0;}
+  }
+  @media (max-width:340px){.grid{grid-template-columns:minmax(0,1fr);}}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>
@@ -230,9 +291,13 @@ header('X-Content-Type-Options: nosniff');
     <svg class="logo" viewBox="0 0 84 84" width="56" height="56" aria-hidden="true"><path d="M42 3 L52.6 18.4 L70.2 13.8 L65.6 31.4 L81 42 L65.6 52.6 L70.2 70.2 L52.6 65.6 L42 81 L31.4 65.6 L13.8 70.2 L18.4 52.6 L3 42 L18.4 31.4 L13.8 13.8 L31.4 18.4 Z" fill="none" stroke="#F0A81F" stroke-width="1.6"/><path d="M42 14 L67 29 V55 L42 70 L17 55 V29 Z" fill="none" stroke="#FBD98A" stroke-width="1" opacity=".7"/><circle cx="42" cy="42" r="3.5" fill="#F0A81F"/></svg>
     <h1>Essência</h1>
     <p>Catálogo de Perfumes</p>
+    <div class="hero-tools">
+      <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar perfume..." aria-label="Buscar perfume" autocomplete="off"></label>
+<?php if($WHATSAPP !== ''): ?>      <a class="cta-wa" target="_blank" rel="noopener" href="https://wa.me/<?= e($WHATSAPP) ?>?text=<?= rawurlencode('Olá! Vi o catálogo da Essência e gostaria de ajuda.') ?>">Falar no WhatsApp</a>
+<?php endif; ?>    </div>
   </header>
 <?php if(count($groups) > 1): ?>
-  <nav class="nav"><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
+  <nav class="nav" id="tabs"><a href="#" data-cat="all" class="on">Todos</a><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
 <?php endif; ?>
   <div class="wrap">
 <?php if(!$groups): ?>
@@ -247,9 +312,10 @@ header('X-Content-Type-Options: nosniff');
 <?php endforeach; ?>
     </section>
 <?php endforeach; endif; ?>
+    <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
-<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div></div></div></div>
+<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Pedir no WhatsApp</a></div></div></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
@@ -264,16 +330,42 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('lb-p').textContent=c.getAttribute('data-price')||'';
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
+    var w=$('lb-w'),cw=c.querySelector('a.buy.wa');if(w){if(cw){w.href=cw.href;w.style.display='block';}else w.style.display='none';}
     lb.className='lb on';document.body.style.overflow='hidden';
   }
   function close(){lb.className='lb';document.body.style.overflow='';}
   document.addEventListener('click',function(e){
+    if(e.target.closest&&e.target.closest('a.buy'))return;
     var c=e.target.closest&&e.target.closest('.card[data-name]');
     if(c&&!lb.contains(e.target)){open(c);return;}
     if((e.target===lb&&(!window._lbd||window._lbd===lb))||(e.target.closest&&e.target.closest('.lb-x')))close();
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+})();
+
+(function(){
+  var q=document.getElementById('q'),tabs=document.getElementById('tabs'),active='all';
+  var secs=[].slice.call(document.querySelectorAll('.catsec')),nr=document.getElementById('noresult');
+  function norm(s){s=(s||'').toLowerCase();try{s=s.normalize('NFD').replace(/[̀-ͯ]/g,'');}catch(e){}return s;}
+  function apply(){
+    var t=norm(q?q.value:''),any=false;
+    secs.forEach(function(sec){
+      var on=active==='all'||sec.id===active,vis=0;
+      [].slice.call(sec.querySelectorAll('.grid')).forEach(function(g){
+        var n=0;[].slice.call(g.querySelectorAll('.card')).forEach(function(c){
+          var m=!t||norm((c.getAttribute('data-name')||'')+' '+(c.getAttribute('data-meta')||'')).indexOf(t)>-1;
+          c.style.display=m?'':'none';if(m)n++;});
+        g.style.display=n?'':'none';var h=g.previousElementSibling;if(h&&h.tagName==='H3')h.style.display=n?'':'none';vis+=n;});
+      sec.style.display=(on&&vis)?'':'none';if(on&&vis)any=true;});
+    if(nr)nr.style.display=any?'none':'block';
+  }
+  if(q)q.addEventListener('input',apply);
+  if(tabs)tabs.addEventListener('click',function(e){
+    var a=e.target.closest('a[data-cat]');if(!a)return;e.preventDefault();
+    active=a.getAttribute('data-cat');[].slice.call(tabs.querySelectorAll('a')).forEach(function(x){x.className=x===a?'on':'';});
+    apply();var w=document.querySelector('.wrap');if(w&&window.scrollY>w.offsetTop)window.scrollTo(0,Math.max(0,w.offsetTop-60));
+  });
 })();
 </script>
 </body>
