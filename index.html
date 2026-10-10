@@ -189,6 +189,7 @@
   tr.catrow td{background:var(--tint);font-weight:600;color:var(--plum);padding:8px 12px;}
   tr.subrow td{background:#F7F7FC;font-size:12px;font-weight:600;color:var(--gold-deep);padding:5px 12px 5px 20px;}
   .grid-split{grid-template-columns:1.6fr 1fr;}
+  .grid>*{min-width:0;}
   @media(max-width:860px){.grid-split{grid-template-columns:1fr;}}
   .selbox{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:6px;padding:4px 5px;display:flex;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12);}
   .selbox input{width:15px;height:15px;cursor:pointer;margin:0;}
@@ -388,6 +389,8 @@
     .prod-img{height:88px;}
     .grid-4{grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;}
     .kpi .kval{font-size:20px;}
+    .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .kpi .klabel{word-break:break-word;min-width:0;}
     .main{padding:12px 10px;}
     h2.serif{font-size:21px!important;}
   }
@@ -2000,7 +2003,7 @@ function renderDashboard(){
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
   </div>
-  <div class="grid grid-4 mb3">
+  <div class="grid grid-4 kpi-grid mb3">
     ${cards.map(([label,val,sub,ic])=>`
       <div class="card kpi">
         <div class="flex-between mb1" style="align-items:flex-start;">
@@ -3257,8 +3260,8 @@ function renderNovoPedido(){
       <div class="card">
         <div class="flex-between" style="font-size:14px;margin-bottom:8px;"><span class="muted">Subtotal</span><span>${brl(subtotal)}</span></div>
         <label class="field"><span class="lbl">Desconto</span>
-          <div class="flex gap">
-            <input type="number" step="0.01" min="0" style="flex:1;" data-field="ui.pedido.discount" value="${esc(P.discount)}">
+          <div class="flex gap flex-wrap">
+            <input type="number" step="0.01" min="0" style="flex:1;min-width:120px;" data-field="ui.pedido.discount" value="${esc(P.discount)}">
             <div class="segbar">
               <button class="${P.discountType!=='percent'?'on':''}" data-action="setPedidoDiscountType" data-type="value">R$</button>
               <button class="${P.discountType==='percent'?'on':''}" data-action="setPedidoDiscountType" data-type="percent">%</button>
@@ -3682,7 +3685,7 @@ function renderRelatorios(){
     <button class="btn btn-gold" data-action="printRelatorio">${icon('printer')} Imprimir relatório</button>
   </div>
   <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
-  <div class="grid" style="grid-template-columns:repeat(4,1fr);" class="mb3">
+  <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Receita</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(revenue)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Custo</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(cost)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Lucro líquido</div><div class="serif" style="font-size:20px;" class="${profit>=0?'ok-c':'danger-c'}">${brl(profit)}</div></div>
