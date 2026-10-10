@@ -1,4 +1,5 @@
 <?php
+// Essência — software proprietário. Copyright (c) 2026. Todos os direitos reservados (veja LICENSE).
 /* ============================================================
    Essência — API de sincronização (PHP + MySQL)
    Coloque este arquivo junto com index.html e database.php em public_html.
@@ -17,6 +18,14 @@ function out($code, $arr){
 function fail($code, $msg, $extra = []){ out($code, array_merge(['ok'=>false, 'error'=>$msg], $extra)); }
 
 if(($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') fail(405, 'Use POST.');
+
+/* ---- só aceita chamadas feitas pelo próprio site (bloqueia uso a partir de outros domínios) ---- */
+$__origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if($__origin !== '' && $__origin !== 'null'){
+  $__oh = strtolower((string)parse_url($__origin, PHP_URL_HOST));
+  $__rh = strtolower((string)parse_url('//'.($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
+  if($__oh !== $__rh && !in_array($__oh, ['localhost','127.0.0.1'], true)) fail(403, 'Origem não autorizada.', ['code'=>'bad_origin']);
+}
 
 $dbFile = __DIR__ . '/database.php';
 if(!is_file($dbFile)) fail(500, 'Arquivo database.php não encontrado ao lado do api.php.', ['code'=>'no_config']);

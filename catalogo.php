@@ -1,4 +1,5 @@
 <?php
+// Essência — software proprietário. Copyright (c) 2026. Todos os direitos reservados (veja LICENSE).
 /* ============================================================
    Essência — Catálogo público (monta a página direto do banco)
    Abra https://SEU-SITE/catalogo.php  — sempre atualizado, sem subir arquivo.
@@ -17,6 +18,10 @@ try { $pdo = db(); } catch(Throwable $ex){ plain(503, 'Catálogo indisponível n
 
 /* ---------- foto de um produto ---------- */
 if(isset($_GET['img'])){
+  $__ref = $_SERVER['HTTP_REFERER'] ?? '';
+  if($__ref !== '' && strtolower((string)parse_url($__ref, PHP_URL_HOST)) !== strtolower((string)parse_url('//'.($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST))){
+    http_response_code(403); exit; /* impede usar as fotos em outros sites (hotlink) */
+  }
   try{
     $st = $pdo->prepare('SELECT image FROM products WHERE id = ? AND active = 1');
     $st->execute([(string)$_GET['img']]);
@@ -192,6 +197,7 @@ header('X-Content-Type-Options: nosniff');
   .lb-desc.empty{color:var(--muted);font-style:italic;}
   .lb-x{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:var(--plum);color:#fff;font-size:20px;line-height:1;cursor:pointer;z-index:2;}
   @media (max-width:640px){.lb{padding:0;align-items:flex-end;}.lb-box{grid-template-columns:1fr;max-height:94vh;border-radius:14px 14px 0 0;}.lb-img{min-height:0;border-right:none;border-bottom:1px solid var(--line);}.lb-img img{max-height:44vh;}.lb-info{padding:18px 16px 22px;}.lb-name{font-size:18px;}}
+  .imgwrap img,.lb-img img{-webkit-user-drag:none;user-select:none;-webkit-touch-callout:none;}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>
@@ -220,6 +226,8 @@ header('X-Content-Type-Options: nosniff');
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div></div></div></div>
 <script>
+document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
+document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 (function(){
   var lb=document.getElementById('lb');if(!lb)return;
   function $(i){return document.getElementById(i);}

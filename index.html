@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="copyright" content="Essência — todos os direitos reservados">
+<meta name="robots" content="noindex,nofollow">
+<!-- Essência — Gestão de Perfumaria. Software proprietário. Copyright © 2026. Todos os direitos reservados.
+     Cópia, redistribuição, revenda ou hospedagem em outro domínio sem autorização são proibidas (veja LICENSE). -->
 <title>Essência — Gestão de Perfumaria</title>
 <style>
   /* Sem dependência de internet: usa fontes do sistema com visual elegante.
@@ -390,6 +394,20 @@
 <div id="toaster"></div>
 
 <script>
+/* ---- Proteção de licença: o sistema só abre nos endereços autorizados ---- */
+(function(){
+  var LIC = {
+    hosts: ['seuperfume.net','www.seuperfume.net','localhost','127.0.0.1'], /* domínios autorizados */
+    allowFile: true  /* true = também abre como arquivo no próprio computador; mude para false se usar só pelo site */
+  };
+  var ok = location.protocol==='file:' ? LIC.allowFile : (LIC.hosts.indexOf(location.hostname)>=0);
+  if(!ok){
+    document.open();
+    document.write('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso não autorizado</title><body style="margin:0;font-family:system-ui,sans-serif;background:#17204A;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px"><div><h1 style="font-weight:300;letter-spacing:.12em">Essência</h1><p style="color:#F0A81F">Esta cópia não está licenciada para este endereço.</p><p style="opacity:.75;font-size:14px">Software proprietário. Todos os direitos reservados.</p></div></body>');
+    document.close();
+    throw new Error('licenca');
+  }
+})();
 /* ================= storage helpers ================= */
 const LS = {
   get(k, def){ try{ const v = localStorage.getItem(k); return v===null? def : JSON.parse(v); }catch(e){ return def; } },

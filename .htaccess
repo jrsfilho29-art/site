@@ -1,4 +1,29 @@
-# Bloqueia download direto de arquivos que não devem ser públicos
-<FilesMatch "\.(sql|md|sqlite)$">
+# ---------- Essência: proteção dos arquivos ----------
+Options -Indexes
+
+# Nunca servir arquivos internos, backups, bancos de dados e a configuração
+<FilesMatch "\.(sql|md|sqlite|zip|bak|log|json|env|ini|sh|yml|yaml)$">
   Require all denied
 </FilesMatch>
+<FilesMatch "^(database\.php|LICENSE)$">
+  Require all denied
+</FilesMatch>
+# pasta .git e arquivos ocultos
+RedirectMatch 404 /\.(?!well-known)
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "same-origin"
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+  Header always set Content-Security-Policy "frame-ancestors 'self'"
+</IfModule>
+
+# Impede que outros sites usem as fotos do catálogo diretamente
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{QUERY_STRING} (^|&)img= [NC]
+  RewriteCond %{HTTP_REFERER} !^$
+  RewriteCond %{HTTP_REFERER} !^https?://(www\.)?seuperfume\.net/ [NC]
+  RewriteRule ^catalogo\.php$ - [F]
+</IfModule>
