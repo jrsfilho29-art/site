@@ -8,6 +8,15 @@
 <!-- Essência — Gestão de Perfumaria. Software proprietário. Copyright © 2026. Todos os direitos reservados.
      Cópia, redistribuição, revenda ou hospedagem em outro domínio sem autorização são proibidas (veja LICENSE). -->
 <title>Essência — Gestão de Perfumaria</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#17204A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Essência">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   /* Sem dependência de internet: usa fontes do sistema com visual elegante.
      Se "Playfair Display"/"Inter" já estiverem instaladas no computador, são usadas; senão, cai no fallback. */
@@ -2014,6 +2023,7 @@ function renderSidebar(){
     </nav>
     <div class="footer">
       <div class="uname"><span class="avatar">${esc((state.currentUser.name||'?').trim().charAt(0).toUpperCase())}</span><span style="display:flex;flex-direction:column;line-height:1.25;min-width:0;"><span>${esc(state.currentUser.name)}</span><span style="font-size:10.5px;opacity:.7;font-weight:400;">${ROLE_LABEL[roleOf(state.currentUser)]}</span></span></div>
+      ${isStandalone()? '' : `<button class="logout" data-action="installApp">${icon('download',13)} Instalar aplicativo</button>`}
       <button class="logout" data-action="openMyPassword">${icon('key',13)} Minha senha</button>
       <button class="logout" data-action="logout">${icon('logout',13)} Sair</button>
     </div>
@@ -4728,6 +4738,13 @@ function renderOrderDetailIfAny(){
 /* ================= actions dispatcher ================= */
 const actions = {
   goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } { const nt=t.dataset.tab; state.ui.prodSubOpen = (nt==='produtos') ? !(state.tab==='produtos' && state.ui.prodSubOpen) : false; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  async installApp(){
+    const ev = window._pwaPrompt;
+    if(ev){ window._pwaPrompt = null; try{ ev.prompt(); const r = await ev.userChoice; if(r && r.outcome==='accepted') notify.ok('Aplicativo instalado! Procure o ícone da Essência na sua tela ou área de trabalho.'); }catch(e){} render(); return; }
+    if(!/^https?:/i.test(location.protocol)){ notify.err('Abra o programa pelo seu site (seuperfume.net) para instalar o aplicativo.'); return; }
+    if(/iphone|ipad|ipod/i.test(navigator.userAgent)) notify.ok('No iPhone/iPad: toque no botão Compartilhar do Safari e escolha "Adicionar à Tela de Início".');
+    else notify.ok('No menu do navegador (⋮ ou ⋯), escolha "Instalar aplicativo" ou "Adicionar à tela inicial".');
+  },
   logout(){ const _pend = (syncEnabled() && SYNC.cfg.dirty) ? syncPush(false,true) : Promise.resolve(); _pend.then(()=>{ if(!SYNC.cfg.key){ SYNC.cfg.user=''; SYNC.cfg.hash=''; syncSaveCfg(); } }); sessionClear(); window._loginFaded = false; clearTimeout(window._loginFadeT); window._loginFadeT = null; state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },
@@ -4876,6 +4893,12 @@ document.addEventListener('click', function(e){
 
 /* ================= init ================= */
 applyPrefs();
+/* ícone / instalação como aplicativo (PWA) */
+function isStandalone(){ try{ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone===true; }catch(e){ return false; } }
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); window._pwaPrompt = e; });
+window.addEventListener('appinstalled', ()=>{ window._pwaPrompt = null; try{ render(); }catch(e){} });
+if('serviceWorker' in navigator && /^https?:/i.test(location.protocol)){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+
 sessionRestore();
 if(ensureProductCodes()) persist('products');
 if(ensureCustomerCodes()) persist('customers');
