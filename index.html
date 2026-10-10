@@ -1973,7 +1973,7 @@ function renderDashboard(){
     <div>
       ${lowStock.slice(0,6).map(p=>`
         <div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;">
-          <span>${esc(p.name)}</span><span class="muted">${p.stock} un. (mín. ${p.minStock||0})</span>
+          <span>${pcode(p)}${esc(p.name)}</span><span class="muted">${p.stock} un. (mín. ${p.minStock||0})</span>
         </div>`).join('')}
     </div>
   </div>`:''}
