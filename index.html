@@ -2408,7 +2408,17 @@ const actions_produtos = {
     const id=t.dataset.id; let ph='';
     if(id){ const c=state.customers.find(x=>x.id===id); ph=waPhone(c&&c.phone); if(!ph){ notify.err('Cliente sem telefone válido.'); return; } }
     const u='https://wa.me/'+ph+'?text='+encodeURIComponent(catalogMsg());
+    // copia a imagem da logo para colar na conversa (o WhatsApp não aceita anexo por link)
+    let copied = false;
+    try{
+      if(/^https?:/i.test(location.protocol) && navigator.clipboard && window.ClipboardItem){
+        const imgUrl = new URL('og-catalogo.png', location.href).href;
+        navigator.clipboard.write([ new ClipboardItem({'image/png': fetch(imgUrl).then(r=>r.blob())}) ]).catch(()=>{});
+        copied = true;
+      }
+    }catch(e){}
     if(!window.open(u,'_blank','noopener')) location.href=u;
+    if(copied) notify.ok('Logo copiada. Na conversa do WhatsApp, cole (Ctrl+V ou segurar e colar) para enviar a imagem junto com a mensagem.');
   },
   async catShare(){
     const text=catalogMsg();
@@ -3575,7 +3585,7 @@ function renderCatalogoEnviar(){
       <button class="btn btn-ghost" data-action="catSendEmail">E-mail</button>
       <button class="btn btn-ghost" data-action="catSendSms">SMS</button>
     </div>
-    <p class="muted2" style="font-size:11.5px;margin-top:10px;">"Enviar por WhatsApp" abre o WhatsApp para você escolher o contato. O catálogo mostra só produtos ativos e com estoque, sem custo nem dados de clientes.</p>
+    <p class="muted2" style="font-size:11.5px;margin-top:10px;">"Enviar por WhatsApp" copia a logo e abre o WhatsApp: cole a imagem na conversa (Ctrl+V) junto com a mensagem. No celular, "Compartilhar..." envia a logo e a mensagem de uma vez, escolhendo o WhatsApp e o contato. O catálogo mostra só produtos ativos e com estoque, sem custo nem dados de clientes.</p>
   </div>
   <div class="card" style="padding:18px;max-width:720px;">
     <b>Enviar para um cliente cadastrado</b>
