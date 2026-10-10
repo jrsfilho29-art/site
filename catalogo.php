@@ -93,7 +93,7 @@ function card($p){
   $im = $src !== '' ? '<img src="'.e($src).'" alt="'.e($p['name']).'" loading="lazy">' : '<div class="noimg">sem foto</div>';
   $vol = trim((string)$p['volume']); if($vol !== '' && is_numeric($vol)) $vol .= 'ml';
   $brand = trim((string)$p['brand']);
-  $meta = ($brand !== '' || $vol !== '') ? '<div class="cat">'.e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol).'</div>' : '';
+  $meta = '<div class="cat">'.(($brand !== '' || $vol !== '') ? e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol) : '&nbsp;').'</div>';
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
   return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div></div></div>';
@@ -198,6 +198,17 @@ header('X-Content-Type-Options: nosniff');
   .lb-x{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:var(--plum);color:#fff;font-size:20px;line-height:1;cursor:pointer;z-index:2;}
   @media (max-width:640px){.lb{padding:0;align-items:flex-end;}.lb-box{grid-template-columns:1fr;max-height:68vh;border-radius:14px 14px 0 0;}.lb-img{min-height:0;border-right:none;border-bottom:1px solid var(--line);}.lb-img img{max-height:22vh;}.lb-info{padding:18px 16px 22px;}.lb-name{font-size:14px;}}
   .imgwrap img,.lb-img img{-webkit-user-drag:none;user-select:none;-webkit-touch-callout:none;}
+  /* tamanho padrão: todos os cards e a janela do produto têm sempre as mesmas dimensões */
+  .card{display:flex;flex-direction:column;}
+  .card .info{flex:1;display:flex;flex-direction:column;}
+  .cat{min-height:1.25em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;min-height:2.6em;}
+  .price{margin-top:auto;}
+  .lb-box{height:min(380px,86vh);grid-template-rows:minmax(0,1fr);}
+  .lb-img{min-height:0;}
+  .lb-info{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .lb-desc{flex:1;min-height:0;overflow-y:auto;}
+  @media (max-width:640px){.lb-box{height:68vh;grid-template-rows:minmax(0,38%) minmax(0,1fr);}.lb-img img{max-height:100%;height:100%;}}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>

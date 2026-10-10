@@ -103,10 +103,13 @@
   .empty .t{font-family:var(--serif);font-size:17px;color:var(--plum);}
   .empty .s{font-size:13px;margin-top:5px;max-width:320px;margin-left:auto;margin-right:auto;}
 
-  .prod-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden;transition:box-shadow .15s ease,transform .15s ease;}
+  .prod-card{background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden;transition:box-shadow .15s ease,transform .15s ease;display:flex;flex-direction:column;height:100%;}
+  .prod-card .pbody{flex:1;display:flex;flex-direction:column;}
+  .prod-card .pname{font-weight:500;font-size:14px;margin-bottom:2px;line-height:1.3;min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .prod-card .pmeta{font-size:10.5px;margin-bottom:4px;min-height:1.3em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .prod-card:hover{box-shadow:0 8px 22px rgba(36,26,34,.1);transform:translateY(-2px);}
   .prod-img{height:96px;background:linear-gradient(160deg,#F6EFE2,var(--cream));display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
-  .prod-img img{width:100%;height:100%;object-fit:cover;}
+  .prod-img img{width:100%;height:100%;object-fit:contain;background:#fff;}
 
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
     background:radial-gradient(circle at 30% 20%, #4A2740, var(--plum) 55%, var(--plum-dark) 100%);padding:16px;}
@@ -848,7 +851,7 @@ function buildCatalogPageHTML(list){
     return `<div class="card" data-name="${esc(p.name)}" data-meta="${esc(metaTxt)}" data-price="${esc(brl(p.salePrice))}" data-desc="${esc((p.description||'').trim())}">
       <div class="imgwrap">${img}${soldOut}</div>
       <div class="info">
-        ${(p.brand||p.volume)? `<div class="cat">${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':''):''}</div>`:''}
+        ${`<div class="cat">${(p.brand||p.volume)?'':'&nbsp;'}${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':''):''}</div>`}
         <div class="name">${esc(p.name)}</div>
         <div class="price">${brl(p.salePrice)}</div>
       </div>
@@ -956,6 +959,17 @@ function buildCatalogPageHTML(list){
   .lb-desc.empty{color:var(--muted);font-style:italic;}
   .lb-x{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:none;background:var(--plum);color:#fff;font-size:20px;line-height:1;cursor:pointer;z-index:2;}
   @media (max-width:640px){.lb{padding:0;align-items:flex-end;}.lb-box{grid-template-columns:1fr;max-height:68vh;border-radius:14px 14px 0 0;}.lb-img{min-height:0;border-right:none;border-bottom:1px solid var(--line);}.lb-img img{max-height:22vh;}.lb-info{padding:18px 16px 22px;}.lb-name{font-size:14px;}}
+  /* tamanho padrão: todos os cards e a janela do produto têm sempre as mesmas dimensões */
+  .card{display:flex;flex-direction:column;}
+  .card .info{flex:1;display:flex;flex-direction:column;}
+  .cat{min-height:1.25em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;min-height:2.6em;}
+  .price{margin-top:auto;}
+  .lb-box{height:min(380px,86vh);grid-template-rows:minmax(0,1fr);}
+  .lb-img{min-height:0;}
+  .lb-info{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .lb-desc{flex:1;min-height:0;overflow-y:auto;}
+  @media (max-width:640px){.lb-box{height:68vh;grid-template-rows:minmax(0,38%) minmax(0,1fr);}.lb-img img{max-height:100%;height:100%;}}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
 </head>
@@ -2113,10 +2127,10 @@ function renderProductCard(p, sel){
             <input type="checkbox" data-action="toggleProductSelect" data-id="${p.id}" ${sel.includes(p.id)?'checked':''}>
           </label>
         </div>
-        <div style="padding:12px;">
-          ${p.volume? `<div class="gold-c" style="font-size:11px;">${esc(p.volume)}ml</div>`:''}
-          <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${esc(p.name)}</div>
-          ${p.brand? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand)}</div>`:'<div style="margin-bottom:4px;"></div>'}
+        <div class="pbody" style="padding:12px;">
+          <div class="gold-c" style="font-size:11px;min-height:1.3em;">${p.volume? esc(p.volume)+'ml' : '&nbsp;'}</div>
+          <div class="pname" title="${esc(p.name)}">${esc(p.name)}</div>
+          <div class="muted2 pmeta">${p.brand? esc(p.brand) : '&nbsp;'}</div>
           ${state.prefs.showPrices!==false ? `
           <div>
             <span class="serif" style="font-size:17px;color:var(--plum);">${brl(p.salePrice)}</span>
@@ -2124,7 +2138,7 @@ function renderProductCard(p, sel){
           <div style="font-size:12px;margin-top:8px;display:flex;align-items:center;" class="${p.stock<=(p.minStock||0)?'danger-c':'muted'}">
             ${vialHTML(p)}<span>${p.stock} un. em estoque ${p.stock<=(p.minStock||0)?'· repor':''}</span>
           </div>
-          <div class="flex gap" style="margin-top:8px;">
+          <div class="flex gap" style="margin-top:auto;padding-top:8px;">
             <button class="btn btn-ghost" style="flex:1;justify-content:center;padding:6px 8px;" data-action="editProduto" data-id="${p.id}">${icon('edit')} Editar</button>
             <button class="icon-btn danger-c" data-action="deleteProduto" data-id="${p.id}">${icon('trash')}</button>
           </div>
@@ -4679,7 +4693,9 @@ document.addEventListener('click', function(e){
 applyPrefs();
 sessionRestore();
 if(ensureProductCodes()) persist('products');
-if(ensureCustomerCodes()) persist('customers');   /* dá código 0001, 0002... aos produtos que ainda não têm */
+if(ensureCustomerCodes()) persist('customers');
+/* uma vez: deixa todas as fotos no mesmo formato (quadradas, fundo branco, até 480px) */
+try{ if(!localStorage.getItem('ess_imgstd1')){ standardizeAllProductImages().then(function(ch){ try{ localStorage.setItem('ess_imgstd1','1'); }catch(e){} if(ch) render(); }).catch(function(){}); } }catch(e){}   /* dá código 0001, 0002... aos produtos que ainda não têm */
 render();
 syncStartup().then(()=>{ if(!SYNC.busy) render(); });
 syncDetectServer();
