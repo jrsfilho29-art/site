@@ -497,6 +497,7 @@ const ICONS = {
   eye: '<path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff: '<path d="M3 3l18 18"/><path d="M10.8 5.2A11 11 0 0 1 12 5.1c6.2 0 10 6.9 10 6.9a15.7 15.7 0 0 1-3.4 4"/><path d="M6.6 6.7A15.6 15.6 0 0 0 2 12s3.8 6.9 10 6.9c1 0 2-.2 2.9-.5"/><path d="M9.4 9.6a3 3 0 0 0 4.2 4.2"/>',
   cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z"/>',
+  send: '<path d="M21 3L10 14"/><path d="M21 3l-6.5 18-4-8-8-4z"/>',
   upload: '<path d="M12 19V6"/><path d="M6 11l6-6.2L18 11"/><path d="M4.5 19h15"/>',
   download: '<path d="M12 5v13"/><path d="M6 12.8l6 6 6-6"/><path d="M4.5 19.5h15"/>'
 };
@@ -2401,8 +2402,21 @@ const actions_produtos = {
     state.ui.modal = null; render();
     notify.ok(n+' foto(s) corrigida(s). O catálogo do site atualiza depois da sincronização.');
   },
+  catSendWhats(t){
+    const id=t.dataset.id; let ph='';
+    if(id){ const c=state.customers.find(x=>x.id===id); ph=waPhone(c&&c.phone); if(!ph){ notify.err('Cliente sem telefone válido.'); return; } }
+    const u='https://wa.me/'+ph+'?text='+encodeURIComponent(catalogMsg());
+    if(!window.open(u,'_blank','noopener')) location.href=u;
+  },
+  async catShare(){
+    const text=catalogMsg();
+    if(navigator.share){ try{ await navigator.share({title:'Catálogo Essência', text, url:catalogPublicUrl()}); }catch(e){} }
+    else { try{ await navigator.clipboard.writeText(text); notify.ok('Mensagem copiada. Cole onde quiser enviar.'); }catch(e){ notify.err('Seu navegador não permite compartilhar. Use o WhatsApp ou copie o link.'); } }
+  },
+  catSendEmail(){ location.href='mailto:?subject='+encodeURIComponent('Catálogo Essência')+'&body='+encodeURIComponent(catalogMsg()); },
+  catSendSms(){ location.href='sms:?&body='+encodeURIComponent(catalogMsg()); },
   async copyCatalogLink(){
-    const url = /^https?:/i.test(location.protocol) ? new URL('catalogo.php', location.href).href : 'catalogo.php';
+    const url = catalogPublicUrl();
     try{ await navigator.clipboard.writeText(url); notify.ok('Link copiado: '+url); }catch(e){ notify.ok('Link do catálogo: '+url); }
   },
   openCatalogPage(){
@@ -3499,9 +3513,54 @@ function renderCatalogo(){
   <div class="segbar mb2">
     <button class="${subView==='vitrine'?'on':''}" data-action="setCatalogoSubView" data-view="vitrine">${icon('book',13)} Vitrine pública</button>
     <button class="${subView==='produtos'?'on':''}" data-action="setCatalogoSubView" data-view="produtos">${icon('edit',13)} Produtos do Catálogo</button>
+    <button class="${subView==='enviar'?'on':''}" data-action="setCatalogoSubView" data-view="enviar">${icon('send',13)} Enviar aos clientes</button>
   </div>
-  ${subView==='produtos' ? renderCatalogoProdutos() : renderCatalogoVitrine()}
+  ${subView==='produtos' ? renderCatalogoProdutos() : subView==='enviar' ? renderCatalogoEnviar() : renderCatalogoVitrine()}
   `;
+}
+
+
+function catalogPublicUrl(){
+  return /^https?:/i.test(location.protocol) && location.hostname ? new URL('catalogo.php', location.href).href : 'https://seuperfume.net/catalogo.php';
+}
+function catalogDefaultMsg(){ return 'Olá! Veja o catálogo de perfumes da Essência e escolha o seu: '+catalogPublicUrl(); }
+function catalogMsg(){ return state.ui.catMsg!==undefined && state.ui.catMsg!=='' ? state.ui.catMsg : catalogDefaultMsg(); }
+function waPhone(ph){ let d=String(ph||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return d; }
+function renderCatalogoEnviar(){
+  const url = catalogPublicUrl();
+  const msg = catalogMsg();
+  const q = (state.ui.catEnvQuery||'').toLowerCase();
+  const custs = state.customers.filter(c=> waPhone(c.phone) && (c.name+' '+(c.code||'')+' '+(c.phone||'')).toLowerCase().includes(q));
+  const semFone = state.customers.filter(c=>!waPhone(c.phone)).length;
+  return `
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>Link do catálogo</b>
+    <div class="flex gap flex-wrap" style="margin:10px 0;align-items:center;">
+      <input readonly style="flex:1;min-width:220px;" value="${esc(url)}" onclick="this.select()">
+      <button class="btn btn-ghost" data-action="copyCatalogLink">Copiar link</button>
+    </div>
+    <label class="field"><span class="lbl">Mensagem</span>
+      <textarea rows="3" data-field="ui.catMsg">${esc(msg)}</textarea>
+    </label>
+    <div class="flex gap flex-wrap">
+      <button class="btn btn-gold" data-action="catSendWhats" data-id="">${icon('send')} Enviar por WhatsApp</button>
+      <button class="btn btn-ghost" data-action="catShare">${icon('upload')} Compartilhar...</button>
+      <button class="btn btn-ghost" data-action="catSendEmail">E-mail</button>
+      <button class="btn btn-ghost" data-action="catSendSms">SMS</button>
+    </div>
+    <p class="muted2" style="font-size:11.5px;margin-top:10px;">"Enviar por WhatsApp" abre o WhatsApp para você escolher o contato. O catálogo mostra só produtos ativos e com estoque, sem custo nem dados de clientes.</p>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;">
+    <b>Enviar para um cliente cadastrado</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Clientes com telefone cadastrado${semFone?` (${semFone} sem telefone não aparecem)`:''}.</p>
+    <input placeholder="Buscar cliente por nome, código ou telefone..." data-field="ui.catEnvQuery" value="${esc(state.ui.catEnvQuery||'')}" style="margin-bottom:10px;">
+    ${custs.length===0 ? '<p class="muted2" style="font-size:13px;">Nenhum cliente encontrado.</p>' : `
+    <div style="max-height:360px;overflow:auto;">${custs.slice(0,100).map(c=>`
+      <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;">
+        <div style="min-width:0;"><div style="font-size:14px;">${ccode(c)} ${esc(c.name)}</div><div class="muted2" style="font-size:12px;">${esc(c.phone||'')}</div></div>
+        <button class="btn btn-gold" style="padding:6px 10px;font-size:12.5px;white-space:nowrap;" data-action="catSendWhats" data-id="${c.id}">WhatsApp</button>
+      </div>`).join('')}</div>`}
+  </div>`;
 }
 
 function renderCatalogoCard(p){
