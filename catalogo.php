@@ -108,6 +108,18 @@ header('X-Content-Type-Options: nosniff');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Essência — Catálogo</title>
+<?php $__scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ? 'https' : 'http'; $__base = $__scheme.'://'.($_SERVER['HTTP_HOST'] ?? 'seuperfume.net').rtrim(str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'] ?? '/')),'/').'/'; ?>
+<meta name="description" content="Catálogo de perfumes da Essência. Escolha o seu!">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Essência">
+<meta property="og:title" content="Essência — Catálogo de Perfumes">
+<meta property="og:description" content="Veja nosso catálogo de perfumes e escolha o seu!">
+<meta property="og:image" content="<?= e($__base) ?>og-catalogo.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="<?= e($__base) ?>catalogo.php">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="<?= e($__base) ?>logo.png">
 <style>
   :root{--ink:#141A3C;--plum:#17204A;--plum-dark:#0D1230;--gold:#F0A81F;--gold-soft:#FBD98A;--gold-deep:#9A6400;--cream:#F1F1F8;--line:#D9DBEC;--muted:#5A6088;--tint:#E9EAF6;
     --lattice:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23F0A81F' stroke-width='1'%3E%3Crect x='6' y='6' width='28' height='28'/%3E%3Crect x='6' y='6' width='28' height='28' transform='rotate(45 20 20)'/%3E%3Ccircle cx='20' cy='20' r='2.5'/%3E%3C/g%3E%3C/svg%3E");}
@@ -115,6 +127,7 @@ header('X-Content-Type-Options: nosniff');
   body{margin:0;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;background:var(--cream);color:var(--ink);font-variant-numeric:lining-nums tabular-nums;}
   header{position:relative;background:radial-gradient(circle at 25% 0,#222C66,var(--plum) 50%,var(--plum-dark));color:#fff;padding:44px 20px 40px;text-align:center;border-bottom:4px solid var(--gold);overflow:hidden;}
   header::before{content:'';position:absolute;inset:0;background:var(--lattice);background-size:40px 40px;opacity:.10;}
+  header .logo{position:relative;display:block;margin:0 auto 10px;}
   header h1,header p{position:relative;}
   header h1{font-family:'Avenir Next','Century Gothic','Segoe UI Variable Display','Trebuchet MS',system-ui,sans-serif;font-weight:300;font-size:36px;margin:0;letter-spacing:.16em;}
   header p{color:var(--gold);font-size:14px;margin:8px 0 0;}
@@ -214,6 +227,7 @@ header('X-Content-Type-Options: nosniff');
 </head>
 <body>
   <header>
+    <svg class="logo" viewBox="0 0 84 84" width="56" height="56" aria-hidden="true"><path d="M42 3 L52.6 18.4 L70.2 13.8 L65.6 31.4 L81 42 L65.6 52.6 L70.2 70.2 L52.6 65.6 L42 81 L31.4 65.6 L13.8 70.2 L18.4 52.6 L3 42 L18.4 31.4 L13.8 13.8 L31.4 18.4 Z" fill="none" stroke="#F0A81F" stroke-width="1.6"/><path d="M42 14 L67 29 V55 L42 70 L17 55 V29 Z" fill="none" stroke="#FBD98A" stroke-width="1" opacity=".7"/><circle cx="42" cy="42" r="3.5" fill="#F0A81F"/></svg>
     <h1>Essência</h1>
     <p>Catálogo de Perfumes</p>
   </header>

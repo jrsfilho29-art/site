@@ -884,6 +884,7 @@ function buildCatalogPageHTML(list){
   body{margin:0;font-family:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;background:var(--cream);color:var(--ink);font-variant-numeric:lining-nums tabular-nums;}
   header{position:relative;background:radial-gradient(circle at 25% 0,#222C66,var(--plum) 50%,var(--plum-dark));color:#fff;padding:44px 20px 40px;text-align:center;border-bottom:4px solid var(--gold);overflow:hidden;}
   header::before{content:'';position:absolute;inset:0;background:var(--lattice);background-size:40px 40px;opacity:.10;}
+  header .logo{position:relative;display:block;margin:0 auto 10px;}
   header h1,header p{position:relative;}
   header h1{font-family:'Avenir Next','Century Gothic','Segoe UI Variable Display','Trebuchet MS',system-ui,sans-serif;font-weight:300;font-size:36px;margin:0;letter-spacing:.16em;}
   header p{color:var(--gold);font-size:14px;margin:8px 0 0;}
@@ -982,6 +983,7 @@ function buildCatalogPageHTML(list){
 </head>
 <body>
   <header>
+    <svg class="logo" viewBox="0 0 84 84" width="56" height="56" aria-hidden="true"><path d="M42 3 L52.6 18.4 L70.2 13.8 L65.6 31.4 L81 42 L65.6 52.6 L70.2 70.2 L52.6 65.6 L42 81 L31.4 65.6 L13.8 70.2 L18.4 52.6 L3 42 L18.4 31.4 L13.8 13.8 L31.4 18.4 Z" fill="none" stroke="#F0A81F" stroke-width="1.6"/><path d="M42 14 L67 29 V55 L42 70 L17 55 V29 Z" fill="none" stroke="#FBD98A" stroke-width="1" opacity=".7"/><circle cx="42" cy="42" r="3.5" fill="#F0A81F"/></svg>
     <h1>Essência</h1>
     <p>Catálogo de Perfumes</p>
   </header>
@@ -2410,7 +2412,16 @@ const actions_produtos = {
   },
   async catShare(){
     const text=catalogMsg();
-    if(navigator.share){ try{ await navigator.share({title:'Catálogo Essência', text, url:catalogPublicUrl()}); }catch(e){} }
+    if(navigator.share){
+      try{
+        if(/^https?:/i.test(location.protocol) && navigator.canShare){
+          const r = await fetch(new URL('og-catalogo.png', location.href).href); const blob = await r.blob();
+          const f = new File([blob], 'essencia-catalogo.png', {type:'image/png'});
+          if(navigator.canShare({files:[f]})){ await navigator.share({title:'Catálogo Essência', text, files:[f]}); return; }
+        }
+      }catch(e){ if(e && e.name==='AbortError') return; }
+      try{ await navigator.share({title:'Catálogo Essência', text, url:catalogPublicUrl()}); }catch(e){}
+    }
     else { try{ await navigator.clipboard.writeText(text); notify.ok('Mensagem copiada. Cole onde quiser enviar.'); }catch(e){ notify.err('Seu navegador não permite compartilhar. Use o WhatsApp ou copie o link.'); } }
   },
   catSendEmail(){ location.href='mailto:?subject='+encodeURIComponent('Catálogo Essência')+'&body='+encodeURIComponent(catalogMsg()); },
@@ -3533,6 +3544,22 @@ function renderCatalogoEnviar(){
   const custs = state.customers.filter(c=> waPhone(c.phone) && (c.name+' '+(c.code||'')+' '+(c.phone||'')).toLowerCase().includes(q));
   const semFone = state.customers.filter(c=>!waPhone(c.phone)).length;
   return `
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>Convite</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">É assim que o cliente vê o convite: o WhatsApp mostra a logo da Essência junto com o link.</p>
+    <div style="max-width:340px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#fff;">
+      <div style="background:radial-gradient(circle at 25% 0,#222C66,#17204A 50%,#0D1230);border-bottom:4px solid #F0A81F;padding:22px 12px 18px;text-align:center;color:#fff;">
+        <svg viewBox="0 0 84 84" width="44" height="44" aria-hidden="true"><path d="M42 3 L52.6 18.4 L70.2 13.8 L65.6 31.4 L81 42 L65.6 52.6 L70.2 70.2 L52.6 65.6 L42 81 L31.4 65.6 L13.8 70.2 L18.4 52.6 L3 42 L18.4 31.4 L13.8 13.8 L31.4 18.4 Z" fill="none" stroke="#F0A81F" stroke-width="1.6"/><path d="M42 14 L67 29 V55 L42 70 L17 55 V29 Z" fill="none" stroke="#FBD98A" stroke-width="1" opacity=".7"/><circle cx="42" cy="42" r="3.5" fill="#F0A81F"/></svg>
+        <div style="font-weight:300;font-size:26px;letter-spacing:.16em;margin-top:6px;">Essência</div>
+        <div style="color:#FBD98A;font-size:11px;letter-spacing:.14em;margin-top:2px;">CATÁLOGO DE PERFUMES</div>
+      </div>
+      <div style="padding:10px 12px;font-size:12.5px;">
+        <b>Essência — Catálogo de Perfumes</b>
+        <div class="muted2" style="font-size:11.5px;">Veja nosso catálogo de perfumes e escolha o seu!</div>
+        <div class="muted2" style="font-size:11px;margin-top:2px;">${esc(url.replace(/^https?:\/\//,'').split('/')[0])}</div>
+      </div>
+    </div>
+  </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Link do catálogo</b>
     <div class="flex gap flex-wrap" style="margin:10px 0;align-items:center;">
