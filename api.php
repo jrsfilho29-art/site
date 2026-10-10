@@ -55,12 +55,16 @@ catch(Throwable $e){
   catch(Throwable $e2){ $hasRole = false; }
 }
 
-/* ---- código do cliente: cria a coluna 'code' sozinho em bancos antigos ---- */
-$hasCustCode = true;
-try{ $pdo->query('SELECT code FROM customers LIMIT 1'); }
-catch(Throwable $e){
-  try{ $pdo->exec("ALTER TABLE customers ADD COLUMN code VARCHAR(20) NOT NULL DEFAULT ''"); }
-  catch(Throwable $e2){ $hasCustCode = false; }
+/* ---- colunas extras de clientes (código e endereço): criadas sozinhas em bancos antigos ---- */
+$custExtra = ['code'=>20, 'number'=>20, 'district'=>120, 'city'=>120, 'state'=>10, 'zip'=>12];
+$custHas = [];
+foreach($custExtra as $col=>$len){
+  $custHas[$col] = true;
+  try{ $pdo->query('SELECT `'.$col.'` FROM customers LIMIT 1'); }
+  catch(Throwable $e){
+    try{ $pdo->exec('ALTER TABLE customers ADD COLUMN `'.$col.'` VARCHAR('.$len.") NOT NULL DEFAULT ''"); }
+    catch(Throwable $e2){ $custHas[$col] = false; }
+  }
 }
 
 /* ---- status público: aparelho novo descobre se o servidor já tem usuários (não revela mais nada) ---- */
@@ -139,7 +143,7 @@ try{
     ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
 
     $d['customers'] = array_map(fn($r)=>[
-      'id'=>$r['id'], 'code'=>s($r['code'] ?? ''), 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
+      'id'=>$r['id'], 'code'=>s($r['code'] ?? ''), 'number'=>s($r['number'] ?? ''), 'district'=>s($r['district'] ?? ''), 'city'=>s($r['city'] ?? ''), 'state'=>s($r['state'] ?? ''), 'zip'=>s($r['zip'] ?? ''), 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
       'cpf'=>s($r['cpf']), 'address'=>s($r['address']), 'notes'=>s($r['notes']), 'createdAt'=>fromDt($r['created_at'])
     ], rows($pdo, 'SELECT * FROM customers ORDER BY name'));
 
@@ -230,12 +234,12 @@ try{
         $st->execute($row);
       }
 
-      $st = $ins($hasCustCode
-        ? 'INSERT INTO customers (id,code,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?)'
-        : 'INSERT INTO customers (id,name,phone,email,cpf,address,notes,created_at) VALUES (?,?,?,?,?,?,?,?)');
+      $cCols = ['id','name','phone','email','cpf','address','notes','created_at'];
+      foreach($custExtra as $col=>$len){ if($custHas[$col]) $cCols[] = $col; }
+      $st = $ins('INSERT INTO customers ('.implode(',', array_map(fn($x)=>'`'.$x.'`', $cCols)).') VALUES ('.implode(',', array_fill(0, count($cCols), '?')).')');
       foreach($d['customers'] as $c){
         $row = [s($c['id']??''), s($c['name']??''), s($c['phone']??''), s($c['email']??''), s($c['cpf']??''), s($c['address']??''), s($c['notes']??''), toDt($c['createdAt']??null) ?? gmdate('Y-m-d H:i:s')];
-        if($hasCustCode) array_splice($row, 1, 0, [mb_substr(s($c['code']??''), 0, 20)]);
+        foreach($custExtra as $col=>$len){ if($custHas[$col]) $row[] = mb_substr(s($c[$col]??''), 0, $len); }
         $st->execute($row);
       }
 

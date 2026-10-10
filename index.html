@@ -782,7 +782,7 @@ function buildDataSQL(){
   if(state.customers.length){
     lines.push('-- clientes');
     state.customers.forEach(c=>{
-      lines.push(`INSERT INTO customers (id,code,name,phone,email,cpf,address,notes,created_at) VALUES (${sqlStr(c.id)},${sqlStr(c.code||'')},${sqlStr(c.name)},${sqlStr(c.phone)},${sqlStr(c.email)},${sqlStr(c.cpf)},${sqlStr(c.address)},${sqlStr(c.notes)},${sqlDate(c.createdAt)});`);
+      lines.push(`INSERT INTO customers (id,code,number,district,city,state,zip,name,phone,email,cpf,address,notes,created_at) VALUES (${sqlStr(c.id)},${sqlStr(c.code||'')},${sqlStr(c.number||'')},${sqlStr(c.district||'')},${sqlStr(c.city||'')},${sqlStr(c.state||'')},${sqlStr(c.zip||'')},${sqlStr(c.name)},${sqlStr(c.phone)},${sqlStr(c.email)},${sqlStr(c.cpf)},${sqlStr(c.address)},${sqlStr(c.notes)},${sqlDate(c.createdAt)});`);
     });
     lines.push('');
   }
@@ -1497,6 +1497,44 @@ function searchProducts(q, limit){
   scored.sort((a,b)=> b.sc-a.sc || String(a.p.name).localeCompare(String(b.p.name),'pt-BR'));
   return scored.slice(0, limit||6).map(x=>x.p);
 }
+/* Máscaras: telefone (DD) 99999-9999 e CEP 00000-000 */
+function maskPhone(v){
+  let d = String(v||'').replace(/\D/g,'');
+  if(d.length>11) d = d.slice(0,11);
+  if(!d) return '';
+  if(d.length<=2) return '('+d;
+  if(d.length<=6) return '('+d.slice(0,2)+') '+d.slice(2);
+  if(d.length<=10) return '('+d.slice(0,2)+') '+d.slice(2,6)+(d.length>6?'-'+d.slice(6):'');
+  return '('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7);
+}
+function maskCep(v){ const d = String(v||'').replace(/\D/g,'').slice(0,8); return d.length>5 ? d.slice(0,5)+'-'+d.slice(5) : d; }
+let _cepSeq = 0;
+async function lookupCep(cep8){
+  const seq = ++_cepSeq;
+  const m = state.ui.modal; if(!m || m.type!=='cliente') return;
+  m.cepMsg = 'Buscando endereço...'; render();
+  try{
+    const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 8000);
+    const r = await fetch('https://viacep.com.br/ws/'+cep8+'/json/', {signal:ctl.signal}); clearTimeout(to);
+    const j = await r.json();
+    if(seq!==_cepSeq || !state.ui.modal || state.ui.modal.type!=='cliente') return;
+    const d = state.ui.modal.data;
+    if(j.erro){ state.ui.modal.cepMsg = 'CEP não encontrado. Confira o número ou preencha o endereço manualmente.'; }
+    else {
+      if(j.logradouro) d.address = j.logradouro;
+      if(j.bairro) d.district = j.bairro;
+      if(j.localidade) d.city = j.localidade;
+      if(j.uf) d.state = j.uf;
+      state.ui.modal.cepMsg = 'Endereço preenchido. Informe o número.';
+      state.ui.modal.focusNum = true;
+    }
+  }catch(e){
+    if(seq!==_cepSeq || !state.ui.modal) return;
+    state.ui.modal.cepMsg = 'Não foi possível buscar o CEP agora (sem internet?). Preencha o endereço manualmente.';
+  }
+  render();
+  if(state.ui.modal && state.ui.modal.focusNum){ state.ui.modal.focusNum = false; const el = document.getElementById('cli-num'); if(el) el.focus(); }
+}
 /* Código sequencial dos clientes: 0001, 0002, ... (campo "code") */
 function nextCustomerCode(){
   let max = 0;
@@ -1663,7 +1701,12 @@ function handleFieldInput(t){
     if(v !== t.value){ const pos = t.selectionStart; t.value = v; try{ t.setSelectionRange(Math.min(pos==null?v.length:pos, v.length), Math.min(pos==null?v.length:pos, v.length)); }catch(e){} }
     val = v;
   }
+  if(t.dataset.mask){
+    val = t.dataset.mask==='phone' ? maskPhone(t.value) : maskCep(t.value);
+    if(val !== t.value) t.value = val;
+  }
   setPath(state, path, val);
+  if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
   if(path.indexOf('prefs.')===0){ persist('prefs'); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
@@ -2016,7 +2059,7 @@ function renderClientes(){
     <tbody>
       ${list.map(c=>`
         <tr>
-          <td>${ccode(c)||'—'}</td><td>${esc(c.name)}</td><td class="muted">${esc(c.phone)||'—'}</td><td class="muted">${esc(c.email)||'—'}</td><td class="muted">${esc(c.cpf)||'—'}</td>
+          <td>${ccode(c)||'—'}</td><td>${esc(c.name)}</td><td class="muted">${esc(maskPhone(c.phone))||'—'}</td><td class="muted">${esc(c.email)||'—'}</td><td class="muted">${esc(c.cpf)||'—'}</td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="icon-btn plum" data-action="viewCustomer" data-id="${c.id}" title="Histórico de compras">${icon('chart')}</button>
             <button class="icon-btn plum" data-action="editCliente" data-id="${c.id}">${icon('edit')}</button>
@@ -2029,7 +2072,7 @@ function renderClientes(){
 }
 
 const actions_clientes = {
-  newCliente(){ state.ui.modal = {type:'cliente', data:{id:null,code:nextCustomerCode(),name:'',phone:'',email:'',cpf:'',address:'',notes:''}}; render(); },
+  newCliente(){ state.ui.modal = {type:'cliente', data:{id:null,code:nextCustomerCode(),name:'',phone:'',email:'',cpf:'',address:'',number:'',district:'',city:'',state:'',zip:'',notes:''}}; render(); },
   editCliente(t){ const c = state.customers.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'cliente', data:{...c}}; render(); },
   deleteCliente(t){
     if(!confirm('Excluir este cliente?')) return;
@@ -4273,15 +4316,30 @@ function modalWrap(title, body, wide){
 }
 
 function renderClienteModal(d){
+  const msg = (state.ui.modal && state.ui.modal.cepMsg) || '';
   const body = `
-    <label class="field"><span class="lbl">Código</span><input data-field="ui.modal.data.code" value="${esc(d.code||'')}" style="max-width:140px;"></label>
+    <div class="grid grid-2">
+      <label class="field"><span class="lbl">Código</span><input data-field="ui.modal.data.code" value="${esc(d.code||'')}"></label>
+      <label class="field"><span class="lbl">Telefone</span><input type="tel" inputmode="tel" placeholder="(00) 00000-0000" data-mask="phone" data-field="ui.modal.data.phone" value="${esc(maskPhone(d.phone))}"></label>
+    </div>
     <label class="field"><span class="lbl">Nome completo</span><input id="cli-name" data-field="ui.modal.data.name" value="${esc(d.name)}"></label>
     <div class="grid grid-2">
-      <label class="field"><span class="lbl">Telefone</span><input data-field="ui.modal.data.phone" value="${esc(d.phone)}"></label>
       <label class="field"><span class="lbl">CPF</span><input data-field="ui.modal.data.cpf" value="${esc(d.cpf)}"></label>
+      <label class="field"><span class="lbl">E-mail</span><input data-field="ui.modal.data.email" value="${esc(d.email)}"></label>
     </div>
-    <label class="field"><span class="lbl">E-mail</span><input data-field="ui.modal.data.email" value="${esc(d.email)}"></label>
-    <label class="field"><span class="lbl">Endereço</span><input data-field="ui.modal.data.address" value="${esc(d.address)}"></label>
+    <div class="grid grid-2" style="align-items:end;">
+      <label class="field"><span class="lbl">CEP</span><input type="text" inputmode="numeric" placeholder="00000-000" data-mask="cep" data-field="ui.modal.data.zip" value="${esc(maskCep(d.zip))}" autocomplete="off"></label>
+      <div class="muted2" style="font-size:12px;margin-bottom:16px;min-height:18px;">${esc(msg)}</div>
+    </div>
+    <label class="field"><span class="lbl">Endereço (rua, avenida...)</span><input data-field="ui.modal.data.address" value="${esc(d.address)}"></label>
+    <div class="grid grid-2">
+      <label class="field"><span class="lbl">Nº</span><input id="cli-num" data-field="ui.modal.data.number" value="${esc(d.number||'')}"></label>
+      <label class="field"><span class="lbl">Bairro</span><input data-field="ui.modal.data.district" value="${esc(d.district||'')}"></label>
+    </div>
+    <div class="grid" style="grid-template-columns:3fr 1fr;gap:12px;">
+      <label class="field"><span class="lbl">Cidade</span><input data-field="ui.modal.data.city" value="${esc(d.city||'')}"></label>
+      <label class="field"><span class="lbl">UF</span><input data-field="ui.modal.data.state" maxlength="2" style="text-transform:uppercase;" value="${esc(d.state||'')}"></label>
+    </div>
     <label class="field"><span class="lbl">Observações</span><input data-field="ui.modal.data.notes" value="${esc(d.notes)}"></label>
     <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
       <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
