@@ -1474,6 +1474,25 @@ async function syncStartup(force){
 }
 
 /* Código sequencial dos produtos: 0001, 0002, ... (usa o campo "sku") */
+/* Busca de produto por código ou nome (usada em Vendas e Pedidos) */
+function searchProducts(q, limit){
+  q = String(q||'').trim().toLowerCase(); if(!q) return [];
+  const isNum = /^\d+$/.test(q), qn = isNum ? parseInt(q,10) : null;
+  const scored = [];
+  state.products.forEach(p=>{
+    if(p.active===false) return;
+    const code = String(p.sku||'').trim().toLowerCase(), name = String(p.name||'').toLowerCase();
+    let sc = 0;
+    if(code && code===q) sc = 100;
+    else if(isNum && /^\d+$/.test(code) && parseInt(code,10)===qn) sc = 95;    /* "1" encontra 0001 */
+    else if(code && code.startsWith(q)) sc = 80;
+    else if(code && q.length>=2 && code.includes(q)) sc = 60;
+    else if(name.includes(q)) sc = 40;
+    if(sc) scored.push({p,sc});
+  });
+  scored.sort((a,b)=> b.sc-a.sc || String(a.p.name).localeCompare(String(b.p.name),'pt-BR'));
+  return scored.slice(0, limit||6).map(x=>x.p);
+}
 function nextProductCode(){
   let max = 0;
   state.products.forEach(p=>{ const c = String(p.sku||'').trim(); if(/^\d+$/.test(c)){ const n = parseInt(c,10); if(n>max) max=n; } });
@@ -2755,7 +2774,7 @@ function renderNovaVenda(){
   const total = Math.max(0, subtotal - discount);
   const paid = V.payments.reduce((a,p)=>a+Math.max(0, parseFloat(p.amount)||0),0);
   const diff = +(total-paid).toFixed(2);
-  const results = V.search.length>0 ? state.products.filter(p=> p.active!==false && p.name.toLowerCase().includes(V.search.toLowerCase())).slice(0,6) : [];
+  const results = searchProducts(V.search);
 
   return `
   <div class="grid grid-split">
@@ -2768,12 +2787,12 @@ function renderNovaVenda(){
           </select>
         </label>
         <div class="relative">
-          <input placeholder="Buscar produto para adicionar..." data-field="ui.venda.search" value="${esc(V.search)}">
+          <input placeholder="Buscar produto por código ou nome..." data-enter-action="vendaSearchEnter" data-field="ui.venda.search" value="${esc(V.search)}">
           ${results.length>0? `
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="addToCart" data-id="${p.id}">
-                <span class="prodcell">${thumbHTML(p,34)}<span>${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${p.sku?`<b class="muted" style="font-weight:600;margin-right:6px;">${esc(p.sku)}</b>`:''}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
@@ -2914,6 +2933,8 @@ const actions_vendas = {
     const total = Math.max(0, sub - computeDiscountAmount(sub, V.discount, V.discountType));
     if(V.payments.length===1){ V.payments[0].amount = total.toFixed(2); render(); }
   },
+  vendaSearchEnter(){ const r = searchProducts(state.ui.venda.search); if(r.length) actions.addToCart({dataset:{id:r[0].id}}); },
+  pedidoSearchEnter(){ const r = searchProducts(state.ui.pedido.search); if(r.length) actions.pedidoAddToCart({dataset:{id:r[0].id}}); },
   addToCart(t){
     const p = state.products.find(x=>x.id===t.dataset.id);
     if(!p){ return; }
@@ -3077,7 +3098,7 @@ function renderNovoPedido(){
   const discount = Math.max(0, parseFloat(P.discount)||0);
   const shipping = Math.max(0, parseFloat(P.shipping)||0);
   const total = Math.max(0, subtotal - discount + shipping);
-  const results = P.search.length>0 ? state.products.filter(p=> p.active!==false && p.name.toLowerCase().includes(P.search.toLowerCase())).slice(0,6) : [];
+  const results = searchProducts(P.search);
 
   return `
   ${editing ? `<div class="banner-danger" style="background:#F6EFDD;color:var(--gold-deep);">Editando pedido <b>${esc(P.orderNumber)}</b>. <button class="icon-btn" data-action="cancelEditPedido" style="color:var(--gold-deep);text-decoration:underline;font-size:12px;">cancelar edição</button></div>` : ''}
@@ -3091,12 +3112,12 @@ function renderNovoPedido(){
           </select>
         </label>
         <div class="relative">
-          <input placeholder="Buscar produto para adicionar..." data-field="ui.pedido.search" value="${esc(P.search)}">
+          <input placeholder="Buscar produto por código ou nome..." data-enter-action="pedidoSearchEnter" data-field="ui.pedido.search" value="${esc(P.search)}">
           ${results.length>0? `
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="pedidoAddToCart" data-id="${p.id}">
-                <span class="prodcell">${thumbHTML(p,34)}<span>${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${p.sku?`<b class="muted" style="font-weight:600;margin-right:6px;">${esc(p.sku)}</b>`:''}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
