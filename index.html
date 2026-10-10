@@ -429,12 +429,15 @@ function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : 
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
 function adminCount(){ return state.users.filter(u=>roleOf(u)==='admin').length; }
 function sessionSave(u, tab){
-  if(!u){ LS.set('ess_session', null); return; }
-  LS.set('ess_session', { uid:u.id, pw:String(u.passwordHash||'').slice(0,12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 });
+  // Sessão só vale enquanto a aba/janela estiver aberta: ao fechar (X), pede login e senha de novo.
+  try{ localStorage.removeItem('ess_session'); }catch(e){}
+  if(!u){ try{ sessionStorage.removeItem('ess_session'); }catch(e){} return; }
+  try{ sessionStorage.setItem('ess_session', JSON.stringify({ uid:u.id, pw:String(u.passwordHash||'').slice(0,12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 })); }catch(e){}
 }
-function sessionClear(){ try{ localStorage.removeItem('ess_session'); }catch(e){} }
+function sessionClear(){ try{ localStorage.removeItem('ess_session'); sessionStorage.removeItem('ess_session'); }catch(e){} }
 function sessionRestore(){
-  const ses = LS.get('ess_session', null);
+  try{ localStorage.removeItem('ess_session'); }catch(e){}
+  let ses = null; try{ ses = JSON.parse(sessionStorage.getItem('ess_session')||'null'); }catch(e){}
   if(!ses || !ses.uid || !(ses.exp>Date.now())) return false;
   const u = state.users.find(x=>x.id===ses.uid);
   if(!u || String(u.passwordHash||'').slice(0,12)!==ses.pw){ sessionClear(); return false; }   // usuário removido ou senha trocada
