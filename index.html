@@ -2498,7 +2498,9 @@ const actions_produtos = {
         copied = true;
       }
     }catch(e){}
-    if(!window.open(u,'_blank','noopener')) location.href=u;
+    // abre o WhatsApp em nova aba e mantém o sistema aberto
+    const a=document.createElement('a'); a.href=u; a.target='_blank'; a.rel='noopener noreferrer'; a.style.display='none';
+    document.body.appendChild(a); a.click(); a.remove();
     if(copied) notify.ok('Logo copiada. Na conversa do WhatsApp, cole (Ctrl+V ou segurar e colar) para enviar a imagem junto com a mensagem.');
   },
   async catShare(){
