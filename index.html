@@ -689,7 +689,7 @@ async function downloadCSV(filename, rows){
 }
 
 /* ================= exportar produtos (CSV / Excel / HTML) ================= */
-const PRODUCT_EXPORT_HEADERS = ['SKU','Nome','Categoria','Subgrupo','Marca','Volume','Fornecedor','Preço de Custo','Preço de Venda','Markup (%)','Estoque','Estoque Mínimo','Estoque Máximo','Descrição','Imagem (URL)'];
+const PRODUCT_EXPORT_HEADERS = ['Código','Nome','Categoria','Subgrupo','Marca','Volume','Fornecedor','Preço de Custo','Preço de Venda','Markup (%)','Estoque','Estoque Mínimo','Estoque Máximo','Descrição','Imagem (URL)'];
 function productExportRow(p){
   return [
     p.sku||'', p.name||'', p.category||'', p.subcategory||'', p.brand||'', p.volume||'', p.supplier||'',
@@ -1025,7 +1025,7 @@ const FIELD_OPTIONS = [
   ['minStock', 'Estoque Mínimo'],
   ['maxStock', 'Estoque Máximo'],
   ['description', 'Descrição'],
-  ['sku', 'Código / SKU'],
+  ['sku', 'Código'],
   ['brand', 'Marca'],
   ['volume', 'Volume (ml)'],
   ['supplier', 'Fornecedor'],
@@ -1369,9 +1369,11 @@ async function syncPush(force, silent){
 }
 function syncApplyPulled(j){
   const d = j.data || {};
+  let codesAdded = false;
   SYNC.applying = true;
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
     state[k] = Array.isArray(d[k]) ? d[k] : [];
+    if(k==='products' && ensureProductCodes()) codesAdded = true;
     persist(k);
   });
   SYNC.applying = false;
@@ -1379,8 +1381,9 @@ function syncApplyPulled(j){
     const me = state.users.find(u=>u.id===state.currentUser.id);
     if(me){ state.currentUser = me; sessionSave(me, state.tab); } else { state.currentUser = null; sessionClear(); }
   }
-  SYNC.cfg.version = j.version; SYNC.cfg.dirty = false; SYNC.cfg.last = new Date().toISOString(); SYNC.conflict = false;
+  SYNC.cfg.version = j.version; SYNC.cfg.dirty = codesAdded; SYNC.cfg.last = new Date().toISOString(); SYNC.conflict = false;
   syncSaveCfg();
+  if(codesAdded) syncSchedulePush();
 }
 async function syncPull(silent){
   if(!syncEnabled() || SYNC.busy) return false;
@@ -1470,7 +1473,21 @@ async function syncStartup(force){
   }catch(e){ syncSetMsg(e.message, 'err'); }
 }
 
+/* Código sequencial dos produtos: 0001, 0002, ... (usa o campo "sku") */
+function nextProductCode(){
+  let max = 0;
+  state.products.forEach(p=>{ const c = String(p.sku||'').trim(); if(/^\d+$/.test(c)){ const n = parseInt(c,10); if(n>max) max=n; } });
+  return String(max+1).padStart(4,'0');
+}
+function ensureProductCodes(){
+  const missing = state.products.map((p,i)=>({p,i})).filter(x=>!String(x.p.sku||'').trim());
+  if(!missing.length) return false;
+  missing.sort((a,b)=> String(a.p.createdAt||'9999').localeCompare(String(b.p.createdAt||'9999')) || a.i-b.i);
+  missing.forEach(x=>{ x.p.sku = nextProductCode(); });
+  return true;
+}
 function persist(key){
+  if(key==='products') ensureProductCodes();
   const map = {customers:KEYS.customers, products:KEYS.products, sales:KEYS.sales, users:KEYS.users, categories:KEYS.categories, subcategories:KEYS.subcategories, orders:KEYS.orders, prefs:KEYS.prefs};
   const ok = LS.set(map[key], state[key]);
   if(key!=='prefs' && !SYNC.applying) syncSchedulePush();
@@ -1993,7 +2010,7 @@ function renderProductCard(p, sel){
         <div style="padding:12px;">
           <div class="gold-c" style="font-size:11px;">${esc(p.category)||'Sem categoria'}${p.volume? ' · '+esc(p.volume)+'ml':''}</div>
           <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${esc(p.name)}</div>
-          ${(p.brand||p.sku)? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand||'')}${p.brand&&p.sku?' · ':''}${p.sku? 'SKU '+esc(p.sku):''}</div>`:'<div style="margin-bottom:4px;"></div>'}
+          ${(p.brand||p.sku)? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand||'')}${p.brand&&p.sku?' · ':''}${p.sku? 'Cód. '+esc(p.sku):''}</div>`:'<div style="margin-bottom:4px;"></div>'}
           ${state.prefs.showPrices!==false ? `
           <div>
             <span class="serif" style="font-size:17px;color:var(--plum);">${brl(p.salePrice)}</span>
@@ -2170,7 +2187,7 @@ function renderProdutos(){
 const actions_produtos = {
   resetBgColor(){ state.prefs.bgColor=''; persist('prefs'); render(); },
   toggleAddMenu(){ state.ui.addMenuOpen = !state.ui.addMenuOpen; render(); },
-  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',stock:0,minStock:0,description:''}}; render(); },
+  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',stock:0,minStock:0,description:''}}; render(); },
   openExportProducts(){
     state.ui.addMenuOpen=false;
     const list = currentProductExportList();
@@ -4242,7 +4259,7 @@ function renderProdutoModal(d){
       </div>
     </div>
     <div class="grid grid-3">
-      <label class="field"><span class="lbl">Código / SKU</span><input data-field="ui.modal.data.sku" value="${esc(d.sku||'')}"></label>
+      <label class="field"><span class="lbl">Código</span><input data-field="ui.modal.data.sku" value="${esc(d.sku||'')}"></label>
       <label class="field"><span class="lbl">Marca</span><input data-field="ui.modal.data.brand" value="${esc(d.brand||'')}"></label>
       <label class="field"><span class="lbl">Volume (ml)</span><input data-field="ui.modal.data.volume" value="${esc(d.volume||'')}"></label>
     </div>
@@ -4523,6 +4540,7 @@ document.addEventListener('click', function(e){
 /* ================= init ================= */
 applyPrefs();
 sessionRestore();
+if(ensureProductCodes()) persist('products');   /* dá código 0001, 0002... aos produtos que ainda não têm */
 render();
 syncStartup().then(()=>{ if(!SYNC.busy) render(); });
 syncDetectServer();
