@@ -179,6 +179,7 @@
   .role-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
   .role-badge.admin{background:var(--tint-warm,#FDF0D2);color:var(--gold-deep);}
   .role-badge.user{background:var(--tint);color:var(--plum);}
+  .pcode{color:var(--gold-deep);font-weight:600;margin-right:7px;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
   .sthumb{display:inline-block;flex-shrink:0;border-radius:6px;border:1px solid var(--line);background:#fff;object-fit:contain;vertical-align:middle;}
   .sthumb.none{display:inline-flex;align-items:center;justify-content:center;color:var(--muted2,#9aa0c0);background:var(--tint);}
   .prodcell{display:flex;align-items:center;gap:10px;min-width:0;}
@@ -2007,6 +2008,7 @@ const actions_clientes = {
 };
 
 /* ================= produtos ================= */
+function pcode(p){ return p && p.sku ? `<b class="pcode">${esc(p.sku)}</b>` : ''; }
 function thumbHTML(p, size){
   size = size || 40;
   const st = `width:${size}px;height:${size}px;`;
@@ -2030,8 +2032,8 @@ function renderProductCard(p, sel){
         </div>
         <div style="padding:12px;">
           <div class="gold-c" style="font-size:11px;">${esc(p.category)||'Sem categoria'}${p.volume? ' · '+esc(p.volume)+'ml':''}</div>
-          <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${esc(p.name)}</div>
-          ${(p.brand||p.sku)? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand||'')}${p.brand&&p.sku?' · ':''}${p.sku? 'Cód. '+esc(p.sku):''}</div>`:'<div style="margin-bottom:4px;"></div>'}
+          <div style="font-weight:500;font-size:14px;margin-bottom:2px;">${pcode(p)}${esc(p.name)}</div>
+          ${p.brand? `<div class="muted2" style="font-size:10.5px;margin-bottom:4px;">${esc(p.brand)}</div>`:'<div style="margin-bottom:4px;"></div>'}
           ${state.prefs.showPrices!==false ? `
           <div>
             <span class="serif" style="font-size:17px;color:var(--plum);">${brl(p.salePrice)}</span>
@@ -2455,7 +2457,7 @@ function renderEstoquePosicao(){
         return `<tr class="catrow"><td colspan="7">${esc(g.name)} <span class="pill">${g.count} produto(s)</span> <span class="muted" style="font-weight:400;font-size:12px;margin-left:6px;">${units} un. em estoque</span></td></tr>` +
         g.subs.map(sb=> (sb.name? `<tr class="subrow"><td colspan="7">${esc(sb.name)} · ${sb.items.length}</td></tr>`:'') + sb.items.map(p=>{ const low = p.stock<=(p.minStock||0); return `
         <tr>
-          <td><div class="prodcell">${thumbHTML(p,42)}<div style="min-width:0;"><div>${esc(p.name)}</div>${(p.brand||p.sku)?`<div class="muted2" style="font-size:11px;">${esc([p.brand,p.sku].filter(Boolean).join(' · '))}</div>`:''}</div></div></td>
+          <td><div class="prodcell">${thumbHTML(p,42)}<div style="min-width:0;"><div>${pcode(p)}${esc(p.name)}</div>${p.brand?`<div class="muted2" style="font-size:11px;">${esc(p.brand)}</div>`:''}</div></div></td>
           <td style="text-align:right;white-space:nowrap;">${vialHTML(p)}${p.stock}</td>
           <td style="text-align:right;" class="${p.stock>0?'ok-c':'danger-c'}">${p.stock>0? p.stock : 'indisponível'}</td>
           <td style="text-align:right;" class="muted">${p.minStock||0}</td>
@@ -2564,7 +2566,7 @@ function renderInventario(){
     const head = cat!==lastCat ? `<tr><td colspan="5" style="background:var(--tint);font-weight:600;color:var(--plum);">${esc(cat)}</td></tr>` : ''; lastCat = cat;
     const d = c===undefined ? null : c-it.sys;
     return head + `<tr>
-      <td><div class="prodcell">${thumbHTML(p,40)}<div style="min-width:0;"><div>${esc(p.name)}</div><div class="muted2" style="font-size:11px;">${esc([p.sku, p.brand].filter(Boolean).join(' · '))}</div></div></div></td>
+      <td><div class="prodcell">${thumbHTML(p,40)}<div style="min-width:0;"><div>${pcode(p)}${esc(p.name)}</div><div class="muted2" style="font-size:11px;">${esc(p.brand||'')}</div></div></div></td>
       <td style="text-align:right;">${it.sys}</td>
       <td style="text-align:right;"><input type="number" min="0" step="1" inputmode="numeric" data-inv-count="${esc(p.id)}" value="${c===undefined?'':c}" style="width:84px;text-align:right;" aria-label="Contagem de ${esc(p.name)}"></td>
       <td style="text-align:right;" id="invdiff-${esc(p.id)}">${d===null?'<span class="muted2">—</span>': d===0?'<span class="badge-ok">confere</span>':`<span class="${d>0?'ok-c':'danger-c'}" style="font-weight:600;">${d>0?'+':''}${d}</span>`}</td>
@@ -2794,7 +2796,7 @@ function renderNovaVenda(){
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="addToCart" data-id="${p.id}">
-                <span class="prodcell">${thumbHTML(p,34)}<span>${p.sku?`<b class="muted" style="font-weight:600;margin-right:6px;">${esc(p.sku)}</b>`:''}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${pcode(p)}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
@@ -2806,7 +2808,7 @@ function renderNovaVenda(){
           <tbody>
             ${V.cart.map(i=>`
               <tr>
-                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${esc(i.name)}</span></div></td>
+                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${pcode(state.products.find(x=>x.id===i.productId))}${esc(i.name)}</span></div></td>
                 <td style="text-align:center;white-space:nowrap;">
                   <button class="icon-btn" data-action="cartQtyDec" data-id="${i.productId}">${icon('minus')}</button>
                   <span style="display:inline-block;min-width:20px;text-align:center;">${i.qty}</span>
@@ -3119,7 +3121,7 @@ function renderNovoPedido(){
           <div class="search-results">
             ${results.map(p=>`
               <div class="search-result-item" data-action="pedidoAddToCart" data-id="${p.id}">
-                <span class="prodcell">${thumbHTML(p,34)}<span>${p.sku?`<b class="muted" style="font-weight:600;margin-right:6px;">${esc(p.sku)}</b>`:''}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
+                <span class="prodcell">${thumbHTML(p,34)}<span>${pcode(p)}${esc(p.name)}</span></span><span class="muted" style="white-space:nowrap;">${brl(p.salePrice)} · ${p.stock} un.</span>
               </div>`).join('')}
           </div>`:''}
         </div>
@@ -3131,7 +3133,7 @@ function renderNovoPedido(){
           <tbody>
             ${P.cart.map(i=>`
               <tr>
-                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${esc(i.name)}</span></div></td>
+                <td><div class="prodcell">${thumbHTML(state.products.find(x=>x.id===i.productId),44)}<span>${pcode(state.products.find(x=>x.id===i.productId))}${esc(i.name)}</span></div></td>
                 <td style="text-align:center;white-space:nowrap;">
                   <button class="icon-btn" data-action="pedidoQtyDec" data-id="${i.productId}">${icon('minus',12)}</button>
                   <span style="display:inline-block;min-width:20px;text-align:center;">${i.qty}</span>
