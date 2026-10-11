@@ -2014,11 +2014,7 @@ function renderSidebar(){
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
-        </div>${id==='produtos' && state.tab==='produtos' && state.ui.prodSubOpen ? `
-        <label class="navitem subitem"><span class="navicon">${icon('image',14)}</span><span>Vincular fotos por nome</span>
-          <input type="file" accept="image/*" multiple webkitdirectory directory style="display:none;" onchange="handleBulkImagesGlobal(this)">
-        </label>
-        <div class="navitem subitem" data-action="openFixBlackBg"><span class="navicon">${icon('image',14)}</span><span>Corrigir fundo preto das imagens</span></div>` : ''}`;
+        </div>`;
       }).join('')}
     </nav>
     <div class="footer">
@@ -4737,7 +4733,7 @@ function renderOrderDetailIfAny(){
 
 /* ================= actions dispatcher ================= */
 const actions = {
-  goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } { const nt=t.dataset.tab; state.ui.prodSubOpen = (nt==='produtos') ? !(state.tab==='produtos' && state.ui.prodSubOpen) : false; } state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  goTab(t){ if(!canAccessTab(t.dataset.tab)){ notify.err('Somente administradores podem abrir essa área.'); return; } state.ui.prodSubOpen = false; state.tab = t.dataset.tab; state.ui.addMenuOpen = false; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
   async installApp(){
     const ev = window._pwaPrompt;
     if(ev){ window._pwaPrompt = null; try{ ev.prompt(); const r = await ev.userChoice; if(r && r.outcome==='accepted') notify.ok('Aplicativo instalado! Procure o ícone da Essência na sua tela ou área de trabalho.'); }catch(e){} render(); return; }
