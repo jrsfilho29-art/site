@@ -3153,7 +3153,29 @@ const actions_vendas = {
     if(k==='hoje'){ state.ui.caixaFrom=today; state.ui.caixaTo=today; }
     else if(k==='7d'){ state.ui.caixaFrom=daysAgoISO(6); state.ui.caixaTo=today; }
     else if(k==='mes'){ state.ui.caixaFrom=today.slice(0,8)+'01'; state.ui.caixaTo=today; }
+    else if(k==='ontem'){ state.ui.caixaFrom=daysAgoISO(1); state.ui.caixaTo=daysAgoISO(1); }
+    else if(k==='30d'){ state.ui.caixaFrom=daysAgoISO(29); state.ui.caixaTo=today; }
+    else if(k==='mespass'){ const a=new Date(); a.setDate(1); a.setMonth(a.getMonth()-1); const b=new Date(); b.setDate(0); state.ui.caixaFrom=localDay(a); state.ui.caixaTo=localDay(b); }
     render();
+  },
+  printCaixa(){
+    const C=caixaData(); const d=x=>x.split('-').reverse().join('/');
+    const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Caixa ${d(C.from)} a ${d(C.to)}</title><style>${invPrintCSS()}
+      td{height:auto;padding:4px 5px;} td.r,th.r{text-align:right;} .kpis{display:flex;gap:8px;margin:8px 0 6px;flex-wrap:wrap;} .kpis div{flex:1;min-width:110px;border:1px solid #888;padding:6px 8px;} .kpis small{display:block;color:#555;font-size:10px;} .kpis b{font-size:14px;} tfoot td{font-weight:700;background:#f2f2f2;}</style></head><body>
+      <h1>ESSÊNCIA · CAIXA</h1><div class="sub">Período: ${d(C.from)} a ${d(C.to)}${C.mFilter?' · Forma: '+esc(C.mFilter):''} · Emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(state.currentUser.name)}</div>
+      <div class="kpis"><div><small>Vendas</small><b>${C.filtered.length}</b></div><div><small>Total vendido</small><b>${brl(C.grandTotal)}</b></div><div><small>Recebido</small><b>${brl(C.received)}</b></div><div><small>A receber (fiado)</small><b>${brl(C.fiado)}</b></div><div><small>Ticket médio</small><b>${brl(C.filtered.length?C.grandTotal/C.filtered.length:0)}</b></div></div>
+      <h2>Por forma de pagamento</h2>
+      <table><thead><tr><th>Forma</th><th class="r">Valor</th><th class="r">%</th></tr></thead><tbody>${C.methods.map(m=>`<tr><td>${esc(m)}</td><td class="r">${brl(C.byMethod[m])}</td><td class="r">${C.grandTotal>0?Math.round(C.byMethod[m]/C.grandTotal*100):0}%</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${brl(C.grandTotal)}</td><td></td></tr></tfoot></table>
+      <h2>Movimentações</h2>
+      ${C.shown.length?`<table><thead><tr><th>Data</th><th>Cliente</th><th>Venda</th><th>Forma</th><th class="r">Valor</th></tr></thead><tbody>${C.shown.map(r=>{const n=(r.sale.items||[]).length;return `<tr><td>${fmtDate(r.date)}</td><td>${esc(r.customer)}</td><td>${n?esc(r.sale.items[0].name||''):'—'}${n>1?' +'+(n-1):''}</td><td>${esc(r.method)}${r.method==='Fiado'?' (a receber)':''}</td><td class="r">${brl(r.amount)}</td></tr>`;}).join('')}</tbody><tfoot><tr><td colspan="4">Total listado (${C.shown.length})</td><td class="r">${brl(C.shownTotal)}</td></tr></tfoot></table>`:'<p class="sm">Sem movimentações.</p>'}
+      </body></html>`;
+    printHTML(html);
+  },
+  async exportCaixa(){
+    const C=caixaData(); const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const lines=[['Data','Cliente','Produtos','Forma de pagamento','Valor'].map(q).join(';')];
+    C.shown.forEach(r=>lines.push([fmtDate(r.date), r.customer, (r.sale.items||[]).map(i=>i.name).join(' + '), r.method, String(r.amount).replace('.',',')].map(q).join(';')));
+    await saveFile('caixa-'+C.from+'_a_'+C.to+'.csv', new Blob(['\uFEFF'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
   },
   filterCaixaMethod(t){ const m=t.dataset.method||''; state.ui.caixaMethod = (state.ui.caixaMethod===m)?'':m; render(); },
   setVendaStatusFilter(t){ vendaFilters().status = t.dataset.status||''; render(); },
@@ -3767,40 +3789,75 @@ function renderCatalogoProdutos(){
 }
 
 /* ================= caixa ================= */
-function caixaRangeKey(from,to){
-  const t = todayISO();
-  if(from===t && to===t) return 'hoje';
-  if(from===daysAgoISO(6) && to===t) return '7d';
-  if(from===t.slice(0,8)+'01' && to===t) return 'mes';
-  return '';
-}
-function renderCaixa(){
-  const from = state.ui.caixaFrom, to = state.ui.caixaTo;
-  const inRange = s=> localDay(s.date)>=from && localDay(s.date)<=to;
-  const filtered = state.sales.filter(s=> s.status!=='cancelada' && inRange(s));
-  const canceled = state.sales.filter(s=> s.status==='cancelada' && inRange(s)).length;
+/* dados do caixa para o período e filtros atuais (usado na tela, na impressão e no CSV) */
+function caixaData(){
+  let from = state.ui.caixaFrom, to = state.ui.caixaTo;
+  if(from && to && from>to){ const x=from; from=to; to=x; }
+  const inRange = (s,f,tt)=> localDay(s.date)>=f && localDay(s.date)<=tt;
+  const filtered = state.sales.filter(s=> s.status!=='cancelada' && inRange(s,from,to));
+  const canceled = state.sales.filter(s=> s.status==='cancelada' && inRange(s,from,to)).length;
   const byMethod = {}; PAYMENT_METHODS.forEach(m=>byMethod[m]=0);
   filtered.forEach(s=> s.payments.forEach(p=>{ byMethod[p.method]=(byMethod[p.method]||0)+p.amount; }));
   const methods = Object.keys(byMethod);
   const grandTotal = methods.reduce((a,m)=>a+byMethod[m],0);
   const fiado = byMethod['Fiado']||0;
   const received = grandTotal - fiado;
+  // período anterior, com o mesmo número de dias
+  const d1 = new Date(from+'T12:00:00'), d2 = new Date(to+'T12:00:00');
+  const days = Math.max(1, Math.round((d2-d1)/86400000)+1);
+  const pe = new Date(d1); pe.setDate(pe.getDate()-1); const ps = new Date(pe); ps.setDate(ps.getDate()-(days-1));
+  const pFrom = localDay(ps), pTo = localDay(pe);
+  let prevTotal = 0; state.sales.filter(s=> s.status!=='cancelada' && inRange(s,pFrom,pTo)).forEach(s=> s.payments.forEach(p=>{ prevTotal+=p.amount; }));
+  // por dia
+  const perDay = {};
+  filtered.forEach(s=>{ const k=localDay(s.date); const o=perDay[k]=perDay[k]||{n:0,total:0}; o.n++; s.payments.forEach(p=>{ o.total+=p.amount; }); });
+  const dayRows = Object.keys(perDay).sort().reverse().map(k=>({day:k,n:perDay[k].n,total:perDay[k].total}));
+  // movimentações
   const mFilter = state.ui.caixaMethod || '';
+  const qq = String(state.ui.caixaQuery||'').trim().toLowerCase();
   const rows = [];
-  filtered.forEach(s=> s.payments.forEach(p=> rows.push({date:s.date, customer:s.customerName, method:p.method, amount:p.amount})));
+  filtered.forEach(s=> s.payments.forEach(p=> rows.push({date:s.date, sale:s, customer:s.customerName, method:p.method, amount:p.amount})));
   rows.sort((a,b)=> new Date(b.date)-new Date(a.date));
-  const shown = mFilter ? rows.filter(r=>r.method===mFilter) : rows;
+  const shown = rows.filter(r=> (!mFilter || r.method===mFilter) && (!qq || String(r.customer||'').toLowerCase().includes(qq) || (r.sale.items||[]).some(i=>String(i.name||'').toLowerCase().includes(qq))));
   const shownTotal = shown.reduce((a,r)=>a+r.amount,0);
+  return {from,to,filtered,canceled,byMethod,methods,grandTotal,fiado,received,days,pFrom,pTo,prevTotal,dayRows,mFilter,qq,rows,shown,shownTotal};
+}
+function caixaRangeKey(from,to){
+  const t = todayISO();
+  const y = daysAgoISO(1);
+  const m0 = t.slice(0,8)+'01';
+  const lm = new Date(); lm.setDate(1); lm.setMonth(lm.getMonth()-1); const lmFrom = localDay(lm);
+  const lmEnd = new Date(); lmEnd.setDate(0); const lmTo = localDay(lmEnd);
+  if(from===t && to===t) return 'hoje';
+  if(from===y && to===y) return 'ontem';
+  if(from===daysAgoISO(6) && to===t) return '7d';
+  if(from===daysAgoISO(29) && to===t) return '30d';
+  if(from===m0 && to===t) return 'mes';
+  if(from===lmFrom && to===lmTo) return 'mespass';
+  return '';
+}
+function renderCaixa(){
+  const C = caixaData();
+  const {from,to,filtered,canceled,byMethod,methods,grandTotal,fiado,received,days,prevTotal,dayRows,mFilter,shown,shownTotal} = C;
   const rk = caixaRangeKey(from,to);
-  const quick = [['hoje','Hoje'],['7d','7 dias'],['mes','Este mês']];
+  const quick = [['hoje','Hoje'],['ontem','Ontem'],['7d','7 dias'],['30d','30 dias'],['mes','Este mês'],['mespass','Mês passado']];
+  const ticket = filtered.length ? grandTotal/filtered.length : 0;
+  let varTxt = '';
+  if(prevTotal>0){ const v=(grandTotal-prevTotal)/prevTotal*100; varTxt = `<span style="color:${v>=0?'var(--gold-soft)':'#FFB4C0'};">${v>=0?'▲':'▼'} ${Math.abs(v).toFixed(0)}%</span> vs período anterior (${brl(prevTotal)})`; }
+  else if(grandTotal>0){ varTxt = 'sem vendas no período anterior para comparar'; }
+  const maxDay = dayRows.reduce((a,r)=>Math.max(a,r.total),0) || 1;
 
   return `
-  <div class="mb2">
+  <div class="flex-between flex-wrap mb2"><div>
     <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Caixa</h2>
     <p class="muted">Entradas por forma de pagamento</p>
   </div>
+  <div class="flex gap flex-wrap">
+    <button class="btn btn-ghost" data-action="printCaixa">${icon('printer')} Imprimir</button>
+    <button class="btn btn-ghost" data-action="exportCaixa">${icon('download')} Exportar CSV</button>
+  </div></div>
   <div class="flex gap flex-wrap mb2" style="align-items:end;">
-    <div class="segbar">
+    <div class="segbar" style="flex-wrap:wrap;">
       ${quick.map(([k,l])=>`<button class="${rk===k?'on':''}" data-action="setCaixaRange" data-range="${k}">${l}</button>`).join('')}
     </div>
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.caixaFrom" value="${from}"></label>
@@ -3810,10 +3867,11 @@ function renderCaixa(){
     <div>
       <div style="color:#D8C7E0;font-size:13px;">Recebido no período</div>
       <div class="serif" style="font-size:28px;color:var(--gold-soft);line-height:1.2;">${brl(received)}</div>
+      ${varTxt? `<div style="color:#D8C7E0;font-size:12px;margin-top:4px;">${varTxt}</div>`:''}
     </div>
     <div style="text-align:right;font-size:13px;color:#D8C7E0;line-height:1.7;">
       ${filtered.length} venda(s) · Total vendido <b style="color:#fff;">${brl(grandTotal)}</b><br>
-      A receber (fiado) <b style="color:var(--gold-soft);">${brl(fiado)}</b>${canceled? `<br>${canceled} cancelada(s) fora do total`:''}
+      Ticket médio <b style="color:#fff;">${brl(ticket)}</b> · A receber (fiado) <b style="color:var(--gold-soft);">${brl(fiado)}</b>${canceled? `<br>${canceled} cancelada(s) fora do total`:''}
     </div>
   </div>
   <div class="filterbar-label" style="margin-bottom:6px;">Por forma de pagamento <span style="text-transform:none;letter-spacing:0;font-weight:400;">· toque para filtrar a lista</span></div>
@@ -3826,17 +3884,29 @@ function renderCaixa(){
         <div class="muted2" style="font-size:11px;margin-top:3px;">${pct}% do total</div>
       </div>`; }).join('')}
   </div>
-  <div class="flex-between flex-wrap" style="margin-bottom:8px;">
+  ${days>1 && dayRows.length>0 ? `
+  <h3 class="serif plum" style="font-size:18px;margin:0 0 8px;">Resumo por dia</h3>
+  <div class="card mb3" style="padding:6px 14px;max-height:300px;overflow:auto;">
+    ${dayRows.map(r=>`<div style="display:grid;grid-template-columns:90px 70px 1fr 110px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;">
+      <span>${r.day.split('-').reverse().join('/')}</span><span class="muted">${r.n} venda(s)</span>
+      <span style="height:8px;background:var(--tint);border-radius:4px;overflow:hidden;"><span style="display:block;height:100%;width:${Math.max(2,Math.round(r.total/maxDay*100))}%;background:var(--gold);"></span></span>
+      <b style="text-align:right;white-space:nowrap;">${brl(r.total)}</b></div>`).join('')}
+  </div>` : ''}
+  <div class="flex-between flex-wrap" style="margin-bottom:8px;gap:10px;">
     <h3 class="serif plum" style="font-size:18px;margin:0;">Movimentações${mFilter? ' · '+esc(mFilter):''}</h3>
-    ${mFilter? `<button class="btn btn-ghost" data-action="filterCaixaMethod" data-method="">Mostrar todas as formas</button>`:''}
+    <div class="flex gap flex-wrap" style="align-items:center;">
+      <input placeholder="Buscar cliente ou produto..." data-field="ui.caixaQuery" value="${esc(state.ui.caixaQuery||'')}" style="min-width:210px;">
+      ${mFilter? `<button class="btn btn-ghost" data-action="filterCaixaMethod" data-method="">Mostrar todas as formas</button>`:''}
+    </div>
   </div>
-  ${shown.length===0 ? emptyState(icon('wallet',26),'Sem movimentações','Nenhum pagamento registrado nesse período.') : `
+  ${shown.length===0 ? emptyState(icon('wallet',26),'Sem movimentações','Nenhum pagamento encontrado nesse período e filtros.') : `
   <div class="table-wrap"><table>
-    <thead><tr><th>Data</th><th>Cliente</th><th>Forma</th><th style="text-align:right;">Valor</th></tr></thead>
-    <tbody>${shown.map(r=>`
-      <tr><td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td><td>${esc(r.customer)}</td><td>${r.method}${r.method==='Fiado'?' <span class="badge-danger" style="margin-left:4px;">a receber</span>':''}</td><td style="text-align:right;white-space:nowrap;">${brl(r.amount)}</td></tr>
-    `).join('')}</tbody>
-    <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600;padding:10px 12px;">Total listado (${shown.length})</td><td style="text-align:right;font-weight:600;padding:10px 12px;white-space:nowrap;">${brl(shownTotal)}</td></tr></tfoot>
+    <thead><tr><th>Data</th><th>Cliente</th><th>Venda</th><th>Forma</th><th style="text-align:right;">Valor</th></tr></thead>
+    <tbody>${shown.map(r=>{ const n=(r.sale.items||[]).length; const first=n?esc(r.sale.items[0].name||''):'—';
+      return `<tr><td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td><td>${esc(r.customer)}</td>
+      <td class="plum" style="cursor:pointer;" data-action="viewSale" data-id="${r.sale.id}" title="Ver venda">${first}${n>1?` <span class="muted">+ ${n-1}</span>`:''}</td>
+      <td>${r.method}${r.method==='Fiado'?' <span class="badge-danger" style="margin-left:4px;">a receber</span>':''}</td><td style="text-align:right;white-space:nowrap;">${brl(r.amount)}</td></tr>`; }).join('')}</tbody>
+    <tfoot><tr><td colspan="4" style="text-align:right;font-weight:600;padding:10px 12px;">Total listado (${shown.length})</td><td style="text-align:right;font-weight:600;padding:10px 12px;white-space:nowrap;">${brl(shownTotal)}</td></tr></tfoot>
   </table></div>`}
   `;
 }
