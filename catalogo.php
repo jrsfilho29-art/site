@@ -20,6 +20,11 @@ try { $pdo = db(); } catch(Throwable $ex){ plain(503, 'Catálogo indisponível n
 if($WHATSAPP === ''){ try{ $__m = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__m->execute(['whatsapp']); $WHATSAPP = (string)($__m->fetchColumn() ?: ''); }catch(Throwable $__e){} }
 $WHATSAPP = preg_replace('/\D/', '', (string)$WHATSAPP);
 if($WHATSAPP !== '' && strlen($WHATSAPP) <= 11) $WHATSAPP = '55'.$WHATSAPP;   /* DDI do Brasil */
+/* vendedores extras: catalogo.php?vend=ID usa o WhatsApp desse vendedor e marca os pedidos com o nome dele */
+$SELLERS = []; $SELLER_ID = ''; $SELLER_NAME = '';
+try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['sellers']); $__j = json_decode((string)($__q->fetchColumn() ?: '[]'), true); if(is_array($__j)) $SELLERS = $__j; }catch(Throwable $__e){}
+$__vend = isset($_GET['vend']) ? preg_replace('/[^a-z0-9]/', '', strtolower((string)$_GET['vend'])) : '';
+if($__vend !== ''){ foreach($SELLERS as $__s){ if(($__s['id'] ?? '') === $__vend){ $SELLER_ID = $__vend; $SELLER_NAME = (string)$__s['name']; $__ph = preg_replace('/\D/', '', (string)$__s['phone']); if(strlen($__ph) <= 11) $__ph = '55'.$__ph; $WHATSAPP = $__ph; break; } } }
 
 /* ---------- pedido feito pelo cliente no catálogo ---------- */
 if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
@@ -40,6 +45,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
   if(strlen($phone) < 10 || strlen($phone) > 13) $jerr(422, 'Informe seu WhatsApp com DDD.');
   if(!in_array($payment, $payAllowed, true)) $jerr(422, 'Escolha a forma de pagamento.');
   $note = mb_substr($note, 0, 300);
+  $sellerId = ''; $sellerName = '';
+  $__sv = preg_replace('/[^a-z0-9]/', '', strtolower((string)($in['seller'] ?? '')));
+  if($__sv !== ''){ foreach($SELLERS as $__s){ if(($__s['id'] ?? '') === $__sv){ $sellerId = $__sv; $sellerName = mb_substr((string)$__s['name'], 0, 80); break; } } }
   /* itens do carrinho (aceita também o formato antigo: um único produto) */
   $raw = $in['items'] ?? null;
   if(!is_array($raw)) $raw = [['productId'=>$in['productId'] ?? '', 'qty'=>$in['qty'] ?? 1]];
@@ -72,11 +80,11 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
       id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, product_id VARCHAR(60), product_name VARCHAR(255),
       unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, qty INT NOT NULL DEFAULT 1, customer_name VARCHAR(120), phone VARCHAR(30),
       note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
-      items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0
+      items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0, seller_id VARCHAR(30), seller_name VARCHAR(80)
     )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
-    try{ $pdo->query('SELECT items, payment, total FROM online_orders LIMIT 1'); }
+    try{ $pdo->query('SELECT items, payment, total, seller_id, seller_name FROM online_orders LIMIT 1'); }
     catch(Throwable $e){
-      foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
+      foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0', 'seller_id VARCHAR(30)', 'seller_name VARCHAR(80)'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
     }
     $ip = substr(hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? '').'|essencia'), 0, 32);
     $since = gmdate('Y-m-d\TH:i:s\Z', time() - 600);
@@ -84,8 +92,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
     if((int)$c->fetchColumn() >= 5) $jerr(429, 'Muitos pedidos em pouco tempo. Tente novamente em alguns minutos.');
     $id = 'ped_'.bin2hex(random_bytes(8));
     $summary = count($items) === 1 ? $items[0]['name'] : $items[0]['name'].' + '.(count($items)-1).' item(ns)';
-    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2)]);
+    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total,seller_id,seller_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2), $sellerId, $sellerName]);
     echo json_encode(['ok'=>true, 'id'=>$id, 'total'=>round($total, 2)]); exit;
   }catch(Throwable $ex){ $jerr(500, 'Não foi possível enviar o pedido agora. Tente pelo WhatsApp.'); }
 }
@@ -199,10 +207,10 @@ function card($p){
   $meta = '<div class="cat">'.(($brand !== '' || $vol !== '') ? e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol) : '&nbsp;').'</div>';
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
-  global $WHATSAPP, $__base;
+  global $WHATSAPP, $__base, $SELLER_ID;
   $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format((float)$p['sale_price'], 2, '.', '')).'" data-st="'.(int)min(20, (int)$p['stock']).'"';
   if($WHATSAPP !== ''){
-    $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']);   /* o WhatsApp mostra a foto do produto na prévia deste link */
+    $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']).($SELLER_ID !== '' ? '&vend='.rawurlencode($SELLER_ID) : '');   /* o WhatsApp mostra a foto do produto na prévia deste link */
     $__d = substr($WHATSAPP, 2); $__ph = strlen($__d) >= 10 ? '('.substr($__d,0,2).') '.substr($__d,2,strlen($__d)-6).'-'.substr($__d,-4) : $__d;
     $attrs .= ' data-ph="'.e($__ph).'"';
     $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink).'"';
@@ -551,7 +559,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
 (function(){
   var lb=document.getElementById('lb');if(!lb)return;
   function $(i){return document.getElementById(i);}
-  var WA=<?= json_encode($WHATSAPP) ?>;
+  var WA=<?= json_encode($WHATSAPP) ?>,SELLER=<?= json_encode($SELLER_ID) ?>,SELLERN=<?= json_encode($SELLER_NAME) ?>;
   var cur=null,cart=[],pay='';
   function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
   function brl(v){return 'R$ '+(Math.round(v*100)/100).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
@@ -638,14 +646,14 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if(!pay){er.textContent='Escolha a forma de pagamento.';return;}
     er.textContent='';btn.disabled=true;btn.textContent='Enviando...';
     var sent=cart.slice(),tot=total();
-    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:sent.map(function(i){return {productId:i.id,qty:i.qty};}),name:n,phone:ph,payment:pay,note:$('of-o').value,website:$('of-h').value})})
+    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:sent.map(function(i){return {productId:i.id,qty:i.qty};}),name:n,phone:ph,payment:pay,seller:SELLER,note:$('of-o').value,website:$('of-h').value})})
     .then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro ao enviar.'};});})
     .then(function(j){
       btn.disabled=false;btn.textContent='Enviar pedido para a loja';
       if(!j.ok){er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
       ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);
       var nn=sent.reduce(function(a,i){return a+i.qty;},0);
-      $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+', pagamento: '+pay+'). A loja vai falar com você pelo WhatsApp '+$('of-p').value+' para combinar pagamento e entrega.';
+      $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+' para combinar pagamento e entrega.';
       var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
       cart=[];saveCart();fab();$('of-o').value='';
       $('ct-main').style.display='none';$('ct-ok').style.display='block';

@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-s';
+const APP_VERSION = '2026.10.12-t';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1490,7 +1490,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'')}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList()}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1536,6 +1536,7 @@ async function syncPush(force, silent){
 function syncApplyPulled(j){
   const d = j.data || {};
   let codesAdded = false;
+  if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
@@ -2427,7 +2428,7 @@ function renderOnline(){
         }).join('');
         return `<div class="card oo-card">
           <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}</span><span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></div>
-          <div class="oo-rows">${rows}</div>
+          <div class="oo-rows">${rows}</div>${o.sellerName?`<div class="muted2" style="font-size:12px;">Vendedor: <strong>${esc(o.sellerName)}</strong></div>`:''}
           <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:8px;"><span class="muted">${o.payment?'Pagamento: <strong>'+esc(o.payment)+'</strong>':''}</span><span>Total <strong style="font-size:17px;">${brl(total)}</strong></span></div>
           <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(onlineDigits(o.phone)))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
           <div class="oo-acts">
@@ -2784,6 +2785,29 @@ const actions_produtos = {
     standardizeImportedImages(newProducts.filter(p=>p.image).map(p=>p.id));
   },
   editProduto(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'produto', data:{...p}}; render(); },
+  setCatSeller(t){ state.ui.catSeller = t.dataset.id||''; state.ui.catMsg=''; render(); },
+  addSeller(){
+    const name = String(state.ui.newSellerName||'').trim(), ph = String(state.ui.newSellerPhone||'').replace(/\D/g,'');
+    if(name.length<2){ notify.err('Informe o nome do vendedor.'); return; }
+    if(ph.length<10){ notify.err('Informe o WhatsApp do vendedor com DDD.'); return; }
+    state.prefs = state.prefs||{}; state.prefs.sellers = sellersList().slice();
+    if(state.prefs.sellers.length>=20){ notify.err('Limite de 20 vendedores.'); return; }
+    const id = (Date.now().toString(36)+Math.random().toString(36).slice(2,5)).replace(/[^a-z0-9]/g,'');
+    state.prefs.sellers.push({id, name, phone:ph});
+    state.ui.newSellerName=''; state.ui.newSellerPhone='';
+    persist('prefs'); syncSchedulePush(); notify.ok('Vendedor '+name+' cadastrado.'); render();
+  },
+  removeSeller(t){
+    const v = sellersList().find(x=>x.id===t.dataset.id); if(!v) return;
+    if(!confirm('Remover o vendedor '+v.name+'? O link dele deixa de levar ao WhatsApp dele (passa a usar o da loja).')) return;
+    state.prefs.sellers = sellersList().filter(x=>x.id!==v.id);
+    if(state.ui.catSeller===v.id){ state.ui.catSeller=''; state.ui.catMsg=''; }
+    persist('prefs'); syncSchedulePush(); render();
+  },
+  async copySellerLink(t){
+    const url = catalogPublicUrl(t.dataset.id);
+    try{ await navigator.clipboard.writeText(url); notify.ok('Link copiado: '+url); }catch(e){ notify.ok('Link: '+url); }
+  },
   setCatalogoSubView(t){ state.ui.catalogoSubView = t.dataset.view; render(); },
   async openFixBlackBg(){
     state.ui.addMenuOpen = false;
@@ -2841,7 +2865,7 @@ const actions_produtos = {
   },
   openCatalogPage(){
     /* abre a página pública atual do site (catalogo.php, com carrinho e pedido online), numa nova aba */
-    openNewTab(catalogPublicUrl() + '?v=' + encodeURIComponent(APP_VERSION));
+    openNewTab(catalogPublicUrl('') + '?v=' + encodeURIComponent(APP_VERSION));
   },
   async exportCatalogPage(){
     let list = state.ui.catalogOnlyAvailable ? state.products.filter(p=>p.stock>0) : state.products;
@@ -3957,10 +3981,14 @@ function renderCatalogo(){
 }
 
 
-function catalogPublicUrl(){
-  return /^https?:/i.test(location.protocol) && location.hostname ? new URL('catalogo.php', location.href).href : 'https://seuperfume.net/catalogo.php';
+function sellersList(){ return (state.prefs && Array.isArray(state.prefs.sellers)) ? state.prefs.sellers : []; }
+function currentSeller(){ const id = state.ui.catSeller||''; return id ? sellersList().find(x=>x.id===id) || null : null; }
+function catalogPublicUrl(sid){
+  const base = /^https?:/i.test(location.protocol) && location.hostname ? new URL('catalogo.php', location.href).href : 'https://seuperfume.net/catalogo.php';
+  const id = sid===undefined ? (currentSeller()?currentSeller().id:'') : sid;
+  return id ? base + '?vend=' + encodeURIComponent(id) : base;
 }
-function catalogDefaultMsg(){ return 'Olá! Veja o catálogo de perfumes da Essência e escolha o seu: '+catalogPublicUrl(); }
+function catalogDefaultMsg(){ const v = currentSeller(); return (v ? 'Olá! Aqui é '+v.name+', da Essência. ' : 'Olá! ')+'Veja o catálogo de perfumes e escolha o seu: '+catalogPublicUrl(); }
 function catalogMsg(){ return state.ui.catMsg!==undefined && state.ui.catMsg!=='' ? state.ui.catMsg : catalogDefaultMsg(); }
 function waPhone(ph){ let d=String(ph||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return d; }
 function renderCatalogoEnviar(){
@@ -3972,11 +4000,30 @@ function renderCatalogoEnviar(){
   const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
   return `
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${wa?'':'border-color:var(--gold-deep);'}">
-    <b>WhatsApp do vendedor</b>
+    <b>WhatsApp da loja (vendedor principal)</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Número para onde o cliente é levado ao tocar em <b>Escolher este perfume</b> no catálogo, para finalizar a compra com você.${wa?'':' <b class="danger-c">Ainda não cadastrado: o botão não aparece no catálogo.</b>'}</p>
     <label class="field" style="max-width:260px;margin-bottom:4px;"><span class="lbl">Telefone com DDD</span>
       <input data-field="prefs.storeWhatsapp" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(maskPhone((state.prefs&&state.prefs.storeWhatsapp)||''))}"></label>
     <span class="hint">Salvo e enviado ao servidor automaticamente (com a sincronização ligada), e o catálogo online passa a usar este número.</span>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>Outros vendedores</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Cadastre quem mais atende clientes. Cada vendedor ganha um <b>link próprio do catálogo</b>: o botão de WhatsApp e os pedidos desse link vão para ele, e o pedido aparece em <b>Pedidos online</b> com o nome do vendedor.</p>
+    ${sellersList().length===0 ? '<p class="muted2" style="font-size:13px;margin-bottom:10px;">Nenhum vendedor extra cadastrado.</p>' : sellersList().map(v=>`
+    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;">
+      <div style="min-width:0;"><div style="font-size:14px;font-weight:600;">${esc(v.name)}</div><div class="muted2" style="font-size:12px;">${esc(maskPhone(waPhone(v.phone).replace(/^55/,'')))}</div></div>
+      <div class="flex gap" style="flex-wrap:wrap;">
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="setCatSeller" data-id="${esc(v.id)}">Enviar como ${esc(v.name.split(' ')[0])}</button>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="copySellerLink" data-id="${esc(v.id)}">Copiar link</button>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;color:var(--danger);" data-action="removeSeller" data-id="${esc(v.id)}">Remover</button>
+      </div>
+    </div>`).join('')}
+    <div class="flex gap flex-wrap" style="align-items:flex-end;margin-top:12px;">
+      <label class="field" style="flex:1;min-width:160px;margin:0;"><span class="lbl">Nome do vendedor</span><input data-field="ui.newSellerName" maxlength="60" placeholder="Ex.: Maria" value="${esc(state.ui.newSellerName||'')}"></label>
+      <label class="field" style="width:190px;margin:0;"><span class="lbl">WhatsApp com DDD</span><input data-field="ui.newSellerPhone" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(state.ui.newSellerPhone||'')}"></label>
+      <button class="btn btn-gold" data-action="addSeller">${icon('plus')} Adicionar vendedor</button>
+    </div>
+    ${(!isAdmin() && sellersList().length) ? '<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam vendedores no servidor.</p>' : ''}
   </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Convite</b>
@@ -3996,6 +4043,7 @@ function renderCatalogoEnviar(){
   </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Link do catálogo</b>
+    ${sellersList().length ? `<div class="flex gap flex-wrap" style="align-items:center;margin-top:8px;"><span class="filterbar-label">Enviar como:</span><div class="segbar" style="flex-wrap:wrap;"><button class="${!state.ui.catSeller?'on':''}" data-action="setCatSeller" data-id="">Loja (principal)</button>${sellersList().map(v=>`<button class="${state.ui.catSeller===v.id?'on':''}" data-action="setCatSeller" data-id="${esc(v.id)}">${esc(v.name)}</button>`).join('')}</div></div>` : ''}
     <div class="flex gap flex-wrap" style="margin:10px 0;align-items:center;">
       <input readonly style="flex:1;min-width:220px;" value="${esc(url)}" onclick="this.select()">
       <button class="btn btn-ghost" data-action="copyCatalogLink">Copiar link</button>

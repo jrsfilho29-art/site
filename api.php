@@ -140,11 +140,11 @@ function ensureOnlineOrders($pdo){
     id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, product_id VARCHAR(60), product_name VARCHAR(255),
     unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, qty INT NOT NULL DEFAULT 1, customer_name VARCHAR(120), phone VARCHAR(30),
     note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
-    items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0
+    items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0, seller_id VARCHAR(30), seller_name VARCHAR(80)
   )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
-  try{ $pdo->query('SELECT items, payment, total FROM online_orders LIMIT 1'); }
+  try{ $pdo->query('SELECT items, payment, total, seller_id, seller_name FROM online_orders LIMIT 1'); }
   catch(Throwable $e){
-    foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
+    foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0', 'seller_id VARCHAR(30)', 'seller_name VARCHAR(80)'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
   }
 }
 
@@ -157,7 +157,7 @@ try{
       'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
       'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
-      'total'=>(float)($o['total'] ?? 0),
+      'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''),
       'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
     ], $r)]);
   }
@@ -241,7 +241,8 @@ try{
       ];
     }, rows($pdo, 'SELECT * FROM orders ORDER BY created_at DESC, id DESC'));
 
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp')];
+    $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : []];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -340,7 +341,19 @@ try{
 
       $new = $cur + 1;
       setVersion($pdo, $new);
-      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('whatsapp', $d['settings'])){
+      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && isset($d['settings']['sellers']) && is_array($d['settings']['sellers'])){
+        $__out = [];
+        foreach(array_slice($d['settings']['sellers'], 0, 20) as $__s){
+          if(!is_array($__s)) continue;
+          $__id = preg_replace('/[^a-z0-9]/', '', strtolower((string)($__s['id'] ?? '')));
+          $__nm = trim(strip_tags((string)($__s['name'] ?? '')));
+          $__ph = substr(preg_replace('/\D/', '', (string)($__s['phone'] ?? '')), 0, 20);
+          if($__id === '' || strlen($__id) > 24 || $__nm === '' || strlen($__ph) < 10) continue;
+          $__out[] = ['id'=>$__id, 'name'=>mb_substr($__nm, 0, 60), 'phone'=>$__ph];
+        }
+        setMeta($pdo, 'sellers', json_encode($__out, JSON_UNESCAPED_UNICODE));
+      }
+      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('whatsapp', $d['settings']) && preg_replace('/\D/', '', (string)$d['settings']['whatsapp']) !== ''){
         setMeta($pdo, 'whatsapp', substr(preg_replace('/\D/', '', (string)$d['settings']['whatsapp']), 0, 20));
       }
       $pdo->commit();
