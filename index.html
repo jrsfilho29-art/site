@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-p';
+const APP_VERSION = '2026.10.12-q';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1623,7 +1623,26 @@ async function afterLoginSync(u){
   try{ await fetchOnlineOrders(true); }catch(e){}
   render();
 }
+/* aviso de nova versão: confere o site de tempos em tempos e oferece atualizar (vale para computador e celular) */
+let _verBar = false;
+async function checkNewVersion(){
+  if(_verBar || !/^https?:$/.test(location.protocol)) return;
+  try{
+    const r = await fetch(location.pathname + '?_v=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const m = (await r.text()).match(/const APP_VERSION = '([^']+)'/);
+    if(!m || m[1] === APP_VERSION) return;
+    _verBar = true;
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:9999;background:#F0A81F;color:#17204A;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:center;font:600 14px system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.25);';
+    d.innerHTML = '<span>Nova versão disponível ('+m[1].replace(/[<>&]/g,'')+').</span><button style="border:none;background:#17204A;color:#fff;border-radius:999px;padding:8px 16px;font:inherit;cursor:pointer;">Atualizar agora</button>';
+    d.querySelector('button').onclick = async ()=>{ try{ const ks = await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){} location.reload(); };
+    document.body.appendChild(d);
+  }catch(e){}
+}
 function syncStartTimers(){
+  setTimeout(checkNewVersion, 4000); setInterval(checkNewVersion, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkNewVersion(); });
   setInterval(syncCheckRemote, 30000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncCheckRemote(); });
   window.addEventListener('online', syncCheckRemote);
