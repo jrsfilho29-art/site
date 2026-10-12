@@ -438,7 +438,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-j';
+const APP_VERSION = '2026.10.12-k';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2338,6 +2338,7 @@ const actions_extras = {
 /* ===== Pedidos online (clientes escolhem no catálogo; chegam pelo servidor) ===== */
 const ONLINE = {orders:[], loaded:false, err:'', lastNew:0};
 const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', concluido:'Concluído', cancelado:'Cancelado'};
+function onlineDigits(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>11 && d.slice(0,2)==='55') d=d.slice(2); return d; }
 function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
 async function fetchOnlineOrders(silent){
   if(!(typeof syncEnabled==='function' && syncEnabled())) return;
@@ -2361,7 +2362,7 @@ function onlineAgo(iso){
 }
 function renderOnline(){
   const flt = state.ui.onlineFilter || 'novo';
-  if(syncEnabled() && !ONLINE.loaded && !ONLINE.loading){ ONLINE.loading=true; fetchOnlineOrders(false).finally(()=>{ONLINE.loading=false;}); }
+  if(syncEnabled() && !ONLINE.loaded && !ONLINE.loading && !ONLINE.err){ ONLINE.loading=true; fetchOnlineOrders(false).finally(()=>{ONLINE.loading=false;}); }
   const cnt = k => k==='todos' ? ONLINE.orders.length : ONLINE.orders.filter(o=>o.status===k).length;
   const chips = [['novo','Novos'],['atendimento','Em atendimento'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
   const list = ONLINE.orders.filter(o=> flt==='todos' || o.status===flt);
@@ -2387,7 +2388,7 @@ function renderOnline(){
             <div class="muted" style="font-size:12.5px;">${p&&p.sku?'Cód. '+esc(p.sku)+' · ':''}${o.qty} × ${brl(o.unitPrice)} = <strong>${brl(total)}</strong></div>
             <div class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}${p&&p.stock!=null?' · estoque '+p.stock:(p?'':' · produto removido')}</div>
           </div></div>
-          <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(o.phone||''))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
+          <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(onlineDigits(o.phone)))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
           <div class="oo-acts">
             <button class="btn btn-primary" data-action="onlineWhats" data-id="${esc(o.id)}">WhatsApp</button>
             ${open&&p?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
@@ -2399,7 +2400,7 @@ function renderOnline(){
 }
 const actions_online = {
   setOnlineFilter(t){ state.ui.onlineFilter = t.dataset.f; render(); },
-  async refreshOnline(){ await fetchOnlineOrders(false); notify.ok('Pedidos atualizados.'); },
+  async refreshOnline(){ ONLINE.err=''; await fetchOnlineOrders(false); if(ONLINE.err) notify.err(ONLINE.err); else notify.ok('Pedidos atualizados.'); },
   onlineWhats(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
     const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+o.qty+'x '+o.productName+' ('+brl((o.unitPrice||0)*o.qty)+'). Vamos finalizar? 😊');
@@ -2418,10 +2419,10 @@ const actions_online = {
     const p = state.products.find(x=>x.id===o.productId);
     if(!p){ notify.err('Produto não encontrado no estoque.'); return; }
     if(p.stock<=0){ notify.err('Produto sem estoque.'); return; }
-    const d = String(o.phone||'').replace(/\D/g,'');
-    let c = state.customers.find(x=>String(x.phone||'').replace(/\D/g,'')===d && d);
+    const d = onlineDigits(o.phone);
+    let c = d && state.customers.find(x=>onlineDigits(x.phone)===d);
     if(!c){
-      c = {id:uid('cli'), code:nextCustomerCode(), name:o.customerName, phone:maskPhone(o.phone||''), email:'', cpf:'', address:'', number:'', district:'', city:'', state:'', zip:'', notes:'Veio do catálogo online', createdAt:new Date().toISOString()};
+      c = {id:uid('cli'), code:nextCustomerCode(), name:o.customerName, phone:maskPhone(onlineDigits(o.phone)), email:'', cpf:'', address:'', number:'', district:'', city:'', state:'', zip:'', notes:'Veio do catálogo online', createdAt:new Date().toISOString()};
       state.customers.push(c); persist('customers');
     }
     const V = state.ui.venda;

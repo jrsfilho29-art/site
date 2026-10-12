@@ -446,7 +446,7 @@ if($__op){
   <label>Seu WhatsApp<input id="of-p" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="(11) 99999-9999"></label>
   <label>Quantidade<span class="of-q"><button type="button" id="of-m" aria-label="Menos">&minus;</button><b id="of-qv">1</b><button type="button" id="of-a" aria-label="Mais">+</button></span></label>
   <label>Observação (opcional)<input id="of-o" maxlength="300" placeholder="Ex.: prefiro retirar na loja"></label>
-  <input id="of-h" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
+  <input id="of-h" name="contato_extra" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
   <div class="of-e" id="of-e" role="alert"></div>
   <button type="submit" class="lb-wa" id="of-s" style="display:block">Enviar pedido</button>
   <button type="button" class="of-b" id="of-b">Voltar</button>
@@ -487,7 +487,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     else if(t.id==='of-m'){qty=Math.max(1,qty-1);$('of-qv').textContent=qty;}
     else if(t.id==='of-a'){qty=Math.min(20,qty+1);$('of-qv').textContent=qty;}
   });
-  document.addEventListener('input',function(e){if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
+  document.addEventListener('input',function(e){var er0=$('of-e');if(er0&&e.target.closest&&e.target.closest('#lb-f'))er0.textContent='';if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
   document.addEventListener('submit',function(e){
     if(e.target.id!=='lb-f')return;e.preventDefault();
     if(!cur)return;
