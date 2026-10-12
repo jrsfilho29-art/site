@@ -4823,11 +4823,6 @@ function renderProdutoModal(d){
           <input list="cats" data-field="ui.modal.data.category" value="${esc(d.category)}">
           <datalist id="cats">${state.categories.map(c=>`<option value="${esc(c.name)}">`).join('')}</datalist>
         </label>
-        <label class="field"><span class="lbl">Subgrupo</span>
-          <input list="subcats" placeholder="Ex: Masculino, Feminino, Linha Ouro..." data-field="ui.modal.data.subcategory" value="${esc(d.subcategory||'')}">
-          <datalist id="subcats">${state.subcategories.filter(sc=>!d.category||sc.category===d.category).map(sc=>`<option value="${esc(sc.name)}">`).join('')}</datalist>
-          <span class="hint">Opcional — organiza os produtos dentro da categoria</span>
-        </label>
       </div>
     </div>
     <div class="grid grid-3">
