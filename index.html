@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-l';
+const APP_VERSION = '2026.10.12-m';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1022,6 +1022,21 @@ function buildCatalogPageHTML(list){
   .lb-desc{flex:1;min-height:0;overflow-y:auto;}
   @media (max-width:640px){.lb-box{height:68vh;grid-template-rows:minmax(0,38%) minmax(0,1fr);}.lb-img img{max-height:100%;height:100%;}}
 
+  /* caixa do produto: ajusta ao conteúdo */
+  .lb-box{height:auto !important;max-height:92vh;overflow-y:auto;grid-template-rows:auto;align-items:start;}
+  .lb-info{overflow:visible;min-height:0;display:block;}
+  .lb-desc{flex:none;overflow:visible;min-height:0;max-height:none;margin-bottom:4px;}
+  .lb-img{align-self:stretch;}
+  .lb-img img{max-height:46vh;}
+  @media (max-width:640px){.lb-box{max-height:94vh;grid-template-columns:1fr;grid-template-rows:auto;}.lb-img img{max-height:34vh;height:auto;}.lb-info{padding-bottom:20px;}}
+
+  @media (min-width:641px){
+    .lb-box{max-width:760px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+    .lb-img{align-items:flex-start;padding:14px;}
+    .lb-img img{max-height:60vh;}
+    .lb-info{padding:22px 20px 18px;}
+    .lb-name{font-size:18px;}
+  }
   /* ===== layout vitrine de loja ===== */
   body{background:#F7F5F0;}
   header{padding:38px 20px 30px;border-bottom:none;}
