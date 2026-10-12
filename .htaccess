@@ -27,3 +27,10 @@ RedirectMatch 404 /\.(?!well-known)
   RewriteCond %{HTTP_REFERER} !^https?://(www\.)?seuperfume\.net/ [NC]
   RewriteRule ^catalogo\.php$ - [F]
 </IfModule>
+
+# HTML e service worker sempre revalidados: o navegador pega a versão nova logo após cada atualização
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|webmanifest)$|^sw\.js$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

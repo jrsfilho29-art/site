@@ -431,6 +431,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
+const APP_VERSION = '2026.10.12-b';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2037,6 +2038,7 @@ function renderSidebar(){
     </nav>
     <div class="footer">
       <div class="uname"><span class="avatar">${esc((state.currentUser.name||'?').trim().charAt(0).toUpperCase())}</span><span style="display:flex;flex-direction:column;line-height:1.25;min-width:0;"><span>${esc(state.currentUser.name)}</span><span style="font-size:10.5px;opacity:.7;font-weight:400;">${ROLE_LABEL[roleOf(state.currentUser)]}</span></span></div>
+      <div class="muted2" style="font-size:10px;opacity:.6;margin-bottom:2px;">versão ${APP_VERSION}</div>
       ${isStandalone()? '' : `<button class="logout" data-action="installApp">${icon('download',13)} Instalar aplicativo</button>`}
       <button class="logout" data-action="openMyPassword">${icon('key',13)} Minha senha</button>
       <button class="logout" data-action="logout">${icon('logout',13)} Sair</button>
