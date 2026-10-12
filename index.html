@@ -431,7 +431,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-b';
+const APP_VERSION = '2026.10.12-c';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2439,7 +2439,6 @@ function renderProdutos(){
   const list = state.products
     .filter(p=> (p.name+p.category).toLowerCase().includes(q))
     .filter(p=> !catFilter || p.category===catFilter)
-    .filter(p=> !subFilter || p.subcategory===subFilter)
     .filter(p=>{ const f=state.ui.productSituation||''; if(!f) return true;
       if(f==='zerado') return p.stock<=0; if(f==='baixo') return p.stock>0 && p.stock<=(p.minStock||0);
       if(f==='semfoto') return !p.image; if(f==='inativo') return p.active===false; return true; });
@@ -2484,14 +2483,6 @@ function renderProdutos(){
         ${[['','Todos'],['zerado','Sem estoque ('+state.products.filter(p=>p.stock<=0).length+')'],['baixo','Estoque baixo ('+state.products.filter(p=>p.stock>0&&p.stock<=(p.minStock||0)).length+')'],['semfoto','Sem foto ('+state.products.filter(p=>!p.image).length+')'],['inativo','Inativos ('+state.products.filter(p=>p.active===false).length+')']].map(([k,l])=>`<button class="${(state.ui.productSituation||'')===k?'on':''}" data-action="setProductSituation" data-s="${k}">${l}</button>`).join('')}
       </div>
     </div>
-    ${catFilter && subOptions.length>0 ? `
-    <div class="flex gap flex-wrap" style="align-items:center;margin-top:10px;">
-      <span class="filterbar-label">Subgrupo:</span>
-      <div class="segbar" style="flex-wrap:wrap;">
-        <button class="${!subFilter?'on':''}" data-action="filterProductSubcategory" data-sub="">Todos</button>
-        ${subOptions.map(sc=>`<button class="${subFilter===sc.name?'on':''}" data-action="filterProductSubcategory" data-sub="${esc(sc.name)}">${esc(sc.name)}</button>`).join('')}
-      </div>
-    </div>` : ''}
   </div>
   <div class="flex gap flex-wrap mb2" style="align-items:center;">
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;color:var(--muted);">
