@@ -134,6 +134,9 @@ function card($p){
   $attrs .= ' data-id="'.e($p['id']).'"';
   if($WHATSAPP !== ''){
     $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']);   /* o WhatsApp mostra a foto do produto na prévia deste link */
+    $__d = substr($WHATSAPP, 2); $__ph = strlen($__d) >= 10 ? '('.substr($__d,0,2).') '.substr($__d,2,strlen($__d)-6).'-'.substr($__d,-4) : $__d;
+    $attrs .= ' data-ph="'.e($__ph).'"';
+    $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink).'"';
     $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink)).'"';
   }
   $btn = '<span class="buy">Ver detalhes</span>';
@@ -316,6 +319,7 @@ if($__op){
   .buy.wa{background:#25D366;color:#073B1B;}
   .buy.wa:hover{background:#1FB85A;}
   .noresult{display:none;text-align:center;color:var(--muted);padding:50px 20px;}
+  .lb-sh{display:none;margin-top:8px;width:100%;border:2px solid #25D366;background:#fff;color:#0B5A2A;font:inherit;font-weight:700;font-size:13px;padding:10px;border-radius:999px;cursor:pointer;}
   .lb-note{display:none;font-size:11px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4;}
   .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:14px;padding:12px;border-radius:999px;box-shadow:0 4px 12px rgba(37,211,102,.35);}
   .lb-box{border-radius:18px;}
@@ -368,7 +372,7 @@ if($__op){
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
-<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Escolher este perfume</a><div class="lb-note" id="lb-wn">Você será direcionado ao WhatsApp da loja para finalizar a compra com o vendedor.</div></div></div></div>
+<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Escolher este perfume</a><button type="button" class="lb-sh" id="lb-s">Enviar com a foto (celular)</button><div class="lb-note" id="lb-wn">Você será direcionado ao WhatsApp da loja para finalizar a compra com o vendedor.</div></div></div></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
@@ -383,7 +387,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('lb-p').textContent=c.getAttribute('data-price')||'';
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
-    var w=$('lb-w'),wn=$('lb-wn'),wa=c.getAttribute('data-wa');if(w){if(wa){w.href=wa;w.style.display='block';if(wn)wn.style.display='block';}else{w.style.display='none';if(wn)wn.style.display='none';}}
+    var w=$('lb-w'),wn=$('lb-wn'),wa=c.getAttribute('data-wa');if(w){if(wa){w.href=wa;w.style.display='block';if(wn){wn.style.display='block';var ph=c.getAttribute('data-ph');wn.textContent='Você será direcionado ao WhatsApp da loja'+(ph?' ('+ph+')':'')+' para finalizar a compra com o vendedor.';}}else{w.style.display='none';if(wn)wn.style.display='none';}}
     lb.className='lb on';document.body.style.overflow='hidden';
   }
   function close(){lb.className='lb';document.body.style.overflow='';}
@@ -412,6 +416,26 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       try{navigator.clipboard.write([new ClipboardItem({'image/png':blobP})]).then(function(){ok=true;if(wn){wn.style.display='block';wn.innerHTML='<b>Foto copiada!</b> No WhatsApp, toque e segure o campo de mensagem e escolha <b>Colar</b> para enviar a foto junto.';}}).catch(function(){});}catch(e){}
       window.open(url,'_blank','noopener');
       setTimeout(function(){if(wn&&!ok)wn.textContent=base;},4000);
+    });
+  })();
+
+  /* celular: compartilha foto + mensagem juntas (o cliente escolhe o WhatsApp e o contato da loja) */
+  (function(){
+    var s=document.getElementById('lb-s'),lbi=document.getElementById('lb-i'),lb=document.getElementById('lb');
+    if(!s)return;
+    var cur=null;
+    document.addEventListener('click',function(e){var c=e.target.closest&&e.target.closest('.card[data-name]');if(c){cur=c;setTimeout(function(){var ok=!!(c.getAttribute('data-wa')&&c.getAttribute('data-msg')&&navigator.share&&navigator.canShare&&lbi&&lbi.getAttribute('src'));s.style.display=ok?'block':'none';},0);}},true);
+    s.addEventListener('click',function(){
+      if(!cur)return;var src=lbi.getAttribute('src'),msg=cur.getAttribute('data-msg')||'',ph=cur.getAttribute('data-ph')||'';
+      var im=new Image();
+      im.onload=function(){var c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);
+        c.toBlob(function(b){
+          var f=new File([b],'perfume.png',{type:'image/png'});
+          if(navigator.canShare({files:[f]})){navigator.share({files:[f],text:msg}).catch(function(){});}
+          else{window.open(cur.getAttribute('data-wa'),'_blank','noopener');}
+        },'image/png');};
+      im.onerror=function(){window.open(cur.getAttribute('data-wa'),'_blank','noopener');};
+      im.src=src;
     });
   })();
   try{var pid=new URLSearchParams(location.search).get('p');if(pid){var cs=document.querySelectorAll('.card[data-id]');for(var i=0;i<cs.length;i++){if(cs[i].getAttribute('data-id')===pid){open(cs[i]);break;}}}}catch(e){}
