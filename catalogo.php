@@ -149,7 +149,7 @@ header('X-Content-Type-Options: nosniff');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Essência — Catálogo</title>
-<?php $__scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ? 'https' : 'http'; $__base = $__scheme.'://'.($_SERVER['HTTP_HOST'] ?? 'seuperfume.net').rtrim(str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'] ?? '/')),'/').'/'; ?>
+<?php $__h = (string)($_SERVER['HTTP_HOST'] ?? 'seuperfume.net'); $__local = (bool)preg_match('/^(localhost|127\.|\[::1\]|.*\.test$|.*\.localhost$)/i', $__h); $__scheme = $__local ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ? 'https' : 'http') : 'https'; $__base = $__scheme.'://'.($_SERVER['HTTP_HOST'] ?? 'seuperfume.net').rtrim(str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'] ?? '/')),'/').'/'; ?>
 <?php
 $__op = null;
 if(isset($_GET['p'])){ foreach($prods as $__x){ if((string)$__x['id'] === (string)$_GET['p']){ $__op = $__x; break; } } }
@@ -161,6 +161,7 @@ if($__op){
 <meta property="og:title" content="<?= e($__ot) ?>">
 <meta property="og:description" content="<?= e(trim($__od)) ?>">
 <?php if($__oi !== ''): ?><meta property="og:image" content="<?= e($__oi) ?>">
+<meta property="og:image:secure_url" content="<?= e($__oi) ?>">
 <meta property="og:image:width" content="600">
 <meta property="og:image:height" content="600">
 <?php endif; ?>
