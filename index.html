@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-r';
+const APP_VERSION = '2026.10.12-s';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2445,7 +2445,7 @@ const actions_online = {
   onlineWhats(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
     const its = onlineItems(o), tot = o.total>0 ? o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0);
-    const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+its.map(i=>i.qty+'x '+i.name).join(', ')+' — total '+brl(tot)+(o.payment?' ('+o.payment+')':'')+'. Vamos finalizar? 😊');
+    const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+its.map(i=>i.qty+'x '+i.name).join(', ')+' — total '+brl(tot)+(o.payment?' ('+o.payment+')':'')+'. Vamos finalizar?');
     if(!u){ notify.err('Telefone do cliente inválido.'); return; }
     openNewTab(u);
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
