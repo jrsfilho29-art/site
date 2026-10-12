@@ -418,6 +418,7 @@ if($__op){
   .lb-img{align-self:stretch;}
   .lb-img img{max-height:46vh;}
   .lb-box.ni{grid-template-columns:1fr;}
+  .lb-acts{position:sticky;bottom:0;background:#fff;padding:2px 0 6px;margin-top:6px;z-index:1;box-shadow:0 -10px 10px -8px rgba(0,0,0,.12);}
   @media (min-width:641px){
     .lb-box{max-width:760px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
     .lb-img{align-items:flex-start;padding:14px;}
@@ -427,7 +428,8 @@ if($__op){
   }
   @media (max-width:640px){
     .lb-box{max-height:94vh;grid-template-columns:1fr;grid-template-rows:auto;}
-    .lb-img img{max-height:34vh;height:auto;}
+    .lb-img{padding:6px;}
+    .lb-img img{max-height:28vh;height:auto;}
     .lb-info{padding-bottom:20px;}
   }
   .lb-act{display:block;width:100%;margin-top:10px;text-align:center;border:none;cursor:pointer;font:inherit;font-weight:700;font-size:14px;padding:12px;border-radius:999px;flex:none;}
@@ -514,11 +516,11 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-o</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-p</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
-<button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
-<button type="button" class="lb-act lb-buy" id="lb-buy">Comprar agora</button>
+<div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
+<button type="button" class="lb-act lb-buy" id="lb-buy">Comprar agora</button></div>
 </div></div></div>
 <button type="button" class="cfab" id="cfab" style="display:none" aria-label="Abrir carrinho"><span class="cfab-i">&#128722;</span><span id="cfab-n">0</span><span class="cfab-t" id="cfab-t"></span></button>
 <div class="ct" id="ct" aria-hidden="true"><div class="ct-box" role="dialog" aria-modal="true">
