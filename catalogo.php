@@ -213,7 +213,7 @@ function card($p){
 }
 
 header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: public, max-age=60');
+header('Cache-Control: no-cache, must-revalidate'); header('X-LiteSpeed-Cache-Control: no-cache');
 header('X-Content-Type-Options: nosniff');
 ?><!DOCTYPE html>
 <html lang="pt-BR">
@@ -514,7 +514,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-o</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>

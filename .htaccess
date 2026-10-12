@@ -34,3 +34,10 @@ RedirectMatch 404 /\.(?!well-known)
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
 </IfModule>
+
+# catálogo, API e sistema nunca ficam em cache de servidor (LiteSpeed) nem do navegador
+<IfModule mod_headers.c>
+  <FilesMatch "^(catalogo|api|index)\.(php|html)$">
+    Header set X-LiteSpeed-Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
