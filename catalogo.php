@@ -48,6 +48,35 @@ if(isset($_GET['img'])){
   http_response_code(404); exit;
 }
 
+/* ---------- foto em JPEG para a prévia do link (WhatsApp/Instagram) ---------- */
+if(isset($_GET['ogimg'])){
+  try{
+    $st = $pdo->prepare('SELECT image FROM products WHERE id = ? AND active = 1');
+    $st->execute([(string)$_GET['ogimg']]);
+    $img = (string)($st->fetchColumn() ?: '');
+  }catch(Throwable $ex){ $img = ''; }
+  if(preg_match('#^data:(image/(?:jpeg|png|gif|webp));base64,(.+)$#s', $img, $m)){
+    $bin = base64_decode($m[2], true);
+    if($bin !== false){
+      $mime = $m[1];
+      if($mime !== 'image/jpeg' && function_exists('imagecreatefromstring') && function_exists('imagejpeg')){
+        $im = @imagecreatefromstring($bin);
+        if($im){
+          $w = imagesx($im); $h = imagesy($im); $S = 600;               /* quadrado branco 600x600 */
+          $can = imagecreatetruecolor($S, $S); imagefill($can, 0, 0, imagecolorallocate($can, 255, 255, 255));
+          $sc = min($S/$w, $S/$h); $nw = max(1,(int)round($w*$sc)); $nh = max(1,(int)round($h*$sc));
+          imagecopyresampled($can, $im, (int)(($S-$nw)/2), (int)(($S-$nh)/2), 0, 0, $nw, $nh, $w, $h);
+          ob_start(); imagejpeg($can, null, 86); $jpg = ob_get_clean();
+          if($jpg){ $bin = $jpg; $mime = 'image/jpeg'; }
+        }
+      }
+      header('Content-Type: '.$mime); header('Cache-Control: public, max-age=3600'); header('X-Content-Type-Options: nosniff'); header('Content-Length: '.strlen($bin));
+      echo $bin; exit;
+    }
+  }
+  http_response_code(404); exit;
+}
+
 /* ---------- dados ---------- */
 try{
   $cats = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
@@ -101,8 +130,12 @@ function card($p){
   $meta = '<div class="cat">'.(($brand !== '' || $vol !== '') ? e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol) : '&nbsp;').'</div>';
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
-  global $WHATSAPP;
-  if($WHATSAPP !== '') $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra!')).'"';
+  global $WHATSAPP, $__base;
+  $attrs .= ' data-id="'.e($p['id']).'"';
+  if($WHATSAPP !== ''){
+    $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']);   /* o WhatsApp mostra a foto do produto na prévia deste link */
+    $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink)).'"';
+  }
   $btn = '<span class="buy">Ver detalhes</span>';
   return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
 }
@@ -117,15 +150,32 @@ header('X-Content-Type-Options: nosniff');
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Essência — Catálogo</title>
 <?php $__scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ? 'https' : 'http'; $__base = $__scheme.'://'.($_SERVER['HTTP_HOST'] ?? 'seuperfume.net').rtrim(str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'] ?? '/')),'/').'/'; ?>
+<?php
+$__op = null;
+if(isset($_GET['p'])){ foreach($prods as $__x){ if((string)$__x['id'] === (string)$_GET['p']){ $__op = $__x; break; } } }
+if($__op){
+  $__ot = trim((string)$__op['name']).' — '.brl($__op['sale_price']);
+  $__od = 'Escolhi este perfume na Essência. '.trim((string)$__op['brand'].' '.(is_numeric($__op['volume']) ? $__op['volume'].'ml' : (string)$__op['volume']));
+  $__oi = (strncmp((string)$__op['image'], 'data:', 5) === 0) ? $__base.'catalogo.php?ogimg='.rawurlencode($__op['id']).'&v='.substr(md5((string)$__op['image']),0,8) : (preg_match('#^https?://#i', (string)$__op['image']) ? (string)$__op['image'] : '');
+?>
+<meta property="og:title" content="<?= e($__ot) ?>">
+<meta property="og:description" content="<?= e(trim($__od)) ?>">
+<?php if($__oi !== ''): ?><meta property="og:image" content="<?= e($__oi) ?>">
+<meta property="og:image:width" content="600">
+<meta property="og:image:height" content="600">
+<?php endif; ?>
+<meta property="og:url" content="<?= e($__base) ?>catalogo.php?p=<?= e(rawurlencode($__op['id'])) ?>">
+<?php } ?>
 <meta name="description" content="Catálogo de perfumes da Essência. Escolha o seu!">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Essência">
-<meta property="og:title" content="Essência — Catálogo de Perfumes">
+<?php if(!$__op): ?><meta property="og:title" content="Essência — Catálogo de Perfumes">
 <meta property="og:description" content="Veja nosso catálogo de perfumes e escolha o seu!">
 <meta property="og:image" content="<?= e($__base) ?>og-catalogo.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="<?= e($__base) ?>catalogo.php">
+<?php endif; ?>
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="<?= e($__base) ?>logo.png">
 <style>
@@ -343,6 +393,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  try{var pid=new URLSearchParams(location.search).get('p');if(pid){var cs=document.querySelectorAll('.card[data-id]');for(var i=0;i<cs.length;i++){if(cs[i].getAttribute('data-id')===pid){open(cs[i]);break;}}}}catch(e){}
 })();
 
 (function(){
