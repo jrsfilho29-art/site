@@ -70,6 +70,9 @@
   .oo-top{display:flex;gap:12px;align-items:flex-start;}
   .oo-img{width:84px;height:84px;border-radius:8px;object-fit:cover;background:#f3eee6;flex:none;border:1px solid var(--line);}
   .oo-img.ph{display:flex;align-items:center;justify-content:center;color:var(--muted);}
+  .oo-rows{display:flex;flex-direction:column;gap:8px;}
+  .oo-row{display:flex;gap:10px;align-items:center;}
+  .oo-img.sm{width:48px;height:48px;}
   .oo-acts{display:flex;gap:6px;flex-wrap:wrap;}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(36,26,34,.04);}
   .grid{display:grid;gap:16px;}
@@ -438,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-k';
+const APP_VERSION = '2026.10.12-l';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2339,6 +2342,7 @@ const actions_extras = {
 const ONLINE = {orders:[], loaded:false, err:'', lastNew:0};
 const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', concluido:'Concluído', cancelado:'Cancelado'};
 function onlineDigits(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>11 && d.slice(0,2)==='55') d=d.slice(2); return d; }
+function onlineItems(o){ return (o.items&&o.items.length) ? o.items.map(i=>({productId:i.productId,name:i.name,qty:+i.qty||1,unitPrice:+i.unitPrice||0})) : [{productId:o.productId,name:o.productName,qty:o.qty||1,unitPrice:o.unitPrice||0}]; }
 function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
 async function fetchOnlineOrders(silent){
   if(!(typeof syncEnabled==='function' && syncEnabled())) return;
@@ -2377,21 +2381,24 @@ function renderOnline(){
     : ONLINE.err ? `<div class="card" style="color:var(--danger);">${esc(ONLINE.err)}</div>`
     : !list.length ? `<div class="card">${emptyState(icon('inbox',28),'Nenhum pedido aqui','Quando um cliente escolher um perfume no catálogo, o pedido aparece nesta tela.')}</div>`
     : `<div class="oo-grid">${list.map(o=>{
-        const p = state.products.find(x=>x.id===o.productId);
-        const img = p && p.image ? `<img class="oo-img" src="${esc(p.image)}" alt="">` : `<div class="oo-img ph">${icon('package',26)}</div>`;
-        const total = (o.unitPrice||0)*(o.qty||1);
+        const its = onlineItems(o);
+        const total = o.total>0 ? o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0);
         const cls = o.status==='novo'?'badge-warn':o.status==='concluido'?'badge-ok':o.status==='cancelado'?'badge-danger':'badge-warn';
         const open = o.status==='novo'||o.status==='atendimento';
+        const sellable = its.some(i=>state.products.some(x=>x.id===i.productId));
+        const rows = its.map(i=>{
+          const p = state.products.find(x=>x.id===i.productId);
+          const im = p && p.image ? `<img class="oo-img sm" src="${esc(p.image)}" alt="">` : `<div class="oo-img sm ph">${icon('package',18)}</div>`;
+          return `<div class="oo-row">${im}<div style="min-width:0;flex:1;"><div style="font-weight:600;font-size:13.5px;">${esc(i.name)}</div><div class="muted" style="font-size:12px;">${p&&p.sku?'Cód. '+esc(p.sku)+' · ':''}${i.qty} × ${brl(i.unitPrice)} = <strong>${brl(i.qty*i.unitPrice)}</strong>${p?'':' · produto removido'}</div></div></div>`;
+        }).join('');
         return `<div class="card oo-card">
-          <div class="oo-top">${img}<div style="min-width:0;flex:1;">
-            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><strong>${esc(o.productName)}</strong><span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></div>
-            <div class="muted" style="font-size:12.5px;">${p&&p.sku?'Cód. '+esc(p.sku)+' · ':''}${o.qty} × ${brl(o.unitPrice)} = <strong>${brl(total)}</strong></div>
-            <div class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}${p&&p.stock!=null?' · estoque '+p.stock:(p?'':' · produto removido')}</div>
-          </div></div>
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}</span><span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></div>
+          <div class="oo-rows">${rows}</div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:8px;"><span class="muted">${o.payment?'Pagamento: <strong>'+esc(o.payment)+'</strong>':''}</span><span>Total <strong style="font-size:17px;">${brl(total)}</strong></span></div>
           <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(onlineDigits(o.phone)))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
           <div class="oo-acts">
             <button class="btn btn-primary" data-action="onlineWhats" data-id="${esc(o.id)}">WhatsApp</button>
-            ${open&&p?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
+            ${open&&sellable?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
             ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
           </div></div>`;
@@ -2403,7 +2410,8 @@ const actions_online = {
   async refreshOnline(){ ONLINE.err=''; await fetchOnlineOrders(false); if(ONLINE.err) notify.err(ONLINE.err); else notify.ok('Pedidos atualizados.'); },
   onlineWhats(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
-    const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+o.qty+'x '+o.productName+' ('+brl((o.unitPrice||0)*o.qty)+'). Vamos finalizar? 😊');
+    const its = onlineItems(o), tot = o.total>0 ? o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0);
+    const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+its.map(i=>i.qty+'x '+i.name).join(', ')+' — total '+brl(tot)+(o.payment?' ('+o.payment+')':'')+'. Vamos finalizar? 😊');
     if(!u){ notify.err('Telefone do cliente inválido.'); return; }
     openNewTab(u);
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
@@ -2416,9 +2424,6 @@ const actions_online = {
   },
   async onlineToSale(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
-    const p = state.products.find(x=>x.id===o.productId);
-    if(!p){ notify.err('Produto não encontrado no estoque.'); return; }
-    if(p.stock<=0){ notify.err('Produto sem estoque.'); return; }
     const d = onlineDigits(o.phone);
     let c = d && state.customers.find(x=>onlineDigits(x.phone)===d);
     if(!c){
@@ -2427,11 +2432,20 @@ const actions_online = {
     }
     const V = state.ui.venda;
     V.customerId = c.id;
-    const q = Math.min(o.qty, p.stock);
-    const ex = V.cart.find(i=>i.productId===p.id);
-    if(ex) ex.qty = Math.min(p.stock, ex.qty+q); else V.cart.push({productId:p.id, name:p.name, qty:q, unitPrice:p.salePrice, stock:p.stock});
+    const miss=[];
+    onlineItems(o).forEach(i=>{
+      const p = state.products.find(x=>x.id===i.productId);
+      if(!p){ miss.push(i.name+' (removido)'); return; }
+      if(p.stock<=0){ miss.push(i.name+' (sem estoque)'); return; }
+      const q = Math.min(i.qty, p.stock); if(q<i.qty) miss.push(i.name+' (só '+p.stock+' em estoque)');
+      const ex = V.cart.find(x=>x.productId===p.id);
+      if(ex) ex.qty = Math.min(p.stock, ex.qty+q); else V.cart.push({productId:p.id, name:p.name, qty:q, unitPrice:p.salePrice, stock:p.stock});
+    });
+    if(!V.cart.length){ notify.err('Nenhum item do pedido pode ser vendido: '+miss.join('; ')); return; }
+    const pm = PAYMENT_METHODS.find(m=>m.toLowerCase()===String(o.payment||'').toLowerCase());
+    if(pm && V.payments.length===1 && !V.payments[0].amount) V.payments[0].method = pm;
     state.tab = 'vendas'; sessionSave(state.currentUser, 'vendas');
-    notify.ok('Venda montada com o pedido de '+o.customerName+'. Confira e finalize.');
+    if(miss.length) notify.err('Atenção: '+miss.join('; ')); else notify.ok('Venda montada com o pedido de '+o.customerName+'. Confira e finalize.');
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}}); else render();
   }
 };

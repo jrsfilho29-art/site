@@ -34,33 +34,59 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
   $name = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($in['name'] ?? ''))));
   $phone = preg_replace('/\D/', '', (string)($in['phone'] ?? ''));
   $note = trim(preg_replace('/\s+/u', ' ', strip_tags((string)($in['note'] ?? ''))));
-  $qty = (int)($in['qty'] ?? 1);
+  $payAllowed = ['PIX', 'Dinheiro', 'Cartão de Débito', 'Cartão de Crédito'];
+  $payment = (string)($in['payment'] ?? '');
   if(mb_strlen($name) < 2 || mb_strlen($name) > 120) $jerr(422, 'Informe seu nome.');
   if(strlen($phone) < 10 || strlen($phone) > 13) $jerr(422, 'Informe seu WhatsApp com DDD.');
-  if($qty < 1 || $qty > 20) $jerr(422, 'Quantidade inválida.');
+  if(!in_array($payment, $payAllowed, true)) $jerr(422, 'Escolha a forma de pagamento.');
   $note = mb_substr($note, 0, 300);
+  /* itens do carrinho (aceita também o formato antigo: um único produto) */
+  $raw = $in['items'] ?? null;
+  if(!is_array($raw)) $raw = [['productId'=>$in['productId'] ?? '', 'qty'=>$in['qty'] ?? 1]];
+  if(count($raw) < 1) $jerr(422, 'Seu carrinho está vazio.');
+  if(count($raw) > 30) $jerr(422, 'Muitos itens no carrinho.');
+  $want = [];
+  foreach($raw as $it){
+    if(!is_array($it)) continue;
+    $pid = (string)($it['productId'] ?? ''); $q = (int)($it['qty'] ?? 0);
+    if($pid === '' || $q < 1) continue;
+    $want[$pid] = ($want[$pid] ?? 0) + $q;
+  }
+  if(!$want) $jerr(422, 'Seu carrinho está vazio.');
+  $items = []; $total = 0.0; $units = 0;
   try{
     $st = $pdo->prepare('SELECT id,name,sale_price,stock FROM products WHERE id = ? AND active = 1 AND stock > 0');
-    $st->execute([(string)($in['productId'] ?? '')]);
-    $pr = $st->fetch();
-  }catch(Throwable $ex){ $pr = false; }
-  if(!$pr) $jerr(404, 'Este produto não está mais disponível.');
-  if($qty > (int)$pr['stock']) $jerr(422, 'Só temos '.(int)$pr['stock'].' unidade(s) disponíveis.');
+    foreach($want as $pid => $q){
+      $st->execute([$pid]); $pr = $st->fetch();
+      if(!$pr) $jerr(404, 'Um dos produtos não está mais disponível. Atualize a página e confira seu carrinho.');
+      if($q > 20) $jerr(422, 'Quantidade inválida.');
+      if($q > (int)$pr['stock']) $jerr(422, 'Só temos '.(int)$pr['stock'].' unidade(s) de '.$pr['name'].'.');
+      $price = (float)$pr['sale_price'];
+      $items[] = ['productId'=>$pr['id'], 'name'=>$pr['name'], 'qty'=>$q, 'unitPrice'=>$price];
+      $total += $price * $q; $units += $q;
+    }
+  }catch(Throwable $ex){ $jerr(500, 'Não foi possível enviar o pedido agora. Tente pelo WhatsApp.'); }
   try{
     $mysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
     $pdo->exec('CREATE TABLE IF NOT EXISTS online_orders (
       id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, product_id VARCHAR(60), product_name VARCHAR(255),
       unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, qty INT NOT NULL DEFAULT 1, customer_name VARCHAR(120), phone VARCHAR(30),
-      note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40)
+      note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
+      items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0
     )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+    try{ $pdo->query('SELECT items, payment, total FROM online_orders LIMIT 1'); }
+    catch(Throwable $e){
+      foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
+    }
     $ip = substr(hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? '').'|essencia'), 0, 32);
     $since = gmdate('Y-m-d\TH:i:s\Z', time() - 600);
     $c = $pdo->prepare('SELECT COUNT(*) FROM online_orders WHERE ip_hash = ? AND created_at > ?'); $c->execute([$ip, $since]);
     if((int)$c->fetchColumn() >= 5) $jerr(429, 'Muitos pedidos em pouco tempo. Tente novamente em alguns minutos.');
     $id = 'ped_'.bin2hex(random_bytes(8));
-    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $pr['id'], $pr['name'], (float)$pr['sale_price'], $qty, $name, $phone, $note, 'novo', $ip]);
-    echo json_encode(['ok'=>true, 'id'=>$id]); exit;
+    $summary = count($items) === 1 ? $items[0]['name'] : $items[0]['name'].' + '.(count($items)-1).' item(ns)';
+    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2)]);
+    echo json_encode(['ok'=>true, 'id'=>$id, 'total'=>round($total, 2)]); exit;
   }catch(Throwable $ex){ $jerr(500, 'Não foi possível enviar o pedido agora. Tente pelo WhatsApp.'); }
 }
 
@@ -174,7 +200,7 @@ function card($p){
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
   global $WHATSAPP, $__base;
-  $attrs .= ' data-id="'.e($p['id']).'"';
+  $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format((float)$p['sale_price'], 2, '.', '')).'" data-st="'.(int)min(20, (int)$p['stock']).'"';
   if($WHATSAPP !== ''){
     $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']);   /* o WhatsApp mostra a foto do produto na prévia deste link */
     $__d = substr($WHATSAPP, 2); $__ph = strlen($__d) >= 10 ? '('.substr($__d,0,2).') '.substr($__d,2,strlen($__d)-6).'-'.substr($__d,-4) : $__d;
@@ -384,6 +410,41 @@ if($__op){
   }
   @media (max-width:340px){.grid{grid-template-columns:minmax(0,1fr);}}
 
+  /* carrinho */
+  .lb-box.ni{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);}
+  @media (max-width:640px){.lb-box.ni{height:auto;max-height:78vh;}}
+  .lb-act{display:block;width:100%;margin-top:10px;text-align:center;border:none;cursor:pointer;font:inherit;font-weight:700;font-size:14px;padding:12px;border-radius:999px;flex:none;}
+  .lb-add{background:var(--plum);color:#fff;}
+  .lb-add:hover{background:var(--plum-dark);}
+  .lb-buy{background:#25D366;color:#073B1B;box-shadow:0 4px 12px rgba(37,211,102,.35);}
+  .lb-buy:disabled{opacity:.5;cursor:default;}
+  .cfab{position:fixed;right:14px;bottom:16px;z-index:60;display:flex;align-items:center;gap:8px;background:var(--plum);color:#fff;border:none;border-radius:999px;padding:12px 18px;font:inherit;font-weight:700;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.3);cursor:pointer;}
+  .cfab-i{font-size:17px;line-height:1;}
+  .cfab #cfab-n{background:var(--gold);color:var(--plum);border-radius:999px;min-width:22px;height:22px;line-height:22px;text-align:center;font-size:12px;padding:0 6px;}
+  .ct{position:fixed;inset:0;z-index:100;background:rgba(13,18,48,.62);display:none;align-items:center;justify-content:center;padding:16px;}
+  .ct.on{display:flex;}
+  .ct-box{position:relative;background:#fff;border-radius:18px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;padding:18px 16px 16px;box-shadow:0 30px 80px rgba(0,0,0,.4);}
+  .ct-it{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .ct-im{width:64px;height:64px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;flex:none;}
+  div.ct-im{background:var(--tint);}
+  .ct-m{min-width:0;flex:1;}
+  .ct-n{font-size:13.5px;font-weight:600;color:var(--plum);line-height:1.25;}
+  .ct-p{font-size:12px;color:var(--muted);margin:2px 0 6px;}
+  .ct-it .of-q{margin:0;gap:10px;}
+  .ct-it .of-q button{width:30px;height:30px;font-size:17px;}
+  .ct-rm{border:none;background:none;color:#B83A57;font:inherit;font-size:12px;cursor:pointer;padding:6px 0 0;}
+  .ct-empty{padding:18px 0;text-align:center;color:var(--muted);font-size:13px;}
+  .ct-tot{display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:16px;color:var(--plum);}
+  .ct-tot b{font-size:20px;}
+  .of-lbl{font-size:12px;font-weight:600;color:var(--plum);margin-bottom:6px;}
+  .pay{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .pay button{font:inherit;font-size:13px;font-weight:600;padding:10px 6px;border:1.5px solid var(--line);background:#fff;color:var(--plum);border-radius:10px;cursor:pointer;}
+  .pay button.on{border-color:var(--gold);background:#FFF6DF;box-shadow:inset 0 0 0 1px var(--gold);}
+  .toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:130;background:var(--plum);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center;}
+  .toast.on{opacity:1;transform:translateX(-50%);}
+  .ct .lb-x{top:10px;right:10px;}
+  .ct .of-t{padding-right:40px;}
+  .ct .of-ok{display:block;}
   /* pedido online */
   .lb-box.fm{height:auto;max-height:90vh;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);max-width:380px;}
   .lb-box.fm .lb-img{display:none;}
@@ -439,26 +500,85 @@ if($__op){
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
-<button type="button" class="lb-wa" id="lb-w">Escolher este perfume</button><div class="lb-note" id="lb-wn">Faça seu pedido aqui mesmo: o vendedor recebe a foto e os dados e fala com você para finalizar a compra.</div>
-<form class="of" id="lb-f" novalidate autocomplete="on" style="display:none">
-  <div class="of-t">Seu pedido</div>
-  <label>Seu nome<input id="of-n" maxlength="120" autocomplete="name" placeholder="Como podemos te chamar?"></label>
-  <label>Seu WhatsApp<input id="of-p" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="(11) 99999-9999"></label>
-  <label>Quantidade<span class="of-q"><button type="button" id="of-m" aria-label="Menos">&minus;</button><b id="of-qv">1</b><button type="button" id="of-a" aria-label="Mais">+</button></span></label>
-  <label>Observação (opcional)<input id="of-o" maxlength="300" placeholder="Ex.: prefiro retirar na loja"></label>
-  <input id="of-h" name="contato_extra" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
-  <div class="of-e" id="of-e" role="alert"></div>
-  <button type="submit" class="lb-wa" id="of-s" style="display:block">Enviar pedido</button>
-  <button type="button" class="of-b" id="of-b">Voltar</button>
-</form>
-<div class="of-ok" id="lb-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="lb-okm"></div><a class="lb-wa" id="lb-ow" target="_blank" rel="noopener" style="display:none">Falar agora no WhatsApp</a><button type="button" class="of-b" id="lb-oc">Fechar</button></div>
+<button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
+<button type="button" class="lb-act lb-buy" id="lb-buy">Comprar agora</button>
 </div></div></div>
+<button type="button" class="cfab" id="cfab" style="display:none" aria-label="Abrir carrinho"><span class="cfab-i">&#128722;</span><span id="cfab-n">0</span><span class="cfab-t" id="cfab-t"></span></button>
+<div class="ct" id="ct" aria-hidden="true"><div class="ct-box" role="dialog" aria-modal="true">
+<button class="lb-x" type="button" id="ct-x" aria-label="Fechar">&times;</button>
+<div id="ct-main">
+  <div class="of-t">Seu carrinho</div>
+  <div id="ct-l"></div>
+  <div class="ct-tot"><span>Total</span><b id="ct-t">R$ 0,00</b></div>
+  <form class="of" id="ct-f" novalidate autocomplete="on">
+    <label>Seu nome<input id="of-n" maxlength="120" autocomplete="name" placeholder="Como podemos te chamar?"></label>
+    <label>Seu WhatsApp<input id="of-p" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="(11) 99999-9999"></label>
+    <div class="of-lbl">Forma de pagamento</div>
+    <div class="pay" id="pay"><button type="button" data-pay="PIX">PIX</button><button type="button" data-pay="Dinheiro">Dinheiro</button><button type="button" data-pay="Cartão de Débito">Cartão de débito</button><button type="button" data-pay="Cartão de Crédito">Cartão de crédito</button></div>
+    <label>Observação (opcional)<input id="of-o" maxlength="300" placeholder="Ex.: prefiro retirar na loja"></label>
+    <input id="of-h" name="contato_extra" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
+    <div class="of-e" id="of-e" role="alert"></div>
+    <button type="submit" class="lb-act lb-buy" id="of-s">Enviar pedido para a loja</button>
+    <div class="lb-note" id="ct-n" style="display:block">O pagamento e a entrega são combinados com a loja pelo WhatsApp.</div>
+    <button type="button" class="of-b" id="ct-more">Continuar escolhendo</button>
+  </form>
+</div>
+<div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
+</div></div>
+<div class="toast" id="toast" role="status"></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 (function(){
   var lb=document.getElementById('lb');if(!lb)return;
   function $(i){return document.getElementById(i);}
+  var WA=<?= json_encode($WHATSAPP) ?>;
+  var cur=null,cart=[],pay='';
+  function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
+  function brl(v){return 'R$ '+(Math.round(v*100)/100).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+  function mask(v){v=v.replace(/\D/g,'').slice(0,11);if(v.length>6)return '('+v.slice(0,2)+') '+v.slice(2,v.length>10?7:6)+'-'+v.slice(v.length>10?7:6);if(v.length>2)return '('+v.slice(0,2)+') '+v.slice(2);return v;}
+  function cardById(id){var cs=document.querySelectorAll('.card[data-id]');for(var i=0;i<cs.length;i++)if(cs[i].getAttribute('data-id')===id)return cs[i];return null;}
+  function saveCart(){ls('ess_cart',JSON.stringify(cart.map(function(i){return {id:i.id,qty:i.qty};})));}
+  function loadCart(){
+    var raw=[];try{raw=JSON.parse(ls('ess_cart')||'[]');}catch(e){}
+    cart=[];(raw||[]).forEach(function(r){var c=cardById(r&&r.id);if(!c)return;cart.push(fromCard(c,Math.max(1,Math.min(+r.qty||1,+c.getAttribute('data-st')||1))));});
+  }
+  function fromCard(c,q){var im=c.querySelector('.imgwrap img');return {id:c.getAttribute('data-id'),name:c.getAttribute('data-name')||'',price:+c.getAttribute('data-pv')||0,max:+c.getAttribute('data-st')||1,qty:q,img:im?im.getAttribute('src'):''};}
+  function count(){return cart.reduce(function(a,i){return a+i.qty;},0);}
+  function total(){return cart.reduce(function(a,i){return a+i.qty*i.price;},0);}
+  function toast(m){var t=$('toast');t.textContent=m;t.className='toast on';clearTimeout(toast._t);toast._t=setTimeout(function(){t.className='toast';},2200);}
+  function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());}
+  function add(c){
+    var id=c.getAttribute('data-id'),it=null;cart.forEach(function(i){if(i.id===id)it=i;});
+    if(it){if(it.qty>=it.max){toast('Máximo disponível: '+it.max+' un.');return false;}it.qty++;}
+    else cart.push(fromCard(c,1));
+    saveCart();fab();return true;
+  }
+  function drawCart(){
+    var l=$('ct-l');l.innerHTML='';
+    if(!cart.length){var em=document.createElement('div');em.className='ct-empty';em.textContent='Seu carrinho está vazio.';l.appendChild(em);}
+    cart.forEach(function(i,ix){
+      var r=document.createElement('div');r.className='ct-it';
+      var im=document.createElement(i.img?'img':'div');if(i.img){im.src=i.img;im.alt='';}im.className='ct-im';r.appendChild(im);
+      var m=document.createElement('div');m.className='ct-m';var n=document.createElement('div');n.className='ct-n';n.textContent=i.name;var p=document.createElement('div');p.className='ct-p';p.textContent=brl(i.price)+' × '+i.qty+' = '+brl(i.price*i.qty);
+      var q=document.createElement('div');q.className='of-q';
+      [['−','dec'],['',''],['+','inc']].forEach(function(x,k){if(k===1){var b=document.createElement('b');b.textContent=i.qty;q.appendChild(b);return;}var bt=document.createElement('button');bt.type='button';bt.textContent=x[0];bt.setAttribute('data-op',x[1]);bt.setAttribute('data-ix',ix);bt.setAttribute('aria-label',x[1]==='dec'?'Menos':'Mais');q.appendChild(bt);});
+      var rm=document.createElement('button');rm.type='button';rm.className='ct-rm';rm.textContent='Remover';rm.setAttribute('data-op','rm');rm.setAttribute('data-ix',ix);
+      m.appendChild(n);m.appendChild(p);m.appendChild(q);m.appendChild(rm);r.appendChild(m);l.appendChild(r);
+    });
+    $('ct-t').textContent=brl(total());
+    $('of-s').disabled=!cart.length;
+    var bs=$('pay').querySelectorAll('button');for(var k=0;k<bs.length;k++)bs[k].className=bs[k].getAttribute('data-pay')===pay?'on':'';
+  }
+  function openCart(){
+    close();$('toast').className='toast';
+    $('ct-main').style.display='block';$('ct-ok').style.display='none';
+    $('of-n').value=$('of-n').value||ls('ess_c_n');$('of-p').value=$('of-p').value||ls('ess_c_p');
+    pay=pay||ls('ess_c_pay');
+    $('of-e').textContent='';drawCart();
+    $('ct').className='ct on';document.body.style.overflow='hidden';
+  }
+  function closeCart(){$('ct').className='ct';document.body.style.overflow='';}
   function open(c){
     var ci=c.querySelector('.imgwrap img'),s=ci?ci.getAttribute('src'):'',im=$('lb-i');
     if(s){im.src=s;im.alt=c.getAttribute('data-name')||'';im.parentNode.style.display='';}else{im.removeAttribute('src');im.parentNode.style.display='none';}
@@ -467,55 +587,55 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('lb-p').textContent=c.getAttribute('data-price')||'';
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
-    cur=c;showView('d');
+    cur=c;$('lb-box').classList.toggle('ni',!s);
     lb.className='lb on';document.body.style.overflow='hidden';
   }
-  var cur=null,qty=1;
-  function showView(v){
-    var box=$('lb-box'),f=$('lb-f'),ok=$('lb-ok');
-    box.className='lb-box'+(v==='d'?'':' fm');
-    f.style.display=v==='f'?'block':'none'; ok.style.display=v==='o'?'block':'none';
-    if(v==='d'){$('of-e').textContent='';}
-  }
-  function mask(v){v=v.replace(/\D/g,'').slice(0,11);if(v.length>6)return '('+v.slice(0,2)+') '+v.slice(2,v.length>10?7:6)+'-'+v.slice(v.length>10?7:6);if(v.length>2)return '('+v.slice(0,2)+') '+v.slice(2);return v;}
-  function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
+  function close(){lb.className='lb';if($('ct').className.indexOf('on')<0)document.body.style.overflow='';}
   document.addEventListener('click',function(e){
     var t=e.target;
-    if(t.id==='lb-w'){showView('f');$('of-n').value=ls('ess_c_n');$('of-p').value=ls('ess_c_p');qty=1;$('of-qv').textContent='1';$('of-o').value='';$('of-e').textContent='';setTimeout(function(){($('of-n').value?$('of-p'):$('of-n')).focus();},50);}
-    else if(t.id==='of-b'){showView('d');}
-    else if(t.id==='lb-oc'){close();}
-    else if(t.id==='of-m'){qty=Math.max(1,qty-1);$('of-qv').textContent=qty;}
-    else if(t.id==='of-a'){qty=Math.min(20,qty+1);$('of-qv').textContent=qty;}
+    if(t.id==='lb-add'){if(cur&&add(cur)){close();toast('Adicionado ao carrinho ✓');}return;}
+    if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
+    if(t.closest&&t.closest('#cfab')){openCart();return;}
+    if(t.id==='ct-x'||t.id==='ct-more'||t.id==='ct-oc'){closeCart();return;}
+    if(t.id==='ct'&&(!window._lbd||window._lbd===t)){closeCart();return;}
+    if(t.getAttribute&&t.getAttribute('data-pay')){pay=t.getAttribute('data-pay');ls('ess_c_pay',pay);$('of-e').textContent='';drawCart();return;}
+    var op=t.getAttribute&&t.getAttribute('data-op');
+    if(op){var ix=+t.getAttribute('data-ix'),it=cart[ix];if(!it)return;
+      if(op==='inc'){if(it.qty<it.max)it.qty++;else toast('Máximo disponível: '+it.max+' un.');}
+      else if(op==='dec'){it.qty--;if(it.qty<1)cart.splice(ix,1);}
+      else cart.splice(ix,1);
+      saveCart();fab();drawCart();return;}
+    var c=t.closest&&t.closest('.card[data-name]');
+    if(c&&!lb.contains(t)){open(c);return;}
+    if((t===lb&&(!window._lbd||window._lbd===lb))||(t.closest&&t.closest('.lb-x')&&t.id!=='ct-x'))close();
   });
-  document.addEventListener('input',function(e){var er0=$('of-e');if(er0&&e.target.closest&&e.target.closest('#lb-f'))er0.textContent='';if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
+  document.addEventListener('input',function(e){var er=$('of-e');if(er&&e.target.closest&&e.target.closest('#ct-f'))er.textContent='';if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
   document.addEventListener('submit',function(e){
-    if(e.target.id!=='lb-f')return;e.preventDefault();
-    if(!cur)return;
+    if(e.target.id!=='ct-f')return;e.preventDefault();
     var n=$('of-n').value.trim(),ph=$('of-p').value.replace(/\D/g,''),er=$('of-e'),btn=$('of-s');
+    if(!cart.length){er.textContent='Seu carrinho está vazio.';return;}
     if(n.length<2){er.textContent='Informe seu nome.';$('of-n').focus();return;}
     if(ph.length<10){er.textContent='Informe seu WhatsApp com DDD.';$('of-p').focus();return;}
+    if(!pay){er.textContent='Escolha a forma de pagamento.';return;}
     er.textContent='';btn.disabled=true;btn.textContent='Enviando...';
-    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:cur.getAttribute('data-id'),qty:qty,name:n,phone:ph,note:$('of-o').value,website:$('of-h').value})})
+    var sent=cart.slice(),tot=total();
+    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:sent.map(function(i){return {productId:i.id,qty:i.qty};}),name:n,phone:ph,payment:pay,note:$('of-o').value,website:$('of-h').value})})
     .then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro ao enviar.'};});})
     .then(function(j){
-      btn.disabled=false;btn.textContent='Enviar pedido';
+      btn.disabled=false;btn.textContent='Enviar pedido para a loja';
       if(!j.ok){er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
       ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);
-      $('lb-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido de '+qty+'x '+(cur.getAttribute('data-name')||'')+'. O vendedor vai falar com você pelo WhatsApp '+$('of-p').value+' para combinar pagamento e entrega.';
-      var ow=$('lb-ow'),wa=cur.getAttribute('data-wa');if(wa){ow.href=wa;ow.style.display='block';}else ow.style.display='none';
-      showView('o');
-    }).catch(function(){btn.disabled=false;btn.textContent='Enviar pedido';er.textContent='Sem conexão. Verifique a internet e tente novamente.';});
-  });
-  function close(){lb.className='lb';document.body.style.overflow='';showView('d');}
-  document.addEventListener('click',function(e){
-    var c=e.target.closest&&e.target.closest('.card[data-name]');
-    if(c&&!lb.contains(e.target)){open(c);return;}
-    if((e.target===lb&&(!window._lbd||window._lbd===lb))||(e.target.closest&&e.target.closest('.lb-x')))close();
+      var nn=sent.reduce(function(a,i){return a+i.qty;},0);
+      $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+', pagamento: '+pay+'). A loja vai falar com você pelo WhatsApp '+$('of-p').value+' para combinar pagamento e entrega.';
+      var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
+      cart=[];saveCart();fab();$('of-o').value='';
+      $('ct-main').style.display='none';$('ct-ok').style.display='block';
+    }).catch(function(){btn.disabled=false;btn.textContent='Enviar pedido para a loja';er.textContent='Sem conexão. Verifique a internet e tente novamente.';});
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
-
-  try{var pid=new URLSearchParams(location.search).get('p');if(pid){var cs=document.querySelectorAll('.card[data-id]');for(var i=0;i<cs.length;i++){if(cs[i].getAttribute('data-id')===pid){open(cs[i]);break;}}}}catch(e){}
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){close();closeCart();}});
+  loadCart();fab();
+  try{var pid=new URLSearchParams(location.search).get('p');if(pid){var c0=cardById(pid);if(c0)open(c0);}}catch(e){}
 })();
 
 (function(){

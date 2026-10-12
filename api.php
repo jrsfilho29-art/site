@@ -139,8 +139,13 @@ function ensureOnlineOrders($pdo){
   $pdo->exec('CREATE TABLE IF NOT EXISTS online_orders (
     id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, product_id VARCHAR(60), product_name VARCHAR(255),
     unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, qty INT NOT NULL DEFAULT 1, customer_name VARCHAR(120), phone VARCHAR(30),
-    note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40)
+    note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
+    items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0
   )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  try{ $pdo->query('SELECT items, payment, total FROM online_orders LIMIT 1'); }
+  catch(Throwable $e){
+    foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
+  }
 }
 
 try{
@@ -151,7 +156,9 @@ try{
     out(200, ['ok'=>true, 'orders'=>array_map(fn($o)=>[
       'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
-      'note'=>s($o['note']), 'status'=>s($o['status'])
+      'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
+      'total'=>(float)($o['total'] ?? 0),
+      'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
     ], $r)]);
   }
   if($action === 'onlineorder_status'){
