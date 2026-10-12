@@ -64,6 +64,13 @@
   tbody tr{transition:background-color .1s ease;}
   tbody tr:hover{background:#FBF4E7;}
 
+  .navbadge{margin-left:auto;background:var(--gold);color:#17204A;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;}
+  .oo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;}
+  .oo-card{display:flex;flex-direction:column;gap:10px;}
+  .oo-top{display:flex;gap:12px;align-items:flex-start;}
+  .oo-img{width:84px;height:84px;border-radius:8px;object-fit:cover;background:#f3eee6;flex:none;border:1px solid var(--line);}
+  .oo-img.ph{display:flex;align-items:center;justify-content:center;color:var(--muted);}
+  .oo-acts{display:flex;gap:6px;flex-wrap:wrap;}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(36,26,34,.04);}
   .grid{display:grid;gap:16px;}
   .grid-2{grid-template-columns:repeat(2,1fr);}
@@ -431,7 +438,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-i';
+const APP_VERSION = '2026.10.12-j';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -498,6 +505,7 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&am
 /* refined line-icon set (inline SVG) used throughout the interface instead of emoji */
 const ICONS = {
   menu: '<path d="M3.5 6h17"/><path d="M3.5 12h17"/><path d="M3.5 18h17"/>',
+  inbox: '<path d="M3 13l2.5-7.2A2 2 0 0 1 7.4 4.5h9.2a2 2 0 0 1 1.9 1.3L21 13"/><path d="M3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5h-5.2a3 3 0 0 1-5.6 0z"/>',
   clipboard: '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M8.5 10.5h7"/><path d="M8.5 14h7"/><path d="M8.5 17.5h4.5"/>',
   dashboard: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
   users: '<circle cx="9" cy="7" r="3.2"/><path d="M2.5 19.5c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6"/><circle cx="17" cy="8.2" r="2.3"/><path d="M15.3 13.9c2.4.6 4.2 2.6 4.2 5.6"/>',
@@ -524,6 +532,7 @@ const ICONS = {
   logout: '<path d="M9.5 4H5.3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4.2"/><path d="M16.3 16.5l4.5-4.5-4.5-4.5"/><path d="M20.8 12H9"/>',
   eye: '<path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff: '<path d="M3 3l18 18"/><path d="M10.8 5.2A11 11 0 0 1 12 5.1c6.2 0 10 6.9 10 6.9a15.7 15.7 0 0 1-3.4 4"/><path d="M6.6 6.7A15.6 15.6 0 0 0 2 12s3.8 6.9 10 6.9c1 0 2-.2 2.9-.5"/><path d="M9.4 9.6a3 3 0 0 0 4.2 4.2"/>',
+  refresh: '<path d="M20 11a8 8 0 0 0-14.5-4.2L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0 0 14.5 4.2L20 15.5"/><path d="M20 20v-4.5h-4.5"/>',
   cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z"/>',
   send: '<path d="M21 3L10 14"/><path d="M21 3l-6.5 18-4-8-8-4z"/>',
   upload: '<path d="M12 19V6"/><path d="M6 11l6-6.2L18 11"/><path d="M4.5 19h15"/>',
@@ -1104,27 +1113,8 @@ function buildCatalogPageHTML(list){
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
-
-  /* copia a foto do produto para a área de transferência: o cliente cola na conversa do WhatsApp */
-  (function(){
-    var w=document.getElementById('lb-w'),wn=document.getElementById('lb-wn'),lbi=document.getElementById('lb-i');
-    if(!w)return;
-    var base=wn?wn.textContent:'';
-    w.addEventListener('click',function(ev){
-      var src=lbi&&lbi.getAttribute('src');
-      if(!src||!window.ClipboardItem||!navigator.clipboard||!navigator.clipboard.write)return;   // sem suporte: abre só o WhatsApp
-      ev.preventDefault();
-      var url=w.href;
-      var blobP=new Promise(function(res,rej){
-        var im=new Image();im.onload=function(){try{var c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);c.toBlob(function(b){b?res(b):rej();},'image/png');}catch(e){rej(e);}};im.onerror=rej;im.src=src;
-      });
-      var ok=false;
-      try{navigator.clipboard.write([new ClipboardItem({'image/png':blobP})]).then(function(){ok=true;if(wn){wn.style.display='block';wn.innerHTML='<b>Foto copiada!</b> No WhatsApp, toque e segure o campo de mensagem e escolha <b>Colar</b> para enviar a foto junto.';}}).catch(function(){});}catch(e){}
-      window.open(url,'_blank','noopener');
-      setTimeout(function(){if(wn&&!ok)wn.textContent=base;},4000);
-    });
-  })();
 })();
+
 
 (function(){
   var q=document.getElementById('q'),tabs=document.getElementById('tabs'),active='all';
@@ -1572,6 +1562,7 @@ function syncSchedulePush(){
   SYNC.timer = setTimeout(()=>{ if(SYNC.busy){ syncSchedulePush(); return; } syncPush(false, true); }, 1500);
 }
 async function syncCheckRemote(){
+  if(state.currentUser && typeof fetchOnlineOrders==='function') fetchOnlineOrders(true);
   /* verifica o servidor e baixa sozinho se houver dados mais novos (sem alterações locais pendentes) */
   if(!(syncEnabled() && SYNC.cfg.auto) || SYNC.busy || SYNC.conflict) return;
   if(state.ui.modal || state.ui.saleDetail || state.ui.orderDetail) return;
@@ -1611,6 +1602,7 @@ async function afterLoginSync(u){
   if(!SYNC.cfg.key){ SYNC.cfg.user = u.username; SYNC.cfg.hash = u.passwordHash; syncSaveCfg(); }
   if(!syncEnabled()) return;
   try{ await syncStartup(true); }catch(e){}
+  try{ await fetchOnlineOrders(true); }catch(e){}
   render();
 }
 function syncStartTimers(){
@@ -1988,7 +1980,7 @@ const actions_login = {
 };
 
 /* ================= shell + sidebar ================= */
-const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',caixa:'Caixa',relatorios:'Relatórios',servidor:'Servidor',usuarios:'Usuários'};
+const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',servidor:'Servidor',usuarios:'Usuários'};
 
 function renderTopbar(){
   const today = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
@@ -2042,6 +2034,7 @@ function renderSidebar(){
     ['vendas','cart','Vendas'],
     ['pedidos','clipboard','Pedidos'],
     ['catalogo','book','Catálogo On'],
+    ['online','inbox','Pedidos online'],
     ['caixa','wallet','Caixa'],
     ['relatorios','chart','Relatórios'],
     ['servidor','cloud','Servidor'],
@@ -2057,7 +2050,7 @@ function renderSidebar(){
       ${items.filter(([id])=>canAccessTab(id)).map(([id,ic,label])=>{
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
-          <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
+          <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='online'&&onlineNewCount()>0 ? `<span class="navbadge">${onlineNewCount()}</span>` : ''}${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
         </div>`;
       }).join('')}
     </nav>
@@ -2081,6 +2074,7 @@ function renderTab(){
     case 'vendas': return renderVendas();
     case 'pedidos': return renderPedidos();
     case 'catalogo': return renderCatalogo();
+    case 'online': return renderOnline();
     case 'caixa': return renderCaixa();
     case 'relatorios': return renderRelatorios();
     case 'servidor': return renderServidor();
@@ -2337,6 +2331,107 @@ const actions_extras = {
     const lines=[['Código','Produto','Categoria','Qtd. vendida','Receita','Custo','Lucro'].map(q).join(';')];
     Object.entries(per).sort((a,b)=>b[1].qty-a[1].qty).forEach(([n,v])=>lines.push([v.sku,n,v.cat,v.qty,String(v.rev).replace('.',','),String(v.cost).replace('.',','),String(v.rev-v.cost).replace('.',',')].map(q).join(';')));
     await saveFile('relatorio-vendas-'+from+'_a_'+to+'.csv', new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+  }
+};
+
+
+/* ===== Pedidos online (clientes escolhem no catálogo; chegam pelo servidor) ===== */
+const ONLINE = {orders:[], loaded:false, err:'', lastNew:0};
+const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', concluido:'Concluído', cancelado:'Cancelado'};
+function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
+async function fetchOnlineOrders(silent){
+  if(!(typeof syncEnabled==='function' && syncEnabled())) return;
+  try{
+    const j = await syncCall('onlineorders');
+    const old = new Set(ONLINE.orders.map(o=>o.id));
+    const fresh = (j.orders||[]).filter(o=>o.status==='novo' && !old.has(o.id));
+    const first = !ONLINE.loaded;
+    ONLINE.orders = j.orders||[]; ONLINE.loaded = true; ONLINE.err = '';
+    if(fresh.length && !first){ notify.ok(fresh.length===1 ? 'Novo pedido online!' : fresh.length+' novos pedidos online!'); }
+    const n = onlineNewCount();
+    document.title = (n>0 ? '('+n+') ' : '') + document.title.replace(/^\(\d+\)\s*/,'');
+    if(!silent || fresh.length || first) { if(!state.ui.modal) render(); }
+  }catch(e){ ONLINE.err = e.message; if(!silent) render(); }
+}
+function onlineAgo(iso){
+  const t = Date.parse(iso); if(!t) return '';
+  const m = Math.max(0, Math.round((Date.now()-t)/60000));
+  if(m<1) return 'agora'; if(m<60) return 'há '+m+' min'; const h=Math.round(m/60); if(h<24) return 'há '+h+' h';
+  return new Date(t).toLocaleDateString('pt-BR')+' '+new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+function renderOnline(){
+  const flt = state.ui.onlineFilter || 'novo';
+  if(syncEnabled() && !ONLINE.loaded && !ONLINE.loading){ ONLINE.loading=true; fetchOnlineOrders(false).finally(()=>{ONLINE.loading=false;}); }
+  const cnt = k => k==='todos' ? ONLINE.orders.length : ONLINE.orders.filter(o=>o.status===k).length;
+  const chips = [['novo','Novos'],['atendimento','Em atendimento'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
+  const list = ONLINE.orders.filter(o=> flt==='todos' || o.status===flt);
+  const head = `<div class="flex-between flex-wrap mb2"><div>
+    <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Pedidos online</h2>
+    <p class="muted">Escolhas feitas pelos clientes no catálogo online</p></div>
+    <button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button></div>`;
+  if(!syncEnabled()){
+    return head + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
+  }
+  const body = !ONLINE.loaded && !ONLINE.err ? `<div class="card muted">Carregando pedidos…</div>`
+    : ONLINE.err ? `<div class="card" style="color:var(--danger);">${esc(ONLINE.err)}</div>`
+    : !list.length ? `<div class="card">${emptyState(icon('inbox',28),'Nenhum pedido aqui','Quando um cliente escolher um perfume no catálogo, o pedido aparece nesta tela.')}</div>`
+    : `<div class="oo-grid">${list.map(o=>{
+        const p = state.products.find(x=>x.id===o.productId);
+        const img = p && p.image ? `<img class="oo-img" src="${esc(p.image)}" alt="">` : `<div class="oo-img ph">${icon('package',26)}</div>`;
+        const total = (o.unitPrice||0)*(o.qty||1);
+        const cls = o.status==='novo'?'badge-warn':o.status==='concluido'?'badge-ok':o.status==='cancelado'?'badge-danger':'badge-warn';
+        const open = o.status==='novo'||o.status==='atendimento';
+        return `<div class="card oo-card">
+          <div class="oo-top">${img}<div style="min-width:0;flex:1;">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><strong>${esc(o.productName)}</strong><span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></div>
+            <div class="muted" style="font-size:12.5px;">${p&&p.sku?'Cód. '+esc(p.sku)+' · ':''}${o.qty} × ${brl(o.unitPrice)} = <strong>${brl(total)}</strong></div>
+            <div class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}${p&&p.stock!=null?' · estoque '+p.stock:(p?'':' · produto removido')}</div>
+          </div></div>
+          <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(o.phone||''))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
+          <div class="oo-acts">
+            <button class="btn btn-primary" data-action="onlineWhats" data-id="${esc(o.id)}">WhatsApp</button>
+            ${open&&p?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
+            ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
+            ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
+          </div></div>`;
+      }).join('')}</div>`;
+  return head + `<div class="segbar mb2" style="flex-wrap:wrap;">${chips.map(([k,l])=>`<button class="${flt===k?'on':''}" data-action="setOnlineFilter" data-f="${k}">${l} (${cnt(k)})</button>`).join('')}</div>` + body;
+}
+const actions_online = {
+  setOnlineFilter(t){ state.ui.onlineFilter = t.dataset.f; render(); },
+  async refreshOnline(){ await fetchOnlineOrders(false); notify.ok('Pedidos atualizados.'); },
+  onlineWhats(t){
+    const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
+    const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebi seu pedido: '+o.qty+'x '+o.productName+' ('+brl((o.unitPrice||0)*o.qty)+'). Vamos finalizar? 😊');
+    if(!u){ notify.err('Telefone do cliente inválido.'); return; }
+    openNewTab(u);
+    if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
+  },
+  async onlineStatus(t){
+    const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
+    const old = o.status; o.status = t.dataset.s; render();
+    try{ await syncCall('onlineorder_status',{id:o.id,status:o.status}); }
+    catch(e){ o.status = old; notify.err(e.message); render(); }
+  },
+  async onlineToSale(t){
+    const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
+    const p = state.products.find(x=>x.id===o.productId);
+    if(!p){ notify.err('Produto não encontrado no estoque.'); return; }
+    if(p.stock<=0){ notify.err('Produto sem estoque.'); return; }
+    const d = String(o.phone||'').replace(/\D/g,'');
+    let c = state.customers.find(x=>String(x.phone||'').replace(/\D/g,'')===d && d);
+    if(!c){
+      c = {id:uid('cli'), code:nextCustomerCode(), name:o.customerName, phone:maskPhone(o.phone||''), email:'', cpf:'', address:'', number:'', district:'', city:'', state:'', zip:'', notes:'Veio do catálogo online', createdAt:new Date().toISOString()};
+      state.customers.push(c); persist('customers');
+    }
+    const V = state.ui.venda;
+    V.customerId = c.id;
+    const q = Math.min(o.qty, p.stock);
+    const ex = V.cart.find(i=>i.productId===p.id);
+    if(ex) ex.qty = Math.min(p.stock, ex.qty+q); else V.cart.push({productId:p.id, name:p.name, qty:q, unitPrice:p.salePrice, stock:p.stock});
+    state.tab = 'vendas'; sessionSave(state.currentUser, 'vendas');
+    notify.ok('Venda montada com o pedido de '+o.customerName+'. Confira e finalize.');
+    if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}}); else render();
   }
 };
 
@@ -5143,6 +5238,7 @@ const actions = {
   ...actions_pedidos,
   ...actions_relatorios,
   ...actions_extras,
+  ...actions_online,
   ...actions_usuarios
 };
 

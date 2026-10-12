@@ -134,7 +134,34 @@ function rows($pdo, $sql){ return $pdo->query($sql)->fetchAll(); }
 
 $action = (string)($req['action'] ?? '');
 
+function ensureOnlineOrders($pdo){
+  $mysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+  $pdo->exec('CREATE TABLE IF NOT EXISTS online_orders (
+    id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, product_id VARCHAR(60), product_name VARCHAR(255),
+    unit_price DECIMAL(12,2) NOT NULL DEFAULT 0, qty INT NOT NULL DEFAULT 1, customer_name VARCHAR(120), phone VARCHAR(30),
+    note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40)
+  )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+}
+
 try{
+  /* ===================== PEDIDOS ONLINE (feitos no catálogo público) ===================== */
+  if($action === 'onlineorders'){
+    ensureOnlineOrders($pdo);
+    $r = rows($pdo, 'SELECT * FROM online_orders ORDER BY created_at DESC LIMIT 300');
+    out(200, ['ok'=>true, 'orders'=>array_map(fn($o)=>[
+      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
+      'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
+      'note'=>s($o['note']), 'status'=>s($o['status'])
+    ], $r)]);
+  }
+  if($action === 'onlineorder_status'){
+    ensureOnlineOrders($pdo);
+    $st = (string)($req['status'] ?? '');
+    if(!in_array($st, ['novo','atendimento','concluido','cancelado'], true)) fail(400, 'Status inválido.');
+    $q = $pdo->prepare('UPDATE online_orders SET status = ? WHERE id = ?'); $q->execute([$st, (string)($req['id'] ?? '')]);
+    out(200, ['ok'=>true]);
+  }
+
   /* ===================== PING ===================== */
   if($action === 'ping'){
     $v = getVersion($pdo);
