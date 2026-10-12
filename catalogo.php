@@ -14,10 +14,12 @@ function plain($code, $msg){ http_response_code($code); header('Content-Type: te
 if(!is_file($dbFile)) plain(503, 'Catálogo indisponível no momento.');
 require $dbFile;
 if(defined('CATALOG_WHATSAPP') && $WHATSAPP === '') $WHATSAPP = (string)CATALOG_WHATSAPP;
-$WHATSAPP = preg_replace('/\D/', '', (string)$WHATSAPP);
 function e($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 try { $pdo = db(); } catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
+if($WHATSAPP === ''){ try{ $__m = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__m->execute(['whatsapp']); $WHATSAPP = (string)($__m->fetchColumn() ?: ''); }catch(Throwable $__e){} }
+$WHATSAPP = preg_replace('/\D/', '', (string)$WHATSAPP);
+if($WHATSAPP !== '' && strlen($WHATSAPP) <= 11) $WHATSAPP = '55'.$WHATSAPP;   /* DDI do Brasil */
 
 /* ---------- foto de um produto ---------- */
 if(isset($_GET['img'])){
@@ -100,9 +102,8 @@ function card($p){
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
   $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
   global $WHATSAPP;
-  $btn = $WHATSAPP !== ''
-    ? '<a class="buy wa" target="_blank" rel="noopener" href="https://wa.me/'.e($WHATSAPP).'?text='.rawurlencode('Olá! Tenho interesse neste perfume: '.$p['name'].' ('.brl($p['sale_price']).')').'">Pedir no WhatsApp</a>'
-    : '<span class="buy">Ver detalhes</span>';
+  if($WHATSAPP !== '') $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra!')).'"';
+  $btn = '<span class="buy">Ver detalhes</span>';
   return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
 }
 
@@ -264,7 +265,8 @@ header('X-Content-Type-Options: nosniff');
   .buy.wa{background:#25D366;color:#073B1B;}
   .buy.wa:hover{background:#1FB85A;}
   .noresult{display:none;text-align:center;color:var(--muted);padding:50px 20px;}
-  .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:13px;padding:10px;border-radius:999px;}
+  .lb-note{display:none;font-size:11px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4;}
+  .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:14px;padding:12px;border-radius:999px;box-shadow:0 4px 12px rgba(37,211,102,.35);}
   .lb-box{border-radius:18px;}
   @media (max-width:640px){
     header{padding:24px 14px 20px;}
@@ -315,7 +317,7 @@ header('X-Content-Type-Options: nosniff');
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
   <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração.</footer>
-<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Pedir no WhatsApp</a></div></div></div>
+<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Escolher este perfume</a><div class="lb-note" id="lb-wn">Você será direcionado ao WhatsApp da loja para finalizar a compra com o vendedor.</div></div></div></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
@@ -330,12 +332,11 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('lb-p').textContent=c.getAttribute('data-price')||'';
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
-    var w=$('lb-w'),cw=c.querySelector('a.buy.wa');if(w){if(cw){w.href=cw.href;w.style.display='block';}else w.style.display='none';}
+    var w=$('lb-w'),wn=$('lb-wn'),wa=c.getAttribute('data-wa');if(w){if(wa){w.href=wa;w.style.display='block';if(wn)wn.style.display='block';}else{w.style.display='none';if(wn)wn.style.display='none';}}
     lb.className='lb on';document.body.style.overflow='hidden';
   }
   function close(){lb.className='lb';document.body.style.overflow='';}
   document.addEventListener('click',function(e){
-    if(e.target.closest&&e.target.closest('a.buy'))return;
     var c=e.target.closest&&e.target.closest('.card[data-name]');
     if(c&&!lb.contains(e.target)){open(c);return;}
     if((e.target===lb&&(!window._lbd||window._lbd===lb))||(e.target.closest&&e.target.closest('.lb-x')))close();

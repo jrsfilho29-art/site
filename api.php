@@ -120,6 +120,16 @@ function setVersion($pdo, $n){
     $pdo->prepare('INSERT INTO meta (k, v) VALUES (?, ?)')->execute(['version', (string)$n]);
   }
 }
+function getMeta($pdo, $k){
+  try{ $st = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $st->execute([$k]); $r = $st->fetch(); return $r ? (string)$r['v'] : ''; }catch(Throwable $e){ return ''; }
+}
+function setMeta($pdo, $k, $v){
+  $st = $pdo->prepare('UPDATE meta SET v = ? WHERE k = ?'); $st->execute([(string)$v, $k]);
+  if($st->rowCount() === 0 && getMeta($pdo, $k) === ''){
+    $pdo->prepare('DELETE FROM meta WHERE k = ?')->execute([$k]);
+    $pdo->prepare('INSERT INTO meta (k, v) VALUES (?, ?)')->execute([$k, (string)$v]);
+  }
+}
 function rows($pdo, $sql){ return $pdo->query($sql)->fetchAll(); }
 
 $action = (string)($req['action'] ?? '');
@@ -197,6 +207,7 @@ try{
       ];
     }, rows($pdo, 'SELECT * FROM orders ORDER BY created_at DESC, id DESC'));
 
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp')];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -295,6 +306,9 @@ try{
 
       $new = $cur + 1;
       setVersion($pdo, $new);
+      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('whatsapp', $d['settings'])){
+        setMeta($pdo, 'whatsapp', substr(preg_replace('/\D/', '', (string)$d['settings']['whatsapp']), 0, 20));
+      }
       $pdo->commit();
       out(200, ['ok'=>true, 'version'=>$new]);
     }catch(Throwable $e){

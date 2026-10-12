@@ -431,7 +431,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-d';
+const APP_VERSION = '2026.10.12-e';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -883,7 +883,9 @@ function buildCatalogPageHTML(list){
     const img = p.image ? `<img src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<div class="noimg">sem foto</div>`;
     const soldOut = p.stock<=0 ? `<span class="tag-soldout">indisponível</span>` : '';
     const metaTxt = [p.brand||'', p.volume? (String(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':'')) : ''].filter(Boolean).join(' · ');
-    return `<div class="card" data-name="${esc(p.name)}" data-meta="${esc(metaTxt)}" data-price="${esc(brl(p.salePrice))}" data-desc="${esc((p.description||'').trim())}">
+    const waNum = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
+    const waAttr = waNum ? ` data-wa="${esc('https://wa.me/'+(waNum.length<=11?'55'+waNum:waNum)+'?text='+encodeURIComponent('Olá! Escolhi este perfume no catálogo da Essência: '+p.name+' ('+brl(p.salePrice)+'). Quero finalizar a compra!'))}"` : '';
+    return `<div class="card" data-name="${esc(p.name)}" data-meta="${esc(metaTxt)}" data-price="${esc(brl(p.salePrice))}" data-desc="${esc((p.description||'').trim())}"${waAttr}>
       <div class="imgwrap">${img}${soldOut}</div>
       <div class="info">
         ${`<div class="cat">${(p.brand||p.volume)?'':'&nbsp;'}${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':''):''}</div>`}
@@ -1042,7 +1044,8 @@ function buildCatalogPageHTML(list){
   .buy.wa{background:#25D366;color:#073B1B;}
   .buy.wa:hover{background:#1FB85A;}
   .noresult{display:none;text-align:center;color:var(--muted);padding:50px 20px;}
-  .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:13px;padding:10px;border-radius:999px;}
+  .lb-note{display:none;font-size:11px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4;}
+  .lb-wa{display:none;margin-top:12px;text-align:center;text-decoration:none;background:#25D366;color:#073B1B;font-weight:700;font-size:14px;padding:12px;border-radius:999px;box-shadow:0 4px 12px rgba(37,211,102,.35);}
   .lb-box{border-radius:18px;}
   @media (max-width:640px){
     header{padding:24px 14px 20px;}
@@ -1077,7 +1080,7 @@ function buildCatalogPageHTML(list){
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
   <footer>Página gerada em ${new Date().toLocaleDateString('pt-BR')} · preços e disponibilidade sujeitos a alteração.</footer>
-<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div></div></div></div>
+<div class="lb" id="lb" aria-hidden="true"><div class="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div><div class="lb-desc" id="lb-d"></div><a class="lb-wa" id="lb-w" target="_blank" rel="noopener">Escolher este perfume</a><div class="lb-note" id="lb-wn">Você será direcionado ao WhatsApp da loja para finalizar a compra com o vendedor.</div></div></div></div>
 <script>
 (function(){
   var lb=document.getElementById('lb');if(!lb)return;
@@ -1090,6 +1093,7 @@ function buildCatalogPageHTML(list){
     $('lb-p').textContent=c.getAttribute('data-price')||'';
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
+    var w=$('lb-w'),wn=$('lb-wn'),wa=c.getAttribute('data-wa');if(w){if(wa){w.href=wa;w.style.display='block';if(wn)wn.style.display='block';}else{w.style.display='none';if(wn)wn.style.display='none';}}
     lb.className='lb on';document.body.style.overflow='hidden';
   }
   function close(){lb.className='lb';document.body.style.overflow='';}
@@ -1458,7 +1462,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'')}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1504,6 +1508,7 @@ async function syncPush(force, silent){
 function syncApplyPulled(j){
   const d = j.data || {};
   let codesAdded = false;
+  if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
     state[k] = Array.isArray(d[k]) ? d[k] : [];
@@ -1842,7 +1847,7 @@ function handleFieldInput(t){
   }
   setPath(state, path, val);
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp') syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -3805,7 +3810,15 @@ function renderCatalogoEnviar(){
   const q = (state.ui.catEnvQuery||'').toLowerCase();
   const custs = state.customers.filter(c=> waPhone(c.phone) && (c.name+' '+(c.code||'')+' '+(c.phone||'')).toLowerCase().includes(q));
   const semFone = state.customers.filter(c=>!waPhone(c.phone)).length;
+  const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
   return `
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${wa?'':'border-color:var(--gold-deep);'}">
+    <b>WhatsApp do vendedor</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Número para onde o cliente é levado ao tocar em <b>Escolher este perfume</b> no catálogo, para finalizar a compra com você.${wa?'':' <b class="danger-c">Ainda não cadastrado: o botão não aparece no catálogo.</b>'}</p>
+    <label class="field" style="max-width:260px;margin-bottom:4px;"><span class="lbl">Telefone com DDD</span>
+      <input data-field="prefs.storeWhatsapp" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(maskPhone((state.prefs&&state.prefs.storeWhatsapp)||''))}"></label>
+    <span class="hint">Salvo e enviado ao servidor automaticamente (com a sincronização ligada), e o catálogo online passa a usar este número.</span>
+  </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Convite</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">É assim que o cliente vê o convite: o WhatsApp mostra a logo da Essência junto com o link.</p>
