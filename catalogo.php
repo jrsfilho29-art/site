@@ -394,6 +394,26 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+
+  /* copia a foto do produto para a área de transferência: o cliente cola na conversa do WhatsApp */
+  (function(){
+    var w=document.getElementById('lb-w'),wn=document.getElementById('lb-wn'),lbi=document.getElementById('lb-i');
+    if(!w)return;
+    var base=wn?wn.textContent:'';
+    w.addEventListener('click',function(ev){
+      var src=lbi&&lbi.getAttribute('src');
+      if(!src||!window.ClipboardItem||!navigator.clipboard||!navigator.clipboard.write)return;   // sem suporte: abre só o WhatsApp
+      ev.preventDefault();
+      var url=w.href;
+      var blobP=new Promise(function(res,rej){
+        var im=new Image();im.onload=function(){try{var c=document.createElement('canvas');c.width=im.naturalWidth||600;c.height=im.naturalHeight||600;var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);c.toBlob(function(b){b?res(b):rej();},'image/png');}catch(e){rej(e);}};im.onerror=rej;im.src=src;
+      });
+      var ok=false;
+      try{navigator.clipboard.write([new ClipboardItem({'image/png':blobP})]).then(function(){ok=true;if(wn){wn.style.display='block';wn.innerHTML='<b>Foto copiada!</b> No WhatsApp, toque e segure o campo de mensagem e escolha <b>Colar</b> para enviar a foto junto.';}}).catch(function(){});}catch(e){}
+      window.open(url,'_blank','noopener');
+      setTimeout(function(){if(wn&&!ok)wn.textContent=base;},4000);
+    });
+  })();
   try{var pid=new URLSearchParams(location.search).get('p');if(pid){var cs=document.querySelectorAll('.card[data-id]');for(var i=0;i<cs.length;i++){if(cs[i].getAttribute('data-id')===pid){open(cs[i]);break;}}}}catch(e){}
 })();
 
