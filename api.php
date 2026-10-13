@@ -169,6 +169,14 @@ try{
     out(200, ['ok'=>true]);
   }
 
+  if($action === 'onlineorders_clear'){
+    if($authRole !== 'admin') fail(403, 'Apenas o administrador pode apagar os pedidos online.');
+    ensureOnlineOrders($pdo);
+    $n = (int)$pdo->query('SELECT COUNT(*) AS n FROM online_orders')->fetch()['n'];
+    $pdo->exec('DELETE FROM online_orders');
+    out(200, ['ok'=>true, 'deleted'=>$n]);
+  }
+
   /* ===================== PING ===================== */
   if($action === 'ping'){
     $v = getVersion($pdo);

@@ -441,12 +441,12 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-x';
+const APP_VERSION = '2026.10.12-y';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
 const ADMIN_TABS = ['relatorios','servidor','usuarios'];
-const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
+const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
 function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
 function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
@@ -2427,7 +2427,7 @@ function renderOnline(){
   const head = `<div class="flex-between flex-wrap mb2"><div>
     <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Pedidos online</h2>
     <p class="muted">Escolhas feitas pelos clientes no catálogo online</p></div>
-    <button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button></div>`;
+    <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button>${isAdmin()&&syncEnabled()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="clearOnlineOrders">${icon('trash')} Zerar pedidos online</button>`:''}</div></div>`;
   if(!syncEnabled()){
     return head + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
   }
@@ -2469,6 +2469,20 @@ const actions_online = {
     if(!u){ notify.err('Telefone do cliente inválido.'); return; }
     openNewTab(u);
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
+  },
+  async clearOnlineOrders(){
+    if(!isAdmin()) return;
+    const n = ONLINE.orders.length;
+    const r = prompt('ATENÇÃO: isto apaga TODOS os pedidos online recebidos pelo catálogo ('+n+') do servidor. Não dá para desfazer.\n\nO estoque não muda (pedido online só mexe no estoque quando vira venda).\n\nPara confirmar, digite APAGAR:');
+    if(r===null) return;
+    if(String(r).trim().toUpperCase()!=='APAGAR'){ notify.err('Texto incorreto. Nada foi apagado.'); return; }
+    try{
+      const j = await syncCall('onlineorders_clear');
+      ONLINE.orders = []; ONLINE.loaded = true; ONLINE.err = '';
+      document.title = document.title.replace(/^\(\d+\)\s*/,'');
+      render();
+      notify.ok('Pedidos online apagados ('+(j.deleted!=null?j.deleted:n)+').');
+    }catch(e){ notify.err(e.message||'Não foi possível apagar.'); }
   },
   async onlineStatus(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
