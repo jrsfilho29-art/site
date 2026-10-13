@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-t';
+const APP_VERSION = '2026.10.12-u';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1827,7 +1827,11 @@ function attachDelegatedEvents(){
   if(listenersAttached) return;
   listenersAttached = true;
   const app = document.getElementById('app');
-  app.addEventListener('mousedown', e => { window._mdTarget = e.target; }, true);
+  app.addEventListener('mousedown', e => { window._mdTarget = e.target;
+    const t = e.target.closest && e.target.closest('[data-action="toggleShowPw"]');
+    if(t){ window._pwHadFocus = document.activeElement && document.activeElement.id==='login-password'; e.preventDefault(); }
+  }, true);
+  app.addEventListener('touchstart', e => { const t = e.target.closest && e.target.closest('[data-action="toggleShowPw"]'); if(t){ window._pwHadFocus = document.activeElement && document.activeElement.id==='login-password'; } }, true);
   document.addEventListener('click', () => { setTimeout(()=>{ window._mdTarget = undefined; }, 0); }, true);
 
   app.addEventListener('click', e => {
@@ -1962,11 +1966,23 @@ function renderLogin(){
 
 const LOGIN_GUARD = {fails:0, until:0};
 const actions_login = {
-  toggleShowPw(){ state.ui.login.showPw = !state.ui.login.showPw; render(); },
+  toggleShowPw(){
+    const L = state.ui.login; L.showPw = !L.showPw;
+    const pw = document.getElementById('login-password'), cf = document.getElementById('login-confirm');
+    const btn = document.querySelector('[data-action="toggleShowPw"]');
+    if(!pw){ render(); return; }
+    /* troca o tipo sem recriar a tela: mantém foco, cursor e teclado do celular */
+    const a = pw.selectionStart, b = pw.selectionEnd, had = (document.activeElement===pw)||(window._pwHadFocus===true);
+    pw.type = L.showPw?'text':'password'; if(cf) cf.type = pw.type;
+    if(btn) btn.innerHTML = L.showPw?icon('eyeoff'):icon('eye');
+    window._pwHadFocus=false; if(had){ pw.focus(); try{ pw.setSelectionRange(a,b); }catch(e){} }
+  },
   goRegister(){ if(state.users.length){ return; } state.ui.login = {mode:'setup',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   goLogin(){ state.ui.login = {mode:'login',name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   async loginSubmit(){
     const L = state.ui.login;
+    /* preenchimento automático do navegador nem sempre dispara 'input': lê direto dos campos */
+    [['login-name','name'],['login-username','username'],['login-password','password'],['login-confirm','confirm']].forEach(([id,k])=>{ const el=document.getElementById(id); if(el && el.value!==L[k]) L[k]=el.value; });
     const hasUsers = state.users.length>0;
     const mode = L.mode || ((hasUsers || SYNC.serverHasUsers)?'login':'setup');
     L.error='';
