@@ -441,12 +441,12 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-w';
+const APP_VERSION = '2026.10.12-x';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
 const ADMIN_TABS = ['relatorios','servidor','usuarios'];
-const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
+const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
 function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
 function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
@@ -4546,6 +4546,11 @@ function renderServidorBackup(){
         <input type="file" accept="application/json" style="display:none;" onchange="importBackupFile(this)">
       </label>
     </div>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;margin-top:16px;border-color:var(--danger);">
+    <b class="danger-c">Zerar vendas e pedidos</b>
+    <p class="muted" style="font-size:13px;margin:6px 0 14px;">Apaga todas as vendas e todos os pedidos e <b>devolve ao estoque</b> as quantidades das vendas que não foram canceladas. Clientes, produtos e usuários não são tocados. Um backup é baixado antes e é preciso digitar APAGAR para confirmar.</p>
+    <button class="btn btn-ghost" style="color:var(--danger);" data-action="resetSalesOrders">${icon('trash')} Apagar vendas e pedidos e devolver ao estoque</button>
   </div>`;
 }
 function renderServidorGuia(){
@@ -4698,6 +4703,24 @@ const actions_usuarios = {
     const backup = { customers: state.customers, products: state.products, sales: state.sales, orders: state.orders, users: state.users, categories: state.categories, subcategories: state.subcategories, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
     await saveFile('essencia-backup-'+todayISO()+'.json', blob);
+  },
+  async resetSalesOrders(){
+    const ativas = state.sales.filter(x=>x.status!=='cancelada');
+    const un = ativas.reduce((a,x)=>a+x.items.reduce((b,i)=>b+(+i.qty||0),0),0);
+    const msg = 'ATENÇÃO: isto apaga TODAS as vendas ('+state.sales.length+') e TODOS os pedidos ('+state.orders.length+') e devolve ao estoque '+un+' unidade(s) das vendas não canceladas.\n\nNão dá para desfazer (um backup .json será baixado antes).\n\nPara confirmar, digite APAGAR:';
+    const r = prompt(msg);
+    if(r===null) return;
+    if(String(r).trim().toUpperCase()!=='APAGAR'){ notify.err('Texto incorreto. Nada foi apagado.'); return; }
+    try{ await actions.exportBackup(); }catch(e){ if(!confirm('Não consegui gerar o backup. Apagar mesmo assim?')) return; }
+    const back = {};
+    ativas.forEach(sl=> sl.items.forEach(i=>{ back[i.productId] = (back[i.productId]||0) + (+i.qty||0); }));
+    state.products = state.products.map(p=> back[p.id] ? {...p, stock:(+p.stock||0)+back[p.id]} : p);
+    state.sales = []; state.orders = [];
+    state.ui.saleDetail = null; state.ui.orderDetail = null;
+    persist('products'); persist('sales'); persist('orders');
+    if(typeof syncSchedulePush==='function') syncSchedulePush();
+    render();
+    notify.ok('Vendas e pedidos apagados. '+un+' unidade(s) voltaram ao estoque.');
   },
   async exportDataSQL(){
     const totalRecords = state.customers.length+state.products.length+state.sales.length+state.orders.length+state.users.length+state.categories.length+state.subcategories.length;
