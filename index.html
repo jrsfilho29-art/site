@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-c';
+const APP_VERSION = '2026.10.13-d';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1466,7 +1466,7 @@ let state = {
   sales: LS.get(KEYS.sales, []),
   orders: LS.get(KEYS.orders, []),
   users: LS.get(KEYS.users, []),
-  prefs: LS.get(KEYS.prefs, {showPrices:true, bgColor:''}),
+  prefs: LS.get(KEYS.prefs, {showPrices:true}),
   currentUser: null,
   ui: {
     clientQuery:'', productQuery:'', productCategory:'', productSubcategory:'', addMenuOpen:false,
@@ -1767,8 +1767,7 @@ function persist(key){
 
 /* ================= render engine ================= */
 function applyPrefs(){
-  if(state.prefs && state.prefs.bgColor){ document.documentElement.style.setProperty('--cream', state.prefs.bgColor); }
-  else { document.documentElement.style.removeProperty('--cream'); }
+  document.documentElement.style.removeProperty('--cream');   /* cor de fundo personalizada foi removida: volta ao padrão */
 }
 let _sessTab = null;
 function render(){
@@ -2725,11 +2724,6 @@ function renderProdutos(){
     <label style="font-size:13px;display:flex;align-items:center;gap:6px;color:var(--muted);">
       <input type="checkbox" data-field="prefs.showPrices" ${state.prefs.showPrices!==false?'checked':''}> Mostrar preços
     </label>
-    <label style="font-size:13px;display:flex;align-items:center;gap:6px;color:var(--muted);">
-      Cor de fundo
-      <input type="color" data-field="prefs.bgColor" value="${state.prefs.bgColor||'#FBF7F1'}" style="width:34px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
-      ${state.prefs.bgColor? `<button class="icon-btn" data-action="resetBgColor" title="Restaurar padrão">${icon('close',12)}</button>`:''}
-    </label>
   </div>
   <div class="flex-between flex-wrap gap mb2">
     <div class="relative" style="max-width:320px;flex:1;min-width:200px;">
@@ -2770,7 +2764,6 @@ function renderProdutos(){
 }
 
 const actions_produtos = {
-  resetBgColor(){ state.prefs.bgColor=''; persist('prefs'); render(); },
   toggleAddMenu(){ state.ui.addMenuOpen = !state.ui.addMenuOpen; render(); },
   newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',stock:0,minStock:0,description:''}}; render(); },
   openExportProducts(){
