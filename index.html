@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-e';
+const APP_VERSION = '2026.10.13-f';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1891,6 +1891,23 @@ function setPath(obj, path, val){
   o[parts[parts.length-1]] = val;
 }
 
+/* custo, markup e preço de venda do cadastro de produto: o campo que você digita manda, os outros se ajustam.
+   (antes isso rodava ANTES de o valor digitado ser guardado e calculava sempre com o valor da tecla anterior) */
+function productPriceSync(which){
+  const d = state.ui.modal && state.ui.modal.data; if(!d) return;
+  const num = v => { const n = parseFloat(String(v==null?'':v).replace(',','.')); return isNaN(n) ? 0 : n; };
+  const has = v => String(v==null?'':v).trim()!=='';
+  const cost = num(d.costPrice), r2 = n => Math.round(n*100)/100;
+  if(which==='costPrice'){
+    if(has(d.markup)) d.salePrice = r2(cost*(1+num(d.markup)/100));
+    else if(has(d.salePrice) && cost>0) d.markup = r2((num(d.salePrice)-cost)/cost*100);
+  }else if(which==='markup'){
+    if(has(d.markup)) d.salePrice = r2(cost*(1+num(d.markup)/100));
+  }else if(which==='salePrice'){
+    if(has(d.salePrice) && cost>0) d.markup = r2((num(d.salePrice)-cost)/cost*100);
+    else if(!has(d.salePrice)) d.markup = '';
+  }
+}
 function handleFieldInput(t){
   const path = t.dataset.field;
   let val = t.type==='checkbox' ? t.checked : t.value;
@@ -1907,6 +1924,7 @@ function handleFieldInput(t){
     if(val !== t.value) t.value = val;
   }
   setPath(state, path, val);
+  { const mm = /^ui\.modal\.data\.(costPrice|markup|salePrice)$/.exec(path); if(mm && state.ui.modal && state.ui.modal.type==='produto') productPriceSync(mm[1]); }
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
@@ -2987,21 +3005,6 @@ const actions_produtos = {
     state.ui.selectedProducts = state.ui.selectedProducts.filter(id=>id!==t.dataset.id);
     persist('products'); render();
     notify.ok('Produto excluído.');
-  },
-  productCostChange(){
-    const d = state.ui.modal.data;
-    const cost = parseFloat(d.costPrice)||0, markup = parseFloat(d.markup)||0;
-    d.salePrice = +(cost*(1+markup/100)).toFixed(2);
-  },
-  productMarkupChange(){
-    const d = state.ui.modal.data;
-    const cost = parseFloat(d.costPrice)||0, markup = parseFloat(d.markup)||0;
-    d.salePrice = +(cost*(1+markup/100)).toFixed(2);
-  },
-  productSalePriceChange(){
-    const d = state.ui.modal.data;
-    const cost = parseFloat(d.costPrice)||0, sale = parseFloat(d.salePrice)||0;
-    d.markup = cost>0 ? +(((sale-cost)/cost)*100).toFixed(2) : 0;
   },
   registerCategoryIfNew(name){
     name = (name||'').trim();
@@ -5218,9 +5221,9 @@ function renderProdutoModal(d){
     </div>
     <label class="field"><span class="lbl">Fornecedor</span><input data-field="ui.modal.data.supplier" value="${esc(d.supplier||'')}"></label>
     <div class="grid grid-3">
-      <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" data-action-on-input="productCostChange" value="${esc(d.costPrice)}" oninput="actions.productCostChange()"></label>
-      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" min="0" data-field="ui.modal.data.markup" value="${esc(d.markup)}" oninput="actions.productMarkupChange()"></label>
-      <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}" oninput="actions.productSalePriceChange()"></label>
+      <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" value="${esc(d.costPrice)}"></label>
+      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" min="0" data-field="ui.modal.data.markup" value="${esc(d.markup)}"></label>
+      <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
     </div>
     <div class="grid grid-3">
       <label class="field"><span class="lbl">Estoque inicial / atual</span><input type="number" min="0" data-field="ui.modal.data.stock" value="${esc(d.stock)}"><span class="hint">Quantidade disponível</span></label>
