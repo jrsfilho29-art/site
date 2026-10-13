@@ -344,6 +344,53 @@
   .prod-card:hover{box-shadow:4px 4px 0 var(--plum);transform:translate(-2px,-2px);}
   .prod-img{background:linear-gradient(160deg,var(--tint),var(--cream));}
   .prod-card.selected{border-color:var(--plum);box-shadow:0 0 0 2px var(--gold);}
+
+  /* ===== Produtos: cartões ===== */
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:16px;}
+  .pc{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .18s ease,transform .18s ease,border-color .18s ease;}
+  .pc:hover{box-shadow:0 10px 26px rgba(23,32,74,.14);transform:translateY(-3px);border-color:#C5C9E2;}
+  .pc.selected{border-color:var(--gold);box-shadow:0 0 0 3px rgba(240,168,31,.35);}
+  .pc.inactive .pc-img img,.pc.inactive .pc-body{opacity:.55;}
+  .pc-img{position:relative;aspect-ratio:1/1;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);}
+  .pc-img img{width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box;transition:transform .25s ease;}
+  .pc:hover .pc-img img{transform:scale(1.04);}
+  .pc-noimg{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted2);font-size:11px;background:repeating-linear-gradient(135deg,var(--tint),var(--tint) 10px,#F3F4FA 10px,#F3F4FA 20px);width:100%;height:100%;justify-content:center;}
+  .pc-sel{position:absolute;top:10px;left:10px;z-index:2;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:5px 6px;display:flex;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+  .pc-sel input{width:16px;height:16px;margin:0;cursor:pointer;}
+  .pc-tag{position:absolute;top:10px;right:10px;z-index:2;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.15);letter-spacing:.2px;}
+  .pc-tag.ok{background:#E3F4F1;color:#0A5F5A;}
+  .pc-tag.low{background:#FDF0D2;color:#8A5A00;}
+  .pc-tag.zero{background:#FADFE6;color:#8F2A42;}
+  .pc-off{position:absolute;left:0;right:0;bottom:0;z-index:2;text-align:center;font-size:11px;font-weight:600;padding:4px;background:rgba(90,96,136,.9);color:#fff;}
+  .pc-body{padding:13px 14px 14px;display:flex;flex-direction:column;flex:1;gap:3px;}
+  .pc-brand{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--gold-deep);min-height:15px;}
+  .pc-brand .vol{margin-left:auto;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted);background:var(--tint);padding:1px 7px;border-radius:999px;}
+  .pc-name{font-size:14.5px;font-weight:600;line-height:1.3;color:var(--ink);min-height:2.6em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .pc-code{font-size:11px;color:var(--muted2);min-height:15px;}
+  .pc-price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:6px;}
+  .pc-price b{font-size:20px;color:var(--plum);font-weight:700;font-variant-numeric:tabular-nums;}
+  .pc-price .mg{font-size:11px;font-weight:600;color:#0A5F5A;background:#E3F4F1;padding:2px 7px;border-radius:999px;}
+  .pc-price .mg.neg{color:#8F2A42;background:#FADFE6;}
+  .pc-stock{margin-top:8px;}
+  .pc-stock .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .pc-stock .row.bad{color:var(--danger);font-weight:600;}
+  .pc-bar{height:6px;border-radius:999px;background:var(--tint);overflow:hidden;}
+  .pc-bar i{display:block;height:100%;border-radius:999px;background:var(--ok);}
+  .pc-bar.low i{background:var(--gold);}
+  .pc-bar.zero i{background:var(--danger);}
+  .pc-act{display:flex;gap:8px;margin-top:auto;padding-top:12px;}
+  .pc-act .btn{flex:1;justify-content:center;padding:8px 10px;}
+  .pc-act .icon-btn{border:1px solid var(--line);border-radius:8px;width:38px;display:flex;align-items:center;justify-content:center;}
+  .pc-act .icon-btn:hover{background:#FADFE6;border-color:#E9B6C2;}
+  @media(max-width:700px){
+    .pgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+    .pc{border-radius:12px;}
+    .pc-body{padding:10px 10px 12px;}
+    .pc-name{font-size:13px;}
+    .pc-price b{font-size:17px;}
+    .pc-act .btn{padding:7px 6px;font-size:12.5px;}
+    .pc-act .icon-btn{width:34px;}
+  }
   .cat-heading{border-bottom:2px solid var(--plum);}
   .cat-heading .serif{color:var(--plum);font-size:18px;}
   .cat-heading-link,.subgroup-heading{color:var(--gold-deep);}
@@ -461,7 +508,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-h';
+const APP_VERSION = '2026.10.13-i';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2642,29 +2689,32 @@ function vialHTML(p){
   return `<span class="vial ${cls}" title="${p.stock} de ${cap}"><i style="height:${pct}%"></i></span>`;
 }
 function renderProductCard(p, sel){
+  const min = p.minStock||0, zero = p.stock<=0, low = !zero && p.stock<=min;
+  const cap = (p.maxStock!=null && p.maxStock>0) ? p.maxStock : Math.max(min*3, 10, p.stock);
+  const pct = zero ? 0 : Math.max(6, Math.min(100, Math.round(p.stock/cap*100)));
+  const margin = (p.costPrice>0 && p.salePrice>0) ? Math.round((p.salePrice-p.costPrice)/p.salePrice*100) : null;
+  const tag = zero ? '<span class="pc-tag zero">Sem estoque</span>' : low ? `<span class="pc-tag low">Repor · ${p.stock} un.</span>` : `<span class="pc-tag ok">${p.stock} un.</span>`;
   return `
-      <div class="prod-card${sel.includes(p.id)?' selected':''}${p.active===false?' inactive':''}">
-        ${p.active===false? `<div style="padding:4px 10px;background:var(--muted);color:#fff;font-size:11px;text-align:center;">Inativo</div>`:''}        <div class="prod-img">
-          ${p.image? `<img src="${p.image}" alt="${esc(p.name)}">` : `<span style="font-size:26px;opacity:.4;">${icon('image')}</span>`}
-          <label class="selbox" title="Selecionar">
-            <input type="checkbox" data-action="toggleProductSelect" data-id="${p.id}" ${sel.includes(p.id)?'checked':''}>
-          </label>
+      <div class="pc${sel.includes(p.id)?' selected':''}${p.active===false?' inactive':''}">
+        <div class="pc-img">
+          ${p.image? `<img src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<div class="pc-noimg">${icon('image',26)}<span>Sem foto</span></div>`}
+          <label class="pc-sel" title="Selecionar"><input type="checkbox" data-action="toggleProductSelect" data-id="${p.id}" ${sel.includes(p.id)?'checked':''}></label>
+          ${tag}
+          ${p.active===false? '<div class="pc-off">Inativo</div>':''}
         </div>
-        <div class="pbody" style="padding:12px;">
-          <div class="gold-c" style="font-size:11px;min-height:1.3em;">${p.volume? esc(p.volume)+'ml' : '&nbsp;'}</div>
-          <div class="pname" title="${esc(p.name)}">${esc(p.name)}</div>
-          <div class="muted2 pmeta">${p.brand? esc(p.brand) : '&nbsp;'}</div>
+        <div class="pc-body">
+          <div class="pc-brand"><span>${p.brand? esc(p.brand) : '&nbsp;'}</span>${p.volume? `<span class="vol">${esc(p.volume)}ml</span>`:''}</div>
+          <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
+          <div class="pc-code">${p.sku? 'Cód. '+esc(p.sku) : '&nbsp;'}</div>
           ${state.prefs.showPrices!==false ? `
-          <div>
-            <span class="serif" style="font-size:17px;color:var(--plum);">${brl(p.salePrice)}</span>
-            ${p.costPrice>0 && p.salePrice>0 ? `<span class="muted2" style="font-size:11px;margin-left:6px;" title="Margem sobre o preço de venda">margem ${Math.round((p.salePrice-p.costPrice)/p.salePrice*100)}%</span>`:''}
-          </div>` : ''}
-          <div style="font-size:12px;margin-top:8px;display:flex;align-items:center;" class="${p.stock<=(p.minStock||0)?'danger-c':'muted'}">
-            ${vialHTML(p)}<span>${p.stock} un. em estoque ${p.stock<=(p.minStock||0)?'· repor':''}</span>
+          <div class="pc-price"><b>${brl(p.salePrice)}</b>${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
+          <div class="pc-stock">
+            <div class="row${zero||low?' bad':''}"><span>Estoque</span><span>${p.stock} de ${cap}${zero||low?' · repor':''}</span></div>
+            <div class="pc-bar${zero?' zero':low?' low':''}"><i style="width:${pct}%"></i></div>
           </div>
-          <div class="flex gap" style="margin-top:auto;padding-top:8px;">
-            <button class="btn btn-ghost" style="flex:1;justify-content:center;padding:6px 8px;" data-action="editProduto" data-id="${p.id}">${icon('edit')} Editar</button>
-            <button class="icon-btn danger-c" data-action="deleteProduto" data-id="${p.id}">${icon('trash')}</button>
+          <div class="pc-act">
+            <button class="btn btn-ghost" data-action="editProduto" data-id="${p.id}">${icon('edit')} Editar</button>
+            <button class="icon-btn danger-c" data-action="deleteProduto" data-id="${p.id}" title="Excluir produto" aria-label="Excluir produto">${icon('trash')}</button>
           </div>
         </div>
       </div>`;
@@ -2688,7 +2738,7 @@ function groupProductsByCategory(list){
 }
 
 function renderProductGrid(items, sel){
-  return `<div class="grid grid-4 mb3">${items.map(p=>renderProductCard(p,sel)).join('')}</div>`;
+  return `<div class="pgrid mb3">${items.map(p=>renderProductCard(p,sel)).join('')}</div>`;
 }
 /* Catálogo organizado como o cadastro: categoria (na ordem cadastrada) > subgrupo (na ordem cadastrada) > produtos em ordem alfabética */
 function catalogStructure(list){
@@ -2818,7 +2868,7 @@ function renderProdutos(){
   </div>
   ${list.length===0 ? emptyState(icon('package',26),'Nenhum produto', catFilter? 'Nenhum produto cadastrado nesse filtro ainda.' : 'Cadastre os perfumes da loja com preço, custo e estoque.') :
     catFilter ? `
-  <div class="grid grid-4">
+  <div class="pgrid">
     ${list.map(p=>renderProductCard(p,sel)).join('')}
   </div>` : `
   ${groups.map(g=>{
