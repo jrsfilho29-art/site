@@ -26,6 +26,38 @@ try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['sel
 $__vend = isset($_GET['vend']) ? preg_replace('/[^a-z0-9]/', '', strtolower((string)$_GET['vend'])) : '';
 if($__vend !== ''){ foreach($SELLERS as $__s){ if(($__s['id'] ?? '') === $__vend){ $SELLER_ID = $__vend; $SELLER_NAME = (string)$__s['name']; $__ph = preg_replace('/\D/', '', (string)$__s['phone']); if(strlen($__ph) <= 11) $__ph = '55'.$__ph; $WHATSAPP = $__ph; break; } } }
 
+/* ---------- PIX (BR Code "copia e cola") ---------- */
+$PIX = null;
+try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['pix']); $__j = json_decode((string)($__q->fetchColumn() ?: ''), true); if(is_array($__j) && !empty($__j['key'])) $PIX = $__j; }catch(Throwable $__e){}
+function pix_tlv($id, $v){ return $id.str_pad((string)strlen($v), 2, '0', STR_PAD_LEFT).$v; }
+function pix_crc($str){ $crc = 0xFFFF; for($i = 0, $n = strlen($str); $i < $n; $i++){ $crc ^= ord($str[$i]) << 8; for($b = 0; $b < 8; $b++){ $crc = ($crc & 0x8000) ? (($crc << 1) ^ 0x1021) : ($crc << 1); $crc &= 0xFFFF; } } return strtoupper(str_pad(dechex($crc), 4, '0', STR_PAD_LEFT)); }
+function pix_text($t, $max){
+  $t = strtr((string)$t, ['á'=>'a','à'=>'a','â'=>'a','ã'=>'a','ä'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','í'=>'i','ì'=>'i','î'=>'i','ï'=>'i','ó'=>'o','ò'=>'o','ô'=>'o','õ'=>'o','ö'=>'o','ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u','ç'=>'c','Á'=>'A','À'=>'A','Â'=>'A','Ã'=>'A','É'=>'E','Ê'=>'E','Í'=>'I','Ó'=>'O','Ô'=>'O','Õ'=>'O','Ú'=>'U','Ü'=>'U','Ç'=>'C']);
+  $t = strtoupper(preg_replace('/[^A-Za-z0-9 ]/', '', $t));
+  return trim(substr($t, 0, $max));
+}
+function pix_key_norm($type, $key){
+  $key = trim((string)$key);
+  if($type === 'email') return strtolower($key);
+  if($type === 'random') return strtolower($key);
+  $d = preg_replace('/\D/', '', $key);
+  if($type === 'phone'){ if(strlen($d) >= 12 && substr($d, 0, 2) === '55') $d = substr($d, 2); return '+55'.$d; }
+  return $d;   /* CPF/CNPJ */
+}
+function pix_payload($pix, $amount, $txid){
+  $key = pix_key_norm($pix['type'] ?? '', $pix['key'] ?? '');
+  if($key === '') return '';
+  $name = pix_text($pix['name'] ?? '', 25); if($name === '') $name = 'LOJA';
+  $city = pix_text($pix['city'] ?? '', 15); if($city === '') $city = 'BRASIL';
+  $tx = substr(preg_replace('/[^A-Za-z0-9]/', '', (string)$txid), 0, 25); if($tx === '') $tx = '***';
+  $acc = pix_tlv('00', 'br.gov.bcb.pix').pix_tlv('01', $key);
+  $p = pix_tlv('00', '01').pix_tlv('26', $acc).pix_tlv('52', '0000').pix_tlv('53', '986');
+  if($amount > 0) $p .= pix_tlv('54', number_format($amount, 2, '.', ''));
+  $p .= pix_tlv('58', 'BR').pix_tlv('59', $name).pix_tlv('60', $city).pix_tlv('62', pix_tlv('05', $tx));
+  $p .= '6304';
+  return $p.pix_crc($p);
+}
+
 /* ---------- pedido feito pelo cliente no catálogo ---------- */
 if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
   header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
@@ -94,7 +126,12 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
     $summary = count($items) === 1 ? $items[0]['name'] : $items[0]['name'].' + '.(count($items)-1).' item(ns)';
     $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total,seller_id,seller_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2), $sellerId, $sellerName]);
-    echo json_encode(['ok'=>true, 'id'=>$id, 'total'=>round($total, 2)]); exit;
+    $resp = ['ok'=>true, 'id'=>$id, 'total'=>round($total, 2)];
+    if($payment === 'PIX' && $PIX){
+      $code = pix_payload($PIX, round($total, 2), strtoupper(substr($id, 4, 16)));
+      if($code !== '') $resp['pix'] = ['code'=>$code, 'name'=>pix_text($PIX['name'] ?? '', 25), 'amount'=>round($total, 2)];
+    }
+    echo json_encode($resp); exit;
   }catch(Throwable $ex){ $jerr(500, 'Não foi possível enviar o pedido agora. Tente pelo WhatsApp.'); }
 }
 
@@ -492,6 +529,13 @@ if($__op){
   .of-ok-i{width:54px;height:54px;border-radius:50%;background:#25D366;color:#fff;font-size:30px;line-height:54px;margin:0 auto 10px;}
   .of-ok-t{font-size:18px;font-weight:700;color:var(--plum);margin-bottom:6px;}
   .of-ok-m{font-size:13px;line-height:1.5;color:var(--ink);margin-bottom:12px;}
+  .pixbox{border:1.5px dashed var(--gold,#b8923f);border-radius:12px;padding:14px 12px;margin:0 0 12px;background:#fff;text-align:center;}
+  .pixbox h4{margin:0 0 4px;font-size:15px;color:var(--plum);}
+  .pixbox .pv{font-size:22px;font-weight:800;color:var(--plum);margin:2px 0 8px;}
+  .pixbox .pq{display:inline-block;background:#fff;padding:8px;border-radius:8px;border:1px solid #e6dccf;line-height:0;}
+  .pixbox .pq svg{width:200px;height:200px;max-width:60vw;max-height:60vw;}
+  .pixbox .pc{display:block;width:100%;margin:10px 0 0;font:11px/1.35 monospace;word-break:break-all;background:#f7f2ea;border:1px solid #e6dccf;border-radius:8px;padding:8px;color:#444;max-height:74px;overflow:auto;text-align:left;user-select:all;}
+  .pixbox .ph{font-size:12px;color:#6b5b4d;margin-top:8px;line-height:1.45;}
   .lb-box.fm #lb-ok .lb-wa{display:block;}
   @media (prefers-reduced-motion:reduce){.card{transition:none;}}
 </style>
@@ -524,7 +568,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-p</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-q</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -550,7 +594,7 @@ if($__op){
     <button type="button" class="of-b" id="ct-more">Continuar escolhendo</button>
   </form>
 </div>
-<div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
+<div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><div class="pixbox" id="ct-pix" style="display:none"><h4>Pague com PIX</h4><div class="pv" id="ct-pixv"></div><div class="pq" id="ct-pixq"></div><textarea class="pc" id="ct-pixc" readonly rows="3" aria-label="Código PIX copia e cola"></textarea><button type="button" class="lb-act lb-buy" id="ct-pixb" style="margin-top:10px">Copiar código PIX</button><div class="ph">Abra o app do seu banco, escolha <b>PIX &rarr; Pagar com QR Code</b> (ou <b>Copia e Cola</b>) e confira o valor. Depois envie o comprovante no WhatsApp.</div></div><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
 </div></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
@@ -653,11 +697,28 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       if(!j.ok){er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
       ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);
       var nn=sent.reduce(function(a,i){return a+i.qty;},0);
-      $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+' para combinar pagamento e entrega.';
+      $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+(j.pix?' para confirmar e combinar a entrega. Faça o pagamento abaixo:':' para combinar pagamento e entrega.');
       var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
+      showPix(j.pix);
       cart=[];saveCart();fab();$('of-o').value='';
       $('ct-main').style.display='none';$('ct-ok').style.display='block';
     }).catch(function(){btn.disabled=false;btn.textContent='Enviar pedido para a loja';er.textContent='Sem conexão. Verifique a internet e tente novamente.';});
+  });
+  function showPix(px){
+    var box=$('ct-pix');if(!box)return;
+    if(!px||!px.code){box.style.display='none';return;}
+    $('ct-pixv').textContent=brl(px.amount);$('ct-pixc').value=px.code;$('ct-pixq').innerHTML='';
+    function draw(){try{var q=qrcode(0,'M');q.addData(px.code);q.make();$('ct-pixq').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true});}catch(e){$('ct-pixq').style.display='none';}}
+    $('ct-pixq').style.display='inline-block';
+    if(window.qrcode)draw();else{var sc=document.createElement('script');sc.src='qr.js?v=q';sc.onload=draw;sc.onerror=function(){$('ct-pixq').style.display='none';};document.head.appendChild(sc);}
+    box.style.display='block';
+  }
+  document.addEventListener('click',function(e){
+    if(!e.target||e.target.id!=='ct-pixb')return;
+    var c=$('ct-pixc'),v=c.value,b=e.target;
+    function ok(){b.textContent='Código copiado!';setTimeout(function(){b.textContent='Copiar código PIX';},2500);}
+    function fb(){c.focus();c.select();try{c.setSelectionRange(0,99999);}catch(x){}try{document.execCommand('copy');ok();}catch(x){b.textContent='Toque e segure no código para copiar';}}
+    if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(v).then(ok,fb);else fb();
   });
   document.addEventListener('mousedown',function(e){window._lbd=e.target;},true);
   document.addEventListener('keydown',function(e){if(e.key==='Escape'){close();closeCart();}});

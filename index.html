@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-v';
+const APP_VERSION = '2026.10.12-w';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1490,7 +1490,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList()}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1537,6 +1537,7 @@ function syncApplyPulled(j){
   const d = j.data || {};
   let codesAdded = false;
   if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
+  if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
@@ -1903,7 +1904,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp') syncSchedulePush(); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.pix/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -4016,6 +4017,7 @@ function renderCatalogoEnviar(){
   const custs = state.customers.filter(c=> waPhone(c.phone) && (c.name+' '+(c.code||'')+' '+(c.phone||'')).toLowerCase().includes(q));
   const semFone = state.customers.filter(c=>!waPhone(c.phone)).length;
   const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
+  const pixType = (state.prefs&&state.prefs.pixType)||'random', pixOk = !!String((state.prefs&&state.prefs.pixKey)||'').trim();
   return `
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${wa?'':'border-color:var(--gold-deep);'}">
     <b>WhatsApp da loja (vendedor principal)</b>
@@ -4023,6 +4025,23 @@ function renderCatalogoEnviar(){
     <label class="field" style="max-width:260px;margin-bottom:4px;"><span class="lbl">Telefone com DDD</span>
       <input data-field="prefs.storeWhatsapp" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(maskPhone((state.prefs&&state.prefs.storeWhatsapp)||''))}"></label>
     <span class="hint">Salvo e enviado ao servidor automaticamente (com a sincronização ligada), e o catálogo online passa a usar este número.</span>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${pixOk?'':'border-color:var(--gold-deep);'}">
+    <b>Receber por PIX</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Quando o cliente escolhe <b>PIX</b> no carrinho do catálogo, ele recebe na hora o <b>QR Code e o código "copia e cola"</b> já com o valor do pedido, para pagar no app do banco.${pixOk?'':' <b class="danger-c">Ainda não cadastrado: o cliente não verá o código PIX.</b>'}</p>
+    <div class="flex gap" style="flex-wrap:wrap;">
+      <label class="field" style="width:200px;margin-bottom:8px;"><span class="lbl">Tipo da chave</span>
+        <select data-field="prefs.pixType">${[['cpf_cnpj','CPF ou CNPJ'],['phone','Celular'],['email','E-mail'],['random','Chave aleatória']].map(o=>`<option value="${o[0]}" ${pixType===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
+      <label class="field" style="flex:1;min-width:220px;margin-bottom:8px;"><span class="lbl">Chave PIX</span>
+        <input data-field="prefs.pixKey" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="${pixType==='email'?'loja@email.com':pixType==='phone'?'(83) 99999-9999':pixType==='cpf_cnpj'?'somente números':'cole a chave aleatória'}" value="${esc((state.prefs&&state.prefs.pixKey)||'')}"></label>
+    </div>
+    <div class="flex gap" style="flex-wrap:wrap;">
+      <label class="field" style="flex:1;min-width:200px;margin-bottom:4px;"><span class="lbl">Nome do recebedor (até 25 letras)</span>
+        <input data-field="prefs.pixName" maxlength="25" placeholder="Ex.: ESSENCIA PERFUMARIA" value="${esc((state.prefs&&state.prefs.pixName)||'')}"></label>
+      <label class="field" style="width:200px;margin-bottom:4px;"><span class="lbl">Cidade (até 15 letras)</span>
+        <input data-field="prefs.pixCity" maxlength="15" placeholder="Ex.: Joao Pessoa" value="${esc((state.prefs&&state.prefs.pixCity)||'')}"></label>
+    </div>
+    <span class="hint">Use o nome e a cidade como estão no cadastro da sua chave no banco. Salvo e enviado ao servidor automaticamente. O dinheiro cai direto na sua conta; confira o pagamento no extrato antes de entregar.</span>
   </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Outros vendedores</b>

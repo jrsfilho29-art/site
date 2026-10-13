@@ -242,7 +242,8 @@ try{
     }, rows($pdo, 'SELECT * FROM orders ORDER BY created_at DESC, id DESC'));
 
     $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : []];
+    $__px = json_decode((string)getMeta($pdo, 'pix'), true);
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass()];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -355,6 +356,14 @@ try{
       }
       if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('whatsapp', $d['settings']) && preg_replace('/\D/', '', (string)$d['settings']['whatsapp']) !== ''){
         setMeta($pdo, 'whatsapp', substr(preg_replace('/\D/', '', (string)$d['settings']['whatsapp']), 0, 20));
+      }
+      if($authRole === 'admin' && isset($d['settings']['pix']) && is_array($d['settings']['pix'])){
+        $__p = $d['settings']['pix'];
+        $__t = in_array(($__p['type'] ?? ''), ['cpf_cnpj', 'phone', 'email', 'random'], true) ? $__p['type'] : 'random';
+        $__k = trim(mb_substr((string)($__p['key'] ?? ''), 0, 77));
+        if($__k !== ''){   /* chave vazia é ignorada, para um aparelho desatualizado não apagar a chave */
+          setMeta($pdo, 'pix', json_encode(['type'=>$__t, 'key'=>$__k, 'name'=>mb_substr(trim((string)($__p['name'] ?? '')), 0, 25), 'city'=>mb_substr(trim((string)($__p['city'] ?? '')), 0, 15)], JSON_UNESCAPED_UNICODE));
+        }
       }
       $pdo->commit();
       out(200, ['ok'=>true, 'version'=>$new]);
