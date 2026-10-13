@@ -350,7 +350,7 @@
   .pc{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .18s ease,transform .18s ease,border-color .18s ease;}
   .pc:hover{box-shadow:0 10px 26px rgba(23,32,74,.14);transform:translateY(-3px);border-color:#C5C9E2;}
   .pc.selected{border-color:var(--gold);box-shadow:0 0 0 3px rgba(240,168,31,.35);}
-  .pc.inactive .pc-img img,.pc.inactive .pc-body{opacity:.55;}
+  .pc.inactive .pc-img img,.pc.inactive .pc-body>*:not(:last-child){opacity:.55;}
   .pc-img{position:relative;aspect-ratio:1/0.82;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);}
   .pc-img img{width:100%;height:100%;object-fit:contain;padding:6px;box-sizing:border-box;transition:transform .25s ease;}
   .pc:hover .pc-img img{transform:scale(1.04);}
@@ -382,6 +382,48 @@
   .pc-act .btn{flex:1;justify-content:center;padding:5px 8px;font-size:12.5px;}
   .pc-act .icon-btn{border:1px solid var(--line);border-radius:7px;width:32px;display:flex;align-items:center;justify-content:center;}
   .pc-act .icon-btn:hover{background:#FADFE6;border-color:#E9B6C2;}
+
+  /* ===== Catálogo On ===== */
+  .cx-hero{position:relative;overflow:hidden;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:linear-gradient(135deg,#0D1230 0%,#17204A 55%,#2A3470 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+  .cx-hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(240,168,31,.35),transparent 65%);pointer-events:none;}
+  .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
+  .cx-hero p{margin:0;color:#C9CDEA;font-size:13px;}
+  .cx-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .cx-stat{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 14px;min-width:96px;backdrop-filter:blur(2px);}
+  .cx-stat b{display:block;font-size:20px;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .cx-stat span{font-size:11px;color:#C9CDEA;}
+  .cx-stat.hot{background:rgba(240,168,31,.22);border-color:rgba(240,168,31,.5);}
+  .cx-hero-act{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;}
+  .cx-hero-act .btn-ghost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff;}
+  .cx-hero-act .btn-ghost:hover{background:rgba(255,255,255,.22);}
+  .cx-tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
+  .cx-tabs::-webkit-scrollbar{display:none;}
+  .cx-tabs button{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;background:none;border:none;padding:10px 16px;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0;transition:color .12s,background .12s;}
+  .cx-tabs button:hover{background:var(--tint);color:var(--plum);}
+  .cx-tabs button.on{color:var(--plum);font-weight:700;border-bottom-color:var(--gold);}
+  .cx-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .cx-switch{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;padding:6px 12px 6px 8px;border:1.5px solid var(--line);border-radius:999px;background:var(--paper);user-select:none;}
+  .cx-switch input{appearance:none;-webkit-appearance:none;width:30px;height:17px;border-radius:999px;background:#C5C9E2;position:relative;margin:0;cursor:pointer;transition:background .15s;flex:0 0 30px;}
+  .cx-switch input:after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);}
+  .cx-switch input:checked{background:var(--ok);}
+  .cx-switch input:checked:after{transform:translateX(13px);}
+  .cx-bar .grow{flex:1;}
+  .cx-nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px;}
+  .cx-head{display:flex;align-items:center;gap:10px;margin:6px 0 12px;}
+  .cx-head:before{content:"";width:5px;height:22px;border-radius:3px;background:linear-gradient(var(--gold),var(--gold-deep));}
+  .cx-head .serif{font-size:19px;color:var(--plum);}
+  .cx-sub{display:flex;align-items:center;gap:8px;margin:0 0 10px 2px;font-size:12px;font-weight:700;color:var(--gold-deep);text-transform:uppercase;letter-spacing:.5px;}
+  .cx-sub:after{content:"";flex:1;height:1px;background:var(--line);}
+  .pc-desc{font-size:11.5px;line-height:1.45;color:var(--muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;}
+  .pc-meta{font-size:10.5px;color:var(--muted2);margin-top:4px;}
+  .pc-btn{width:100%;justify-content:center;padding:6px 8px;font-size:12.5px;margin-top:10px;}
+  @media(max-width:700px){
+    .cx-hero{padding:16px;border-radius:14px;}
+    .cx-hero h2{font-size:22px;}
+    .cx-stat{min-width:0;flex:1;padding:7px 10px;}
+    .cx-stat b{font-size:17px;}
+    .cx-tabs button{padding:9px 12px;font-size:13px;}
+  }
   @media(max-width:700px){
     .pgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
     .pc-body{padding:8px 9px 10px;}
@@ -507,7 +549,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-j';
+const APP_VERSION = '2026.10.13-k';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -4131,16 +4173,30 @@ function printOrderDoc(orderId){
 /* ================= catalogo ================= */
 function renderCatalogo(){
   const subView = state.ui.catalogoSubView || 'vitrine';
+  const act = state.products.filter(p=>p.active!==false);
+  const avail = act.filter(p=>p.stock>0).length;
+  const novos = (typeof onlineNewCount==='function') ? onlineNewCount() : 0;
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Catálogo On</h2>
-      <p class="muted">Vitrine pública e edição rápida dos produtos</p>
+  <div class="cx-hero">
+    <div>
+      <h2 class="serif">Catálogo On</h2>
+      <p>Sua vitrine na internet: vitrine pública, edição rápida e envio aos clientes</p>
+      <div class="cx-stats">
+        <div class="cx-stat"><b>${act.length}</b><span>no catálogo</span></div>
+        <div class="cx-stat"><b>${avail}</b><span>disponíveis</span></div>
+        <div class="cx-stat"><b>${act.length-avail}</b><span>sem estoque</span></div>
+        ${novos>0?`<div class="cx-stat hot"><b>${novos}</b><span>pedido(s) novo(s)</span></div>`:''}
+      </div>
+    </div>
+    <div class="cx-hero-act">
+      <button class="btn btn-gold" data-action="openCatalogPage">${icon('book')} Abrir página</button>
+      <button class="btn btn-ghost" data-action="copyCatalogLink">${icon('send')} Copiar link</button>
     </div>
   </div>
-  <div class="segbar mb2">
-    <button class="${subView==='vitrine'?'on':''}" data-action="setCatalogoSubView" data-view="vitrine">${icon('book',13)} Vitrine pública</button>
-    <button class="${subView==='produtos'?'on':''}" data-action="setCatalogoSubView" data-view="produtos">${icon('edit',13)} Produtos do Catálogo</button>
-    <button class="${subView==='enviar'?'on':''}" data-action="setCatalogoSubView" data-view="enviar">${icon('send',13)} Enviar aos clientes</button>
+  <div class="cx-tabs" role="tablist">
+    <button class="${subView==='vitrine'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="vitrine">${icon('book',15)} Vitrine pública</button>
+    <button class="${subView==='produtos'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="produtos">${icon('edit',15)} Produtos do Catálogo</button>
+    <button class="${subView==='enviar'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="enviar">${icon('send',15)} Enviar aos clientes</button>
   </div>
   ${subView==='produtos' ? renderCatalogoProdutos() : subView==='enviar' ? renderCatalogoEnviar() : renderCatalogoVitrine()}
   `;
@@ -4268,23 +4324,23 @@ function renderCatalogoEnviar(){
 }
 
 function renderCatalogoCard(p){
-  const inactive = p.active===false;
+  const inactive = p.active===false, out = p.stock<=0;
   return `
-      <div class="prod-card${inactive?' inactive':''}">
-        <div class="prod-img" style="height:130px;">
-          ${p.image? `<img src="${p.image}" alt="${esc(p.name)}">` : `<span style="font-size:26px;opacity:.4;">${icon('image')}</span>`}
-          ${p.stock<=0? `<span style="position:absolute;top:8px;right:8px;background:var(--danger);color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;">indisponível</span>`:''}
-          ${inactive? `<span style="position:absolute;top:8px;left:8px;background:var(--muted);color:#fff;font-size:10px;padding:2px 6px;border-radius:10px;">inativo</span>`:''}
+      <div class="pc${inactive?' inactive':''}">
+        <div class="pc-img">
+          ${p.image? `<img src="${p.image}" alt="${esc(p.name)}" loading="lazy">` : `<div class="pc-noimg">${icon('image',26)}<span>Sem foto</span></div>`}
+          ${out? '<span class="pc-tag zero">Indisponível</span>' : '<span class="pc-tag ok">Disponível</span>'}
+          ${inactive? '<div class="pc-off">Inativo (oculto na loja)</div>':''}
         </div>
-        <div style="padding:12px;text-align:center;">
-          ${(p.brand||p.volume)? `<div class="gold-c" style="font-size:12px;">${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+'ml':''}</div>`:''}
-          <div style="font-weight:500;font-size:14px;margin-bottom:4px;">${esc(p.name)}</div>
-          <div class="serif" style="font-size:17px;color:var(--plum);margin-bottom:6px;">${brl(p.salePrice)}</div>
-          <div class="muted2" style="font-size:11.5px;margin-bottom:6px;">${p.sku?'Cód. '+esc(p.sku)+' · ':''}${p.stock>0?p.stock+' em estoque':'sem estoque'}${p.category?' · '+esc(p.category):''}</div>
-          ${p.description?`<div class="muted" style="font-size:12px;line-height:1.5;text-align:left;white-space:pre-line;margin-bottom:8px;">${esc(p.description)}</div>`:''}
-          <button class="btn ${inactive?'btn-gold':'btn-ghost'}" style="width:100%;justify-content:center;padding:6px 8px;font-size:12.5px;" data-action="toggleProductActive" data-id="${p.id}">
-            ${inactive? icon('check',13)+' Ativar' : icon('close',13)+' Desativar'}
-          </button>
+        <div class="pc-body">
+          <div class="pc-brand"><span>${p.brand? esc(p.brand) : '&nbsp;'}</span>${p.volume? `<span class="vol">${esc(p.volume)}ml</span>`:''}</div>
+          <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
+          <div class="pc-price"><b>${brl(p.salePrice)}</b></div>
+          <div class="pc-meta">${p.sku?'Cód. '+esc(p.sku)+' · ':''}${out?'sem estoque':p.stock+' em estoque'}${p.category?' · '+esc(p.category):''}</div>
+          ${p.description?`<div class="pc-desc">${esc(p.description)}</div>`:''}
+          <div style="margin-top:auto;"><button class="btn ${inactive?'btn-gold':'btn-ghost'} pc-btn" data-action="toggleProductActive" data-id="${p.id}">
+            ${inactive? icon('check',13)+' Ativar no catálogo' : icon('close',13)+' Desativar'}
+          </button></div>
         </div>
       </div>`;
 }
@@ -4294,37 +4350,27 @@ function renderCatalogoVitrine(){
   if(!state.ui.catalogShowInactive) list = list.filter(p=> p.active!==false);
   const inactiveCount = state.products.filter(p=>p.active===false).length;
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <p class="muted">Gerado a partir dos produtos em estoque${inactiveCount>0? ` · ${inactiveCount} inativo(s)`:''}</p>
-    </div>
-    <div class="flex gap flex-wrap" style="align-items:center;">
-      <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" data-field="ui.catalogOnlyAvailable" ${state.ui.catalogOnlyAvailable?'checked':''}> só disponíveis
-      </label>
-      <label style="font-size:14px;display:flex;align-items:center;gap:6px;">
-        <input type="checkbox" data-field="ui.catalogShowInactive" ${state.ui.catalogShowInactive?'checked':''}> mostrar inativos
-      </label>
-      <button class="btn btn-ghost" onclick="window.print()">${icon('printer')} Imprimir</button>
-      <button class="btn btn-ghost" data-action="openCatalogPage">${icon('book')} Abrir página</button>
-    </div>
+  <div class="cx-bar">
+    <label class="cx-switch"><input type="checkbox" data-field="ui.catalogOnlyAvailable" ${state.ui.catalogOnlyAvailable?'checked':''}> Só disponíveis</label>
+    <label class="cx-switch"><input type="checkbox" data-field="ui.catalogShowInactive" ${state.ui.catalogShowInactive?'checked':''}> Mostrar inativos${inactiveCount>0?' ('+inactiveCount+')':''}</label>
+    <span class="grow"></span>
+    <button class="btn btn-ghost" onclick="window.print()">${icon('printer')} Imprimir</button>
   </div>
-  <p class="muted2" style="font-size:11.5px;margin-bottom:16px;max-width:640px;">
-    No site, o endereço <b>catalogo.php</b> mostra este catálogo automaticamente a partir do banco (menu Servidor).
-  </p>
+  <p class="muted2" style="font-size:12px;margin:0 0 16px;max-width:680px;">Gerado automaticamente a partir dos produtos. No site, o endereço <b>catalogo.php</b> mostra este catálogo direto do banco (menu Servidor).</p>
   ${list.length===0 ? emptyState(icon('book',26),'Catálogo vazio','Cadastre produtos com estoque para gerar o catálogo.') : `
   ${(()=>{ const st = catalogStructure(list); return `
-  <nav class="catnav" aria-label="Categorias do catálogo">
-    ${st.map((g,i)=>`<a href="#${catalogSlug(i)}" class="catnav-link">${esc(g.name)} <span class="pill">${g.count}</span></a>`).join('')}
+  <nav class="cx-nav" aria-label="Categorias do catálogo">
+    ${st.map((g,i)=>`<a href="#${catalogSlug(i)}" class="fchip" style="text-decoration:none;">${esc(g.name)} <span class="n">${g.count}</span></a>`).join('')}
   </nav>
   ${st.map((g,i)=>`
     <div class="cat-section" id="${catalogSlug(i)}">
-      <div class="cat-heading">
+      <div class="cx-head">
         <span class="serif">${esc(g.name)}</span>
         <span class="pill">${g.count}</span>
       </div>
       ${g.subs.map(sub=>`
-        ${sub.name ? `<div class="subgroup-heading"><span>${icon('chart',10)} ${esc(sub.name)}</span><span class="pill">${sub.items.length}</span></div>` : ''}
-        <div class="grid grid-4 mb3">
+        ${sub.name ? `<div class="cx-sub"><span>${esc(sub.name)}</span><span class="pill">${sub.items.length}</span></div>` : ''}
+        <div class="pgrid mb3">
           ${sub.items.map(p=>renderCatalogoCard(p)).join('')}
         </div>`).join('')}
     </div>`).join('')}`; })()}
