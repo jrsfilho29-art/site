@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-y';
+const APP_VERSION = '2026.10.13-a';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1490,7 +1490,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1538,6 +1538,7 @@ function syncApplyPulled(j){
   let codesAdded = false;
   if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
   if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
+  if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
   ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
@@ -1904,7 +1905,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.pix/.test(path)) syncSchedulePush(); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -2387,6 +2388,7 @@ const actions_extras = {
     const per={}; sales.forEach(s=>s.items.forEach(i=>{ const p=pc[i.productId]||{}; const o=per[i.name]=per[i.name]||{sku:p.sku||'',cat:p.category||'',qty:0,rev:0,cost:0}; o.qty+=i.qty; o.rev+=i.subtotal; o.cost+=(p.costPrice||0)*i.qty; }));
     const lines=[['Código','Produto','Categoria','Qtd. vendida','Receita','Custo','Lucro'].map(q).join(';')];
     Object.entries(per).sort((a,b)=>b[1].qty-a[1].qty).forEach(([n,v])=>lines.push([v.sku,n,v.cat,v.qty,String(v.rev).replace('.',','),String(v.cost).replace('.',','),String(v.rev-v.cost).replace('.',',')].map(q).join(';')));
+    const sr = sellersByPeriod(sales); if(sr.length){ lines.push(''); lines.push(['Vendedor','Vendas','Total vendido','% do total','% comissão','Comissão'].map(q).join(';')); const f=n=>String(+n.toFixed(2)).replace('.',','); sr.forEach(o=>lines.push([o.name,o.n,f(o.total),f(o.share),f(o.pct),f(o.comm)].map(q).join(';'))); }
     await saveFile('relatorio-vendas-'+from+'_a_'+to+'.csv', new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
   }
 };
@@ -2500,6 +2502,7 @@ const actions_online = {
     }
     const V = state.ui.venda;
     V.customerId = c.id;
+    V.sellerId = (o.sellerId && sellersList().some(x=>x.id===o.sellerId)) ? o.sellerId : '';
     const miss=[];
     onlineItems(o).forEach(i=>{
       const p = state.products.find(x=>x.id===i.productId);
@@ -3373,6 +3376,12 @@ function renderNovaVenda(){
   <div class="grid grid-split">
     <div>
       <div class="card mb2">
+        ${sellersList().length ? `<label class="field"><span class="lbl">Vendedor (comissão)</span>
+          <select data-field="ui.venda.sellerId">
+            <option value="">Loja (principal)</option>
+            ${sellersList().map(v=>`<option value="${esc(v.id)}" ${V.sellerId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+          </select>
+        </label>`:''}
         <label class="field"><span class="lbl">Cliente</span>
           <select data-field="ui.venda.customerId">
             <option value="">Consumidor Final</option>
@@ -3599,13 +3608,14 @@ const actions_vendas = {
       payments: V.payments.filter(p=>parseFloat(p.amount)>0).map(p=>({method:p.method, amount:+parseFloat(p.amount).toFixed(2)})),
       status:'concluida'
     };
+    if(V.sellerId && sellersList().some(x=>x.id===V.sellerId)){ sale.sellerId = V.sellerId; sale.sellerName = sellerNameOf(V.sellerId); }
     state.sales.unshift(sale); persist('sales');
     state.products = state.products.map(p=>{
       const item = sale.items.find(i=>i.productId===p.id);
       return item ? {...p, stock: Math.max(0, p.stock-item.qty)} : p;
     });
     persist('products');
-    state.ui.venda = {customerId:'',search:'',cart:[],discount:0,discountType:'value',payments:[{method:'Dinheiro',amount:''}]};
+    state.ui.venda = {customerId:'',sellerId:V.sellerId||'',search:'',cart:[],discount:0,discountType:'value',payments:[{method:'Dinheiro',amount:''}]};
     state.ui.vendaView='lista';
     render();
   },
@@ -4014,6 +4024,14 @@ function renderCatalogo(){
 }
 
 
+function commissionOf(id){ if(!id) return parseFloat(state.prefs&&state.prefs.commissionMain)||0; const v=sellersList().find(x=>x.id===id); return v ? (parseFloat(v.commission)||0) : 0; }
+function sellerNameOf(id, fallback){ if(!id) return 'Loja (principal)'; const v=sellersList().find(x=>x.id===id); return v ? v.name : (fallback||'Vendedor removido'); }
+function sellersByPeriod(sales){
+  const per = {};
+  sales.forEach(s=>{ const id=s.sellerId||''; const o=per[id]=per[id]||{id, name:sellerNameOf(id, s.sellerName), n:0, total:0}; o.n++; o.total+=(+s.total||0); });
+  const grand = Object.values(per).reduce((a,o)=>a+o.total,0);
+  return Object.values(per).map(o=>{ const pct=commissionOf(o.id); return Object.assign(o,{share: grand>0?o.total/grand*100:0, pct, comm: o.total*pct/100}); }).sort((a,b)=>b.total-a.total);
+}
 function sellersList(){ return (state.prefs && Array.isArray(state.prefs.sellers)) ? state.prefs.sellers : []; }
 function currentSeller(){ const id = state.ui.catSeller||''; return id ? sellersList().find(x=>x.id===id) || null : null; }
 function catalogPublicUrl(sid){
@@ -4060,10 +4078,13 @@ function renderCatalogoEnviar(){
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Outros vendedores</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Cadastre quem mais atende clientes. Cada vendedor ganha um <b>link próprio do catálogo</b>: o botão de WhatsApp e os pedidos desse link vão para ele, e o pedido aparece em <b>Pedidos online</b> com o nome do vendedor.</p>
-    ${sellersList().length===0 ? '<p class="muted2" style="font-size:13px;margin-bottom:10px;">Nenhum vendedor extra cadastrado.</p>' : sellersList().map(v=>`
+    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;"><div><div style="font-size:14px;font-weight:600;">Loja (principal)</div><div class="muted2" style="font-size:12px;">Vendas sem vendedor escolhido</div></div>
+      <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.commissionMain" value="${esc((state.prefs&&state.prefs.commissionMain)||'')}" placeholder="0"> %</label></div>
+    ${sellersList().length===0 ? '<p class="muted2" style="font-size:13px;margin-bottom:10px;">Nenhum vendedor extra cadastrado.</p>' : sellersList().map((v,vi)=>`
     <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;">
       <div style="min-width:0;"><div style="font-size:14px;font-weight:600;">${esc(v.name)}</div><div class="muted2" style="font-size:12px;">${esc(maskPhone(waPhone(v.phone).replace(/^55/,'')))}</div></div>
-      <div class="flex gap" style="flex-wrap:wrap;">
+      <div class="flex gap" style="flex-wrap:wrap;align-items:center;">
+        <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.sellers.${vi}.commission" value="${esc(v.commission||'')}" placeholder="0"> %</label>
         <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="setCatSeller" data-id="${esc(v.id)}">Enviar como ${esc(v.name.split(' ')[0])}</button>
         <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="copySellerLink" data-id="${esc(v.id)}">Copiar link</button>
         <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;color:var(--danger);" data-action="removeSeller" data-id="${esc(v.id)}">Remover</button>
@@ -4350,6 +4371,7 @@ function renderRelatorios(){
   const custRows = Object.entries(perCust).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
   const perDay = {}; filtered.forEach(s=>{ const k=localDay(s.date); perDay[k]=(perDay[k]||0)+s.total; });
   const dayKeys = Object.keys(perDay).sort(); const maxD = dayKeys.reduce((a,k)=>Math.max(a,perDay[k]),0)||1;
+  const sellerRows = sellersByPeriod(filtered);
   const lowStock = state.products.filter(p=>p.stock<=(p.minStock||0));
   const stockValueCost = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
   const stockValueSale = state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
@@ -4381,6 +4403,13 @@ function renderRelatorios(){
     <div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Melhores clientes</h3>
       <div class="table-wrap">${custRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Cliente</th><th style="text-align:right;">Compras</th><th style="text-align:right;">Total</th></tr></thead><tbody>${custRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.n}</td><td style="text-align:right;">${brl(v.total)}</td></tr>`).join('')}</tbody></table>`}</div></div>
   </div>
+  <h3 class="serif plum" style="font-size:18px;margin-bottom:4px;">Vendas por vendedor e comissão</h3>
+  <p class="muted2" style="font-size:12px;margin:0 0 10px;">Comissão calculada sobre o total de cada venda (já com desconto). Defina o percentual de cada vendedor em Catálogo On &rarr; Enviar aos clientes.</p>
+  <div class="table-wrap mb3">${sellerRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table>
+    <thead><tr><th>Vendedor</th><th style="text-align:right;">Vendas</th><th style="text-align:right;">Total vendido</th><th style="text-align:right;">% do total</th><th style="text-align:right;">% comissão</th><th style="text-align:right;">Comissão a pagar</th></tr></thead>
+    <tbody>${sellerRows.map(o=>`<tr><td>${esc(o.name)}</td><td style="text-align:right;">${o.n}</td><td style="text-align:right;">${brl(o.total)}</td><td style="text-align:right;">${o.share.toFixed(1).replace('.',',')}%</td><td style="text-align:right;">${String(o.pct).replace('.',',')}%</td><td style="text-align:right;font-weight:600;">${brl(o.comm)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td><b>Total</b></td><td style="text-align:right;"><b>${sellerRows.reduce((a,o)=>a+o.n,0)}</b></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.total,0))}</b></td><td style="text-align:right;"><b>100%</b></td><td></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.comm,0))}</b></td></tr></tfoot>
+  </table>`}</div>
   <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Formas de pagamento</h3>
   <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">${Object.entries(perMethod).sort((a,b)=>b[1]-a[1]).map(([m,v])=>`<div class="card" style="padding:12px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">${esc(m)}</div><div class="serif" style="font-size:17px;color:var(--plum);">${brl(v)}</div></div>`).join('') || `<p class="muted2" style="font-size:13px;">Sem pagamentos no período.</p>`}</div>
   <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por produto</h3>
@@ -4607,6 +4636,8 @@ const actions_relatorios = {
       <div class="kpis"><div><small>Vendas</small><b>${sales.length}</b></div><div><small>Receita</small><b>${brl(revenue)}</b></div><div><small>Custo</small><b>${brl(cost)}</b></div><div><small>Descontos</small><b>${brl(disc)}</b></div><div><small>Lucro líquido</small><b class="${profit>=0?'pos':'neg'}">${brl(profit)}</b></div><div><small>Margem</small><b>${margin.toFixed(1)}%</b></div></div>
       <h2>Vendas por produto</h2>
       ${rows.length?`<table><thead><tr><th>Cód.</th><th>Produto</th><th class="r">Qtd.</th><th class="r">Receita</th><th class="r">Lucro</th></tr></thead><tbody>${rows.map(([n,v])=>`<tr><td>${esc(v.sku||'')}</td><td>${esc(n)}</td><td class="r">${v.qty}</td><td class="r">${brl(v.revenue)}</td><td class="r">${brl(v.revenue-v.cost)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2">Total</td><td class="r">${rows.reduce((a,[,v])=>a+v.qty,0)}</td><td class="r">${brl(revenue)}</td><td class="r">${brl(revenue-cost)}</td></tr></tfoot></table>`:'<p class="sm">Sem vendas no período.</p>'}
+      <h2>Vendas por vendedor e comissão</h2>
+      ${(()=>{ const sr=sellersByPeriod(sales); return sr.length?`<table><thead><tr><th>Vendedor</th><th class="r">Vendas</th><th class="r">Total</th><th class="r">% do total</th><th class="r">% comissão</th><th class="r">Comissão</th></tr></thead><tbody>${sr.map(o=>`<tr><td>${esc(o.name)}</td><td class="r">${o.n}</td><td class="r">${brl(o.total)}</td><td class="r">${o.share.toFixed(1).replace('.',',')}%</td><td class="r">${String(o.pct).replace('.',',')}%</td><td class="r">${brl(o.comm)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${sr.reduce((a,o)=>a+o.n,0)}</td><td class="r">${brl(sr.reduce((a,o)=>a+o.total,0))}</td><td class="r">100%</td><td></td><td class="r">${brl(sr.reduce((a,o)=>a+o.comm,0))}</td></tr></tfoot></table>`:'<p>Sem vendas no período.</p>'; })()}
       <h2>Estoque</h2>
       <div class="kpis"><div><small>Valor (custo)</small><b>${brl(sv)}</b></div><div><small>Valor (venda)</small><b>${brl(ss)}</b></div><div><small>Produtos em alerta</small><b>${low.length}</b></div></div>
       ${low.length?`<table><thead><tr><th>Cód.</th><th>Produto em alerta</th><th class="r">Estoque</th><th class="r">Mínimo</th></tr></thead><tbody>${low.map(p=>`<tr><td>${esc(p.sku||'')}</td><td>${esc(p.name)}</td><td class="r neg">${p.stock}</td><td class="r">${p.minStock||0}</td></tr>`).join('')}</tbody></table>`:''}

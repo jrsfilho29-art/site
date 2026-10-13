@@ -55,6 +55,14 @@ catch(Throwable $e){
   catch(Throwable $e2){ $hasRole = false; }
 }
 
+/* ---- vendedor da venda (comissões): cria as colunas sozinho em bancos antigos ---- */
+$salesSeller = true;
+try{ $pdo->query('SELECT seller_id, seller_name FROM sales LIMIT 1'); }
+catch(Throwable $e){
+  try{ $pdo->exec('ALTER TABLE sales ADD COLUMN seller_id VARCHAR(30) DEFAULT NULL'); $pdo->exec('ALTER TABLE sales ADD COLUMN seller_name VARCHAR(80) DEFAULT NULL'); }
+  catch(Throwable $e2){ $salesSeller = false; }
+}
+
 /* ---- colunas extras de clientes (código e endereço): criadas sozinhas em bancos antigos ---- */
 $custExtra = ['code'=>20, 'number'=>20, 'district'=>120, 'city'=>120, 'state'=>10, 'zip'=>12];
 $custHas = [];
@@ -157,7 +165,7 @@ try{
       'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
       'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
-      'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''),
+      'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
       'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
     ], $r)]);
   }
@@ -230,6 +238,8 @@ try{
         'payments'=>$pays[$r['id']] ?? [], 'status'=>$r['status']
       ];
       if($r['order_id']) $o['orderId'] = $r['order_id'];
+      if(!empty($r['seller_id'])) $o['sellerId'] = $r['seller_id'];
+      if(!empty($r['seller_name'])) $o['sellerName'] = $r['seller_name'];
       return $o;
     }, rows($pdo, 'SELECT * FROM sales ORDER BY date DESC, id DESC'));
 
@@ -251,7 +261,7 @@ try{
 
     $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
     $__px = json_decode((string)getMeta($pdo, 'pix'), true);
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass()];
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main')];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -318,13 +328,15 @@ try{
         ]);
       }
 
-      $st  = $ins('INSERT INTO sales (id,date,customer_id,customer_name,subtotal,discount,total,status,order_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
+      $st  = $salesSeller ? $ins('INSERT INTO sales (id,date,customer_id,customer_name,subtotal,discount,total,status,order_id,created_at,seller_id,seller_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+                          : $ins('INSERT INTO sales (id,date,customer_id,customer_name,subtotal,discount,total,status,order_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
       $sti = $ins('INSERT INTO sale_items (sale_id,product_id,name,qty,unit_price,subtotal) VALUES (?,?,?,?,?,?)');
       $stp = $ins('INSERT INTO sale_payments (sale_id,method,amount) VALUES (?,?,?)');
       foreach($d['sales'] as $sa){
         $dt = toDt($sa['date']??null) ?? gmdate('Y-m-d H:i:s');
         $st->execute([s($sa['id']??''), $dt, sn($sa['customerId']??null), s($sa['customerName']??'Consumidor Final'),
-          num($sa['subtotal']??0), num($sa['discount']??0), num($sa['total']??0), s($sa['status']??'concluida'), sn($sa['orderId']??null), $dt]);
+          num($sa['subtotal']??0), num($sa['discount']??0), num($sa['total']??0), s($sa['status']??'concluida'), sn($sa['orderId']??null), $dt]
+          + ($salesSeller ? [10=>mb_substr(s($sa['sellerId']??''), 0, 30), 11=>mb_substr(s($sa['sellerName']??''), 0, 80)] : []));
         foreach(($sa['items']??[]) as $i){
           $sti->execute([s($sa['id']), sn($i['productId']??null), s($i['name']??''), (int)num($i['qty']??1), num($i['unitPrice']??0), num($i['subtotal']??0)]);
         }
@@ -358,12 +370,15 @@ try{
           $__nm = trim(strip_tags((string)($__s['name'] ?? '')));
           $__ph = substr(preg_replace('/\D/', '', (string)($__s['phone'] ?? '')), 0, 20);
           if($__id === '' || strlen($__id) > 24 || $__nm === '' || strlen($__ph) < 10) continue;
-          $__out[] = ['id'=>$__id, 'name'=>mb_substr($__nm, 0, 60), 'phone'=>$__ph];
+          $__out[] = ['id'=>$__id, 'name'=>mb_substr($__nm, 0, 60), 'phone'=>$__ph, 'commission'=>max(0, min(100, round((float)str_replace(',', '.', (string)($__s['commission'] ?? 0)), 2)))];
         }
         setMeta($pdo, 'sellers', json_encode($__out, JSON_UNESCAPED_UNICODE));
       }
       if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('whatsapp', $d['settings']) && preg_replace('/\D/', '', (string)$d['settings']['whatsapp']) !== ''){
         setMeta($pdo, 'whatsapp', substr(preg_replace('/\D/', '', (string)$d['settings']['whatsapp']), 0, 20));
+      }
+      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('commissionMain', $d['settings'])){
+        setMeta($pdo, 'commission_main', (string)max(0, min(100, round((float)str_replace(',', '.', (string)$d['settings']['commissionMain']), 2))));
       }
       if($authRole === 'admin' && isset($d['settings']['pix']) && is_array($d['settings']['pix'])){
         $__p = $d['settings']['pix'];
