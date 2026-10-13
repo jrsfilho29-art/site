@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-f';
+const APP_VERSION = '2026.10.13-g';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1868,6 +1868,26 @@ function attachDelegatedEvents(){
     const t = e.target;
     if(t.dataset.field){ try{ handleFieldInput(t); }catch(err){ console.error('Field change failed:', err); } }
     if(t.dataset.fileField){ handleFileInput(t).catch(err=>{ console.error('File field failed:', err); notify.err('Não foi possível carregar essa imagem.'); }); }
+  });
+  /* Enter nos formulários (janelas e login): vai para o próximo campo; no último, executa a ação do formulário */
+  app.addEventListener('keydown', e => {
+    if(e.key!=='Enter' || e.isComposing || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+    const t = e.target; if(!t || !t.closest || (t.tagName!=='INPUT' && t.tagName!=='SELECT')) return;
+    if(['checkbox','radio','file','color','button','submit','range'].indexOf(t.type)>=0) return;
+    const scope = t.closest('.modal-box, .login-wrap'); if(!scope) return;
+    const ea = t.dataset.enterAction;
+    if(ea && !/^(loginSubmit|submit)/.test(ea)) return;   /* campos de busca/adicionar têm a própria ação */
+    const fields = Array.prototype.slice.call(scope.querySelectorAll('input,select')).filter(x=> !x.disabled && x.type!=='hidden' && ['checkbox','radio','file','color','button','submit','range'].indexOf(x.type)<0 && x.tabIndex>=0 && x.offsetParent!==null);
+    const nxt = fields[fields.indexOf(t)+1];
+    if(nxt){
+      e.preventDefault(); e.stopImmediatePropagation();
+      nxt.focus(); if(nxt.tagName==='INPUT'){ try{ nxt.select(); }catch(err){} }
+      return;
+    }
+    if(!ea){
+      const prim = scope.querySelectorAll('.btn-gold[data-action]');
+      if(prim.length===1){ e.preventDefault(); e.stopImmediatePropagation(); prim[0].click(); }
+    }
   });
   app.addEventListener('keydown', e => {
     if(e.key==='Enter' && e.target.dataset && e.target.dataset.enterAction){
