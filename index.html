@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-d';
+const APP_VERSION = '2026.10.13-e';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1766,7 +1766,11 @@ function persist(key){
 }
 
 /* ================= render engine ================= */
+const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza']];
+function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
 function applyPrefs(){
+  const bg = state.prefs && state.prefs.bgColor;
+  document.body.style.background = (bg && bgOk(bg)) ? bg : '';
   document.documentElement.style.removeProperty('--cream');   /* cor de fundo personalizada foi removida: volta ao padrão */
 }
 let _sessTab = null;
@@ -1906,6 +1910,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
+  if(path==='prefs.bgColor'){ persist('prefs'); if(!bgOk(val)) notify.err('Cor muito escura: o texto ficaria difícil de ler. Escolha uma cor clara.'); applyPrefs(); return; }   /* sem render: o seletor de cor do navegador não pode ser refeito enquanto se arrasta */
   if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
@@ -2186,10 +2191,15 @@ function renderDashboard(){
   const topMax = top.length ? top[0][1].rev : 1;
 
   return `
-  <div class="flex gap flex-wrap mb3">
+  <div class="flex gap flex-wrap mb3" style="align-items:center;">
     <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
+    <div class="bgpick" style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor de fundo do aplicativo">
+      <span class="muted2" style="font-size:12px;">Fundo</span>
+      ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
+      <input type="color" data-field="prefs.bgColor" value="${(state.prefs&&state.prefs.bgColor)||'#F1F1F8'}" title="Outra cor (use cores claras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
+    </div>
   </div>
   <div class="grid grid-4 kpi-grid mb3">
     ${cards.map(([label,val,sub,ic])=>`
@@ -2488,6 +2498,7 @@ const actions_online = {
     openNewTab(u);
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
   },
+  setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; persist('prefs'); render(); },
   toggleOnlineSound(){
     state.prefs = state.prefs||{}; state.prefs.soundOnline = !soundOn(); persist('prefs');
     if(state.prefs.soundOnline) playOrderSound(true);
