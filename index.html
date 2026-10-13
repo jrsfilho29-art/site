@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-a';
+const APP_VERSION = '2026.10.13-b';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2382,14 +2382,10 @@ const actions_extras = {
     state.ui.modal=null; render();
   },
   async exportRelatorio(){
-    const from=state.ui.relFrom, to=state.ui.relTo; const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-    const sales = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
-    const pc={}; state.products.forEach(p=>pc[p.id]=p);
-    const per={}; sales.forEach(s=>s.items.forEach(i=>{ const p=pc[i.productId]||{}; const o=per[i.name]=per[i.name]||{sku:p.sku||'',cat:p.category||'',qty:0,rev:0,cost:0}; o.qty+=i.qty; o.rev+=i.subtotal; o.cost+=(p.costPrice||0)*i.qty; }));
-    const lines=[['Código','Produto','Categoria','Qtd. vendida','Receita','Custo','Lucro'].map(q).join(';')];
-    Object.entries(per).sort((a,b)=>b[1].qty-a[1].qty).forEach(([n,v])=>lines.push([v.sku,n,v.cat,v.qty,String(v.rev).replace('.',','),String(v.cost).replace('.',','),String(v.rev-v.cost).replace('.',',')].map(q).join(';')));
-    const sr = sellersByPeriod(sales); if(sr.length){ lines.push(''); lines.push(['Vendedor','Vendas','Total vendido','% do total','% comissão','Comissão'].map(q).join(';')); const f=n=>String(+n.toFixed(2)).replace('.',','); sr.forEach(o=>lines.push([o.name,o.n,f(o.total),f(o.share),f(o.pct),f(o.comm)].map(q).join(';'))); }
-    await saveFile('relatorio-vendas-'+from+'_a_'+to+'.csv', new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+    const from=state.ui.relFrom, to=state.ui.relTo, T=relType(); const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const R = relTables(T, from, to); const lines=[];
+    R.tables.forEach(t=>{ if(lines.length) lines.push(''); lines.push(q(t.title)); lines.push(t.head.map(q).join(';')); t.rows.forEach(r=>lines.push(r.map(q).join(';'))); if(t.foot) lines.push(t.foot.map(q).join(';')); });
+    await saveFile('relatorio-'+T+'-'+from+'_a_'+to+'.csv', new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
   }
 };
 
@@ -4347,7 +4343,44 @@ function renderCaixa(){
 }
 
 /* ================= relatorios ================= */
+
+function relTables(T, from, to){
+  const sales = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
+  const pm = {}; state.products.forEach(p=>pm[p.id]=p);
+  const f2 = n => (+n||0).toFixed(2).replace('.',','), pc = n => (+n||0).toFixed(1).replace('.',',')+'%';
+  let revenue=0, cost=0; const prod={}, cat={}, cust={}, meth={}, day={};
+  sales.forEach(s=>{
+    s.items.forEach(i=>{
+      const p=pm[i.productId]||{}, c=(p.costPrice||0)*i.qty; revenue+=i.subtotal; cost+=c;
+      const o=prod[i.name]=prod[i.name]||{sku:p.sku||'',qty:0,rev:0,cost:0}; o.qty+=i.qty; o.rev+=i.subtotal; o.cost+=c;
+      const k=(p.category||'').trim()||'Sem categoria'; const g=cat[k]=cat[k]||{qty:0,rev:0}; g.qty+=i.qty; g.rev+=i.subtotal;
+    });
+    const k=s.customerName||'Consumidor Final'; const o=cust[k]=cust[k]||{n:0,total:0}; o.n++; o.total+=s.total;
+    (s.payments||[]).forEach(x=>{ meth[x.method]=(meth[x.method]||0)+x.amount; });
+    const d=localDay(s.date); day[d]=(day[d]||0)+s.total;
+  });
+  const disc = sales.reduce((a,s)=>a+(s.discount||0),0), profit = revenue-cost-disc;
+  const T_ = [];
+  const want = k => T==='geral' || T===k;
+  if(want('lucro')) T_.push({key:'lucro', title:'Lucratividade', head:['Vendas','Receita','Custo','Descontos','Lucro líquido','Margem'], rows:[[sales.length, 'R$ '+f2(revenue), 'R$ '+f2(cost), 'R$ '+f2(disc), 'R$ '+f2(profit), revenue>0?pc(profit/revenue*100):'0,0%']]});
+  if(want('vendedor')){ const sr=sellersByPeriod(sales); T_.push({key:'vendedor', title:'Vendas por vendedor e comissão', head:['Vendedor','Vendas','Total vendido','% do total','% comissão','Comissão a pagar'], rows:sr.map(o=>[o.name,o.n,'R$ '+f2(o.total),pc(o.share),pc(o.pct),'R$ '+f2(o.comm)]), foot:sr.length?['Total',sr.reduce((a,o)=>a+o.n,0),'R$ '+f2(sr.reduce((a,o)=>a+o.total,0)),'100%','','R$ '+f2(sr.reduce((a,o)=>a+o.comm,0))]:null}); }
+  if(want('produto')) T_.push({key:'produto', title:'Vendas por produto', head:['Código','Produto','Qtd. vendida','Receita','Custo','Lucro'], rows:Object.entries(prod).sort((a,b)=>b[1].qty-a[1].qty).map(([n,v])=>[v.sku,n,v.qty,'R$ '+f2(v.rev),'R$ '+f2(v.cost),'R$ '+f2(v.rev-v.cost)])});
+  if(want('categoria')) T_.push({key:'categoria', title:'Vendas por categoria', head:['Categoria','Qtd. vendida','Receita','% da receita'], rows:Object.entries(cat).sort((a,b)=>b[1].rev-a[1].rev).map(([n,v])=>[n,v.qty,'R$ '+f2(v.rev),pc(revenue>0?v.rev/revenue*100:0)])});
+  if(want('cliente')) T_.push({key:'cliente', title:'Melhores clientes', head:['Cliente','Compras','Total'], rows:Object.entries(cust).sort((a,b)=>b[1].total-a[1].total).slice(0,T==='cliente'?50:10).map(([n,v])=>[n,v.n,'R$ '+f2(v.total)])});
+  if(want('pagamento')){ const tot=Object.values(meth).reduce((a,b)=>a+b,0); T_.push({key:'pagamento', title:'Formas de pagamento', head:['Forma','Total recebido','% do total'], rows:Object.entries(meth).sort((a,b)=>b[1]-a[1]).map(([n,v])=>[n,'R$ '+f2(v),pc(tot>0?v/tot*100:0)])}); }
+  if(want('dia')) T_.push({key:'dia', title:'Vendas por dia', head:['Dia','Total vendido'], rows:Object.keys(day).sort().map(k=>[k.split('-').reverse().join('/'),'R$ '+f2(day[k])])});
+  if(want('estoque')){
+    const sv=state.products.reduce((a,p)=>a+p.stock*p.costPrice,0), ss=state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
+    T_.push({key:'estoque', title:'Estoque', head:['Valor (custo)','Valor (venda)','Produtos'], rows:[['R$ '+f2(sv),'R$ '+f2(ss),state.products.length]]});
+    const low=state.products.filter(p=>p.stock<=(p.minStock||0));
+    T_.push({key:'estoque', title:'Produtos em alerta de estoque', head:['Código','Produto','Estoque','Mínimo'], rows:low.map(p=>[p.sku||'',p.name,p.stock,p.minStock||0])});
+  }
+  return {tables:T_, count:sales.length};
+}
+const REL_TYPES = [['geral','Relatório geral (completo)'],['lucro','Lucratividade'],['vendedor','Vendas por vendedor e comissão'],['produto','Vendas por produto'],['categoria','Vendas por categoria'],['cliente','Melhores clientes'],['pagamento','Formas de pagamento'],['dia','Vendas por dia'],['estoque','Estoque']];
+function relType(){ const t = state.ui.relType||'geral'; return REL_TYPES.some(r=>r[0]===t) ? t : 'geral'; }
 function renderRelatorios(){
+  const T = relType(), show = k => T==='geral' || T===k;
   const from = state.ui.relFrom, to = state.ui.relTo;
   const filtered = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
   const productCost = {}; state.products.forEach(p=> productCost[p.id]=p.costPrice);
@@ -4380,39 +4413,41 @@ function renderRelatorios(){
   <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Relatórios</h2>
   <p class="muted mb2">Lucratividade, vendas e estoque</p>
   <div class="flex gap flex-wrap mb3" style="align-items:end;">
+    <label class="field" style="margin-bottom:0;min-width:210px;"><span class="lbl">Tipo de relatório</span>
+      <select data-field="ui.relType">${REL_TYPES.map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.relFrom" value="${from}"></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.relTo" value="${to}"></label>
     <button class="btn btn-gold" data-action="printRelatorio">${icon('printer')} Imprimir relatório</button>
     <button class="btn btn-ghost" data-action="exportRelatorio">${icon('download')} Exportar CSV</button>
   </div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
+  ${show('lucro')?`<h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
   <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Receita</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(revenue)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Custo</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(cost)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Lucro líquido</div><div class="serif" style="font-size:20px;" class="${profit>=0?'ok-c':'danger-c'}">${brl(profit)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Margem</div><div class="serif" style="font-size:20px;color:var(--plum);">${margin.toFixed(1)}%</div></div>
-  </div>
-  ${dayKeys.length>1 ? `
+  </div>`:''}
+  ${dayKeys.length>(T==='dia'?0:1) && show('dia') ? `
   <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por dia</h3>
   <div class="card mb3" style="padding:12px 14px;overflow-x:auto;"><div style="display:flex;align-items:flex-end;gap:6px;height:130px;min-width:${dayKeys.length*26}px;">
     ${dayKeys.map(k=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;" title="${k.split('-').reverse().join('/')} · ${brl(perDay[k])}"><div style="width:100%;max-width:34px;height:${Math.max(3,Math.round(perDay[k]/maxD*100))}%;background:linear-gradient(180deg,var(--gold),var(--gold-deep));border-radius:3px 3px 0 0;"></div><span class="muted2" style="font-size:10px;margin-top:3px;">${k.slice(8)}/${k.slice(5,7)}</span></div>`).join('')}
   </div></div>` : ''}
-  <div class="grid grid-2 mb3" style="align-items:start;">
-    <div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por categoria</h3>
-      <div class="table-wrap">${catRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Categoria</th><th style="text-align:right;">Qtd.</th><th style="text-align:right;">Receita</th><th style="text-align:right;">%</th></tr></thead><tbody>${catRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.qty}</td><td style="text-align:right;">${brl(v.revenue)}</td><td style="text-align:right;">${revenue>0?Math.round(v.revenue/revenue*100):0}%</td></tr>`).join('')}</tbody></table>`}</div></div>
-    <div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Melhores clientes</h3>
-      <div class="table-wrap">${custRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Cliente</th><th style="text-align:right;">Compras</th><th style="text-align:right;">Total</th></tr></thead><tbody>${custRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.n}</td><td style="text-align:right;">${brl(v.total)}</td></tr>`).join('')}</tbody></table>`}</div></div>
+  <div class="grid ${T==='geral'?'grid-2':''} mb3" style="align-items:start;">
+    ${show('categoria')?`<div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por categoria</h3>
+      <div class="table-wrap">${catRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Categoria</th><th style="text-align:right;">Qtd.</th><th style="text-align:right;">Receita</th><th style="text-align:right;">%</th></tr></thead><tbody>${catRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.qty}</td><td style="text-align:right;">${brl(v.revenue)}</td><td style="text-align:right;">${revenue>0?Math.round(v.revenue/revenue*100):0}%</td></tr>`).join('')}</tbody></table>`}</div></div>`:''}
+    ${show('cliente')?`    <div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Melhores clientes</h3>
+      <div class="table-wrap">${custRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Cliente</th><th style="text-align:right;">Compras</th><th style="text-align:right;">Total</th></tr></thead><tbody>${custRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.n}</td><td style="text-align:right;">${brl(v.total)}</td></tr>`).join('')}</tbody></table>`}</div></div>`:''}
   </div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:4px;">Vendas por vendedor e comissão</h3>
+  ${show('vendedor')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:4px;">Vendas por vendedor e comissão</h3>
   <p class="muted2" style="font-size:12px;margin:0 0 10px;">Comissão calculada sobre o total de cada venda (já com desconto). Defina o percentual de cada vendedor em Catálogo On &rarr; Enviar aos clientes.</p>
   <div class="table-wrap mb3">${sellerRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table>
     <thead><tr><th>Vendedor</th><th style="text-align:right;">Vendas</th><th style="text-align:right;">Total vendido</th><th style="text-align:right;">% do total</th><th style="text-align:right;">% comissão</th><th style="text-align:right;">Comissão a pagar</th></tr></thead>
     <tbody>${sellerRows.map(o=>`<tr><td>${esc(o.name)}</td><td style="text-align:right;">${o.n}</td><td style="text-align:right;">${brl(o.total)}</td><td style="text-align:right;">${o.share.toFixed(1).replace('.',',')}%</td><td style="text-align:right;">${String(o.pct).replace('.',',')}%</td><td style="text-align:right;font-weight:600;">${brl(o.comm)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td><b>Total</b></td><td style="text-align:right;"><b>${sellerRows.reduce((a,o)=>a+o.n,0)}</b></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.total,0))}</b></td><td style="text-align:right;"><b>100%</b></td><td></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.comm,0))}</b></td></tr></tfoot>
-  </table>`}</div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Formas de pagamento</h3>
-  <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">${Object.entries(perMethod).sort((a,b)=>b[1]-a[1]).map(([m,v])=>`<div class="card" style="padding:12px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">${esc(m)}</div><div class="serif" style="font-size:17px;color:var(--plum);">${brl(v)}</div></div>`).join('') || `<p class="muted2" style="font-size:13px;">Sem pagamentos no período.</p>`}</div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por produto</h3>
+  </table>`}</div>`:''}
+  ${show('pagamento')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Formas de pagamento</h3>
+  <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">${Object.entries(perMethod).sort((a,b)=>b[1]-a[1]).map(([m,v])=>`<div class="card" style="padding:12px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">${esc(m)}</div><div class="serif" style="font-size:17px;color:var(--plum);">${brl(v)}</div></div>`).join('') || `<p class="muted2" style="font-size:13px;">Sem pagamentos no período.</p>`}</div>`:''}
+  ${show('produto')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por produto</h3>
   <div class="table-wrap mb3">
     ${topProducts.length===0 ? `<div style="padding:24px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período selecionado.</div>` : `
     <table>
@@ -4421,8 +4456,8 @@ function renderRelatorios(){
         <tr><td class="muted">${esc(v.sku||'')}</td><td>${esc(name)}</td><td style="text-align:right;">${v.qty}</td><td style="text-align:right;">${brl(v.revenue)}</td><td style="text-align:right;">${brl(v.revenue-v.cost)}</td></tr>
       `).join('')}</tbody>
     </table>`}
-  </div>
-  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Estoque</h3>
+  </div>`:''}
+  ${show('estoque')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Estoque</h3>
   <div class="grid grid-3 mb2">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor do estoque (custo)</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(stockValueCost)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor do estoque (venda)</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(stockValueSale)}</div></div>
@@ -4434,7 +4469,7 @@ function renderRelatorios(){
       <div class="flex-between" style="padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;">
         <span>${pcode(p)} ${esc(p.name)}</span><span class="danger-c">${p.stock} un. (mín. ${p.minStock||0})</span>
       </div>`).join('')}
-  </div>`:''}
+  </div>`:''}`:''}
   `;
 }
 
@@ -4617,30 +4652,17 @@ function renderServidorGuia(){
 
 const actions_relatorios = {
   printRelatorio(){
-    const from=state.ui.relFrom, to=state.ui.relTo;
-    const sales = state.sales.filter(s=> s.status!=='cancelada' && localDay(s.date)>=from && localDay(s.date)<=to);
-    const pc={}; state.products.forEach(p=>pc[p.id]=p.costPrice);
-    let revenue=0,cost=0; const per={};
-    sales.forEach(s=>s.items.forEach(i=>{ revenue+=i.subtotal; const c=(pc[i.productId]??0)*i.qty; cost+=c;
-      const o=per[i.name]=per[i.name]||{qty:0,revenue:0,cost:0,sku:(state.products.find(p=>p.id===i.productId)||{}).sku||''}; o.qty+=i.qty;o.revenue+=i.subtotal;o.cost+=c; }));
-    const disc=sales.reduce((a,s)=>a+(s.discount||0),0), profit=revenue-cost-disc, margin=revenue>0?profit/revenue*100:0;
-    const rows=Object.entries(per).sort((a,b)=>b[1].qty-a[1].qty);
-    const low=state.products.filter(p=>p.stock<=(p.minStock||0));
-    const sv=state.products.reduce((a,p)=>a+p.stock*p.costPrice,0), ss=state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
+    const from=state.ui.relFrom, to=state.ui.relTo, T=relType();
+    const R = relTables(T, from, to);
     const d=x=>x.split('-').reverse().join('/');
-    const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório ${d(from)} a ${d(to)}</title><style>${invPrintCSS()}
+    const label = (REL_TYPES.find(r=>r[0]===T)||[0,'Relatório'])[1];
+    const rt=(t,i)=> i>0 && t.rows.length && /^(R\$ |-?[\d.,]+%?$)/.test(String(t.rows[0][i]));
+    const tbl = t => `<h2>${esc(t.title)}</h2>${t.rows.length?`<table><thead><tr>${t.head.map((h,i)=>`<th${rt(t,i)?' class="r"':''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r=>`<tr>${r.map((c,i)=>`<td${rt(t,i)?' class="r"':''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>${t.foot?`<tfoot><tr>${t.foot.map((c,i)=>`<td${rt(t,i)?' class="r"':''}>${esc(c)}</td>`).join('')}</tr></tfoot>`:''}</table>`:'<p>Sem dados no período.</p>'}`;
+    const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(label)} ${d(from)} a ${d(to)}</title><style>${invPrintCSS()}
       td{height:auto;padding:4px 5px;} td.r,th.r{text-align:right;} .kpis{display:flex;gap:8px;margin:8px 0 6px;} .kpis div{flex:1;border:1px solid #888;padding:6px 8px;} .kpis small{display:block;color:#555;font-size:10px;} .kpis b{font-size:14px;}
       tfoot td{font-weight:700;background:#f2f2f2;}</style></head><body>
-      <h1>ESSÊNCIA · RELATÓRIO</h1><div class="sub">Período: ${d(from)} a ${d(to)} · Emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(state.currentUser.name)}</div>
-      <h2>Lucratividade</h2>
-      <div class="kpis"><div><small>Vendas</small><b>${sales.length}</b></div><div><small>Receita</small><b>${brl(revenue)}</b></div><div><small>Custo</small><b>${brl(cost)}</b></div><div><small>Descontos</small><b>${brl(disc)}</b></div><div><small>Lucro líquido</small><b class="${profit>=0?'pos':'neg'}">${brl(profit)}</b></div><div><small>Margem</small><b>${margin.toFixed(1)}%</b></div></div>
-      <h2>Vendas por produto</h2>
-      ${rows.length?`<table><thead><tr><th>Cód.</th><th>Produto</th><th class="r">Qtd.</th><th class="r">Receita</th><th class="r">Lucro</th></tr></thead><tbody>${rows.map(([n,v])=>`<tr><td>${esc(v.sku||'')}</td><td>${esc(n)}</td><td class="r">${v.qty}</td><td class="r">${brl(v.revenue)}</td><td class="r">${brl(v.revenue-v.cost)}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2">Total</td><td class="r">${rows.reduce((a,[,v])=>a+v.qty,0)}</td><td class="r">${brl(revenue)}</td><td class="r">${brl(revenue-cost)}</td></tr></tfoot></table>`:'<p class="sm">Sem vendas no período.</p>'}
-      <h2>Vendas por vendedor e comissão</h2>
-      ${(()=>{ const sr=sellersByPeriod(sales); return sr.length?`<table><thead><tr><th>Vendedor</th><th class="r">Vendas</th><th class="r">Total</th><th class="r">% do total</th><th class="r">% comissão</th><th class="r">Comissão</th></tr></thead><tbody>${sr.map(o=>`<tr><td>${esc(o.name)}</td><td class="r">${o.n}</td><td class="r">${brl(o.total)}</td><td class="r">${o.share.toFixed(1).replace('.',',')}%</td><td class="r">${String(o.pct).replace('.',',')}%</td><td class="r">${brl(o.comm)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${sr.reduce((a,o)=>a+o.n,0)}</td><td class="r">${brl(sr.reduce((a,o)=>a+o.total,0))}</td><td class="r">100%</td><td></td><td class="r">${brl(sr.reduce((a,o)=>a+o.comm,0))}</td></tr></tfoot></table>`:'<p>Sem vendas no período.</p>'; })()}
-      <h2>Estoque</h2>
-      <div class="kpis"><div><small>Valor (custo)</small><b>${brl(sv)}</b></div><div><small>Valor (venda)</small><b>${brl(ss)}</b></div><div><small>Produtos em alerta</small><b>${low.length}</b></div></div>
-      ${low.length?`<table><thead><tr><th>Cód.</th><th>Produto em alerta</th><th class="r">Estoque</th><th class="r">Mínimo</th></tr></thead><tbody>${low.map(p=>`<tr><td>${esc(p.sku||'')}</td><td>${esc(p.name)}</td><td class="r neg">${p.stock}</td><td class="r">${p.minStock||0}</td></tr>`).join('')}</tbody></table>`:''}
+      <h1>ESSÊNCIA · ${esc(label.toUpperCase())}</h1><div class="sub">Período: ${d(from)} a ${d(to)} · Emitido em ${new Date().toLocaleString('pt-BR')} por ${esc(state.currentUser.name)}</div>
+      ${R.tables.map(tbl).join('')}
       </body></html>`;
     printHTML(html);
   }
