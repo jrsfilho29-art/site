@@ -441,7 +441,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.12-u';
+const APP_VERSION = '2026.10.12-v';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1900,6 +1900,8 @@ function handleFieldInput(t){
     if(val !== t.value) t.value = val;
   }
   setPath(state, path, val);
+  /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
+  if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
   if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp') syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
@@ -1946,13 +1948,13 @@ function renderLogin(){
         </label>
         <label class="field"><span class="lbl">Senha</span>
           <div class="relative">
-            <input id="login-password" type="${L.showPw?'text':'password'}" data-field="ui.login.password" value="${esc(L.password)}" style="padding-right:34px;" autocomplete="${mode==='login'?'current-password':'new-password'}" data-enter-action="loginSubmit">
+            <input id="login-password" type="${L.showPw?'text':'password'}" data-field="ui.login.password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(L.password)}" style="padding-right:34px;" autocomplete="${mode==='login'?'current-password':'new-password'}" data-enter-action="loginSubmit">
             <button type="button" class="icon-btn" style="position:absolute;right:8px;top:8px;" title="Mostrar/ocultar senha" aria-label="Mostrar ou ocultar senha" data-action="toggleShowPw">${L.showPw?icon('eyeoff'):icon('eye')}</button>
           </div>
         </label>
         ${mode!=='login' ? `
         <label class="field"><span class="lbl">Confirmar senha</span>
-          <input id="login-confirm" type="${L.showPw?'text':'password'}" data-field="ui.login.confirm" value="${esc(L.confirm)}" autocomplete="new-password" data-enter-action="loginSubmit">
+          <input id="login-confirm" type="${L.showPw?'text':'password'}" data-field="ui.login.confirm" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" value="${esc(L.confirm)}" autocomplete="new-password" data-enter-action="loginSubmit">
         </label>`:''}
         ${L.error ? `<div class="danger-c" style="font-size:14px;margin-bottom:12px;">${esc(L.error)}</div>`:''}
         <button class="btn btn-gold btn-block" data-action="loginSubmit" ${L.busy?'disabled':''}>
