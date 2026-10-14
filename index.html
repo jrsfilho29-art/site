@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-n';
+const APP_VERSION = '2026.10.13-o';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1890,7 +1890,7 @@ function persist(key){
 /* ================= render engine ================= */
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
-const HERO_PRESETS = [['','Padrão'],['#0D1230','Azul noite'],['#4A1230','Vinho'],['#0F3B33','Verde'],['#3B1F5C','Roxo'],['#5A2A0E','Marrom'],['#1F2937','Grafite'],['#7A1F2B','Vermelho']];
+const HERO_PRESETS = [['','Padrão'],['#0D1230','Azul noite'],['#0B2A5B','Azul marinho'],['#123F8C','Azul royal'],['#1D5FBF','Azul'],['#0E6BA8','Azul oceano'],['#1B7FA8','Azul petróleo'],['#2F80ED','Azul claro']];
 function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) <= 130; }   /* só cores escuras: o texto do cabeçalho é branco */
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
