@@ -100,7 +100,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
     foreach($want as $pid => $q){
       $st->execute([$pid]); $pr = $st->fetch();
       if(!$pr) $jerr(404, 'Um dos produtos não está mais disponível. Atualize a página e confira seu carrinho.');
-      if($q > 20) $jerr(422, 'Quantidade inválida.');
+      if($q > 100000) $jerr(422, 'Quantidade inválida.');
       if($q > (int)$pr['stock']) $jerr(422, 'Só temos '.(int)$pr['stock'].' unidade(s) de '.$pr['name'].'.');
       $price = eff_price($pr);
       $items[] = ['productId'=>$pr['id'], 'name'=>$pr['name'], 'qty'=>$q, 'unitPrice'=>$price];
@@ -252,7 +252,7 @@ function card($p){
   global $WHATSAPP, $__base, $SELLER_ID;
   if($__promo) $attrs .= ' data-promo="1" data-old="'.e(brl($p['sale_price'])).'"';
   if($__new) $attrs .= ' data-new="1"';
-  $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format($__eff, 2, '.', '')).'" data-st="'.(int)min(20, (int)$p['stock']).'"';
+  $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format($__eff, 2, '.', '')).'" data-st="'.(int)$p['stock'].'"';
   if($WHATSAPP !== ''){
     $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']).($SELLER_ID !== '' ? '&vend='.rawurlencode($SELLER_ID) : '');   /* o WhatsApp mostra a foto do produto na prévia deste link */
     $__d = substr($WHATSAPP, 2); $__ph = strlen($__d) >= 10 ? '('.substr($__d,0,2).') '.substr($__d,2,strlen($__d)-6).'-'.substr($__d,-4) : $__d;
@@ -661,7 +661,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-z</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-zz</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>

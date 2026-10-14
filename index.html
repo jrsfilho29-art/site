@@ -585,7 +585,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-y';
+const APP_VERSION = '2026.10.13-z';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2780,14 +2780,14 @@ function thumbHTML(p, size){
 }
 function vialHTML(p){
   const min = p.minStock||0;
-  const cap = (p.maxStock!=null && p.maxStock>0) ? p.maxStock : Math.max(min*3, 10, p.stock);
+  const cap = Math.max(min*3, 10, p.stock);
   const pct = Math.max(0, Math.min(100, Math.round((p.stock/cap)*100)));
   const cls = p.stock<=0 ? 'zero' : (p.stock<=min ? 'low' : '');
   return `<span class="vial ${cls}" title="${p.stock} de ${cap}"><i style="height:${pct}%"></i></span>`;
 }
 function renderProductCard(p, sel){
   const min = p.minStock||0, zero = p.stock<=0, low = !zero && p.stock<=min;
-  const cap = (p.maxStock!=null && p.maxStock>0) ? p.maxStock : Math.max(min*3, 10, p.stock);
+  const cap = Math.max(min*3, 10, p.stock);
   const pct = zero ? 0 : Math.max(6, Math.min(100, Math.round(p.stock/cap*100)));
   const margin = (p.costPrice>0 && p.salePrice>0) ? Math.round((p.salePrice-p.costPrice)/p.salePrice*100) : null;
   const tag = zero ? '<span class="pc-tag zero">Sem estoque</span>' : low ? `<span class="pc-tag low">Repor · ${p.stock} un.</span>` : `<span class="pc-tag ok">${p.stock} un.</span>`;
@@ -3262,19 +3262,18 @@ function renderEstoquePosicao(){
   </div>
   ${state.products.length===0 ? emptyState(icon('warehouse',26),'Estoque vazio','Cadastre produtos para que o estoque seja organizado automaticamente.') : `
   <div class="table-wrap"><table>
-    <thead><tr><th>Produto</th><th style="text-align:right;">Estoque atual</th><th style="text-align:right;">Disponível</th><th style="text-align:right;">Mínimo</th><th style="text-align:right;">Máximo</th><th style="text-align:center;">Situação</th><th style="text-align:right;">Ajustar</th></tr></thead>
+    <thead><tr><th>Produto</th><th style="text-align:right;">Estoque atual</th><th style="text-align:right;">Disponível</th><th style="text-align:right;">Mínimo</th><th style="text-align:center;">Situação</th><th style="text-align:right;">Ajustar</th></tr></thead>
     <tbody>
       ${catalogStructure(state.products).map(g=>{
         const units = g.subs.reduce((a,sb)=>a+sb.items.reduce((x,p)=>x+p.stock,0),0);
-        return `<tr class="catrow"><td colspan="7">${esc(g.name)} <span class="pill">${g.count} produto(s)</span> <span class="muted" style="font-weight:400;font-size:12px;margin-left:6px;">${units} un. em estoque</span></td></tr>` +
-        g.subs.map(sb=> (sb.name? `<tr class="subrow"><td colspan="7">${esc(sb.name)} · ${sb.items.length}</td></tr>`:'') + sb.items.map(p=>{ const low = p.stock<=(p.minStock||0); return `
+        return `<tr class="catrow"><td colspan="6">${esc(g.name)} <span class="pill">${g.count} produto(s)</span> <span class="muted" style="font-weight:400;font-size:12px;margin-left:6px;">${units} un. em estoque</span></td></tr>` +
+        g.subs.map(sb=> (sb.name? `<tr class="subrow"><td colspan="6">${esc(sb.name)} · ${sb.items.length}</td></tr>`:'') + sb.items.map(p=>{ const low = p.stock<=(p.minStock||0); return `
         <tr>
           <td><div class="prodcell">${thumbHTML(p,42)}<div style="min-width:0;"><div>${pcode(p)}${esc(p.name)}</div>${p.brand?`<div class="muted2" style="font-size:11px;">${esc(p.brand)}</div>`:''}</div></div></td>
           <td style="text-align:right;white-space:nowrap;">${vialHTML(p)}${p.stock}</td>
           <td style="text-align:right;" class="${p.stock>0?'ok-c':'danger-c'}">${p.stock>0? p.stock : 'indisponível'}</td>
           <td style="text-align:right;" class="muted">${p.minStock||0}</td>
-          <td style="text-align:right;" class="muted">${p.maxStock!=null? p.maxStock : '—'}</td>
-          <td style="text-align:center;"><span class="${low?'badge-danger':'badge-ok'}">${low?'repor':'ok'}</span></td>
+                    <td style="text-align:center;"><span class="${low?'badge-danger':'badge-ok'}">${low?'repor':'ok'}</span></td>
           <td style="text-align:right;"><button class="icon-btn plum" data-action="openAjuste" data-id="${p.id}">${icon('edit')}</button></td>
         </tr>`;}).join('')).join('');
       }).join('')}
@@ -5488,10 +5487,9 @@ function renderProdutoModal(d){
       <label class="field"><span class="lbl">Preço promocional (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.promoPrice" value="${esc(d.promoPrice||'')}" placeholder="vazio = sem promoção"><span class="hint">${(parseFloat(d.promoPrice)||0)>0 && (parseFloat(d.promoPrice)||0)>=(parseFloat(d.salePrice)||0) ? '<b class="danger-c">Precisa ser menor que o preço de venda.</b>' : 'Aparece riscado no catálogo, com o desconto em %.'}</span></label>
       <label class="field" style="display:flex;align-items:center;gap:8px;padding-bottom:20px;"><input type="checkbox" data-field="ui.modal.data.isNew" ${d.isNew?'checked':''}> <span><b>Novidade</b> <span class="muted2" style="font-size:12px;">(selo no catálogo)</span></span></label>
     </div>
-    <div class="grid grid-3">
-      <label class="field"><span class="lbl">Estoque inicial / atual</span><input type="number" min="0" data-field="ui.modal.data.stock" value="${esc(d.stock)}"><span class="hint">Quantidade disponível</span></label>
+    <div class="grid grid-2">
+      <label class="field"><span class="lbl">Estoque inicial / atual</span><input type="number" min="0" data-field="ui.modal.data.stock" value="${esc(d.stock)}"><span class="hint">Sem limite de quantidade</span></label>
       <label class="field"><span class="lbl">Estoque mínimo</span><input type="number" min="0" data-field="ui.modal.data.minStock" value="${esc(d.minStock)}"><span class="hint">Alerta de reposição</span></label>
-      <label class="field"><span class="lbl">Estoque máximo</span><input type="number" min="0" data-field="ui.modal.data.maxStock" value="${esc(d.maxStock||'')}"><span class="hint">Opcional</span></label>
     </div>
     <label class="field"><span class="lbl">Descrição</span><input data-field="ui.modal.data.description" value="${esc(d.description)}"></label>
     <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
