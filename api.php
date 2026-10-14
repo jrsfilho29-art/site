@@ -55,6 +55,11 @@ catch(Throwable $e){
   catch(Throwable $e2){ $hasRole = false; }
 }
 
+/* ---- frete da venda: cria a coluna sozinho em bancos antigos ---- */
+$salesShip = true;
+try{ $pdo->query('SELECT shipping FROM sales LIMIT 1'); }
+catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE sales ADD COLUMN shipping DECIMAL(12,2) NOT NULL DEFAULT 0'); }catch(Throwable $e2){ $salesShip = false; } }
+
 /* ---- vendedor da venda (comissões): cria as colunas sozinho em bancos antigos ---- */
 $salesSeller = true;
 try{ $pdo->query('SELECT seller_id, seller_name FROM sales LIMIT 1'); }
@@ -257,6 +262,7 @@ try{
         'id'=>$r['id'], 'date'=>fromDt($r['date']), 'customerId'=>$r['customer_id'],
         'customerName'=>s($r['customer_name']), 'items'=>$items[$r['id']] ?? [],
         'subtotal'=>(float)$r['subtotal'], 'discount'=>(float)$r['discount'], 'total'=>(float)$r['total'],
+        'shipping'=>(float)($r['shipping'] ?? 0),
         'payments'=>$pays[$r['id']] ?? [], 'status'=>$r['status']
       ];
       if($r['order_id']) $o['orderId'] = $r['order_id'];
@@ -362,6 +368,7 @@ try{
         $st->execute([s($sa['id']??''), $dt, sn($sa['customerId']??null), s($sa['customerName']??'Consumidor Final'),
           num($sa['subtotal']??0), num($sa['discount']??0), num($sa['total']??0), s($sa['status']??'concluida'), sn($sa['orderId']??null), $dt]
           + ($salesSeller ? [10=>mb_substr(s($sa['sellerId']??''), 0, 30), 11=>mb_substr(s($sa['sellerName']??''), 0, 80)] : []));
+        if($salesShip && num($sa['shipping']??0) > 0){ $pdo->prepare('UPDATE sales SET shipping = ? WHERE id = ?')->execute([num($sa['shipping']), s($sa['id']??'')]); }
         foreach(($sa['items']??[]) as $i){
           $sti->execute([s($sa['id']), sn($i['productId']??null), s($i['name']??''), (int)num($i['qty']??1), num($i['unitPrice']??0), num($i['subtotal']??0)]);
         }

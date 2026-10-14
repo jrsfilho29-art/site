@@ -591,7 +591,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-h';
+const APP_VERSION = '2026.10.14-i';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1624,7 +1624,7 @@ let state = {
     catalogOnlyAvailable: true, catalogShowInactive:false, catalogoSubView:'vitrine', catalogoProdutosQuery:'',
     globalQuery:'', menuOpen:false, selectedProducts:[],
     vendaView:'nova',
-    venda: { customerId:'', search:'', cart:[], discount:0, discountType:'value', payments:[{method:'Dinheiro',amount:''}] },
+    venda: { customerId:'', search:'', cart:[], discount:0, discountType:'value', shipping:0, payments:[{method:'Dinheiro',amount:''}] },
     pedidoView:'nova',
     pedido: { id:null, orderNumber:'', customerId:'', search:'', cart:[], discount:0, shipping:0, expectedDate:'', notes:'' },
     orderStatusFilter:'', orderQuery:'', orderDetail:null,
@@ -2786,6 +2786,7 @@ const actions_online = {
     const V = state.ui.venda;
     V.customerId = c.id;
     V.sellerId = (o.sellerId && sellersList().some(x=>x.id===o.sellerId)) ? o.sellerId : '';
+    { const its0 = onlineItems(o); const sum0 = its0.reduce((a,i)=>a+i.qty*i.unitPrice,0); V.shipping = (o.total>0 && o.total>sum0+0.009) ? +(o.total-sum0).toFixed(2) : 0; }
     const miss=[];
     onlineItems(o).forEach(i=>{
       const p = state.products.find(x=>x.id===i.productId);
@@ -3631,7 +3632,8 @@ function renderNovaVenda(){
   const V = state.ui.venda;
   const subtotal = V.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
   const discount = computeDiscountAmount(subtotal, V.discount, V.discountType);
-  const total = Math.max(0, subtotal - discount);
+  const vship = Math.max(0, parseFloat(V.shipping)||0);
+  const total = Math.max(0, subtotal - discount + vship);
   const paid = V.payments.reduce((a,p)=>a+Math.max(0, parseFloat(p.amount)||0),0);
   const diff = +(total-paid).toFixed(2);
   const results = searchProducts(V.search);
@@ -3697,6 +3699,7 @@ function renderNovaVenda(){
           </div>
           ${V.discountType==='percent' ? `<span class="hint">${Math.min(Math.max(0,parseFloat(V.discount)||0),100)}% = ${brl(discount)}</span>` : ''}
         </label>
+        <label class="field"><span class="lbl">Frete (R$)</span><input type="number" step="0.01" min="0" inputmode="decimal" data-field="ui.venda.shipping" value="${esc(V.shipping||'')}" placeholder="0,00"></label>
         <div class="flex-between serif" style="font-size:20px;margin-bottom:12px;color:var(--plum);"><span>Total</span><span>${brl(total)}</span></div>
         <div class="muted" style="font-size:12px;margin-bottom:8px;">Forma(s) de pagamento</div>
         ${V.payments.map((p,idx)=>`
@@ -3818,7 +3821,7 @@ const actions_vendas = {
   clearCart(){ if(!state.ui.venda.cart.length) return; if(!confirm('Esvaziar o carrinho?')) return; state.ui.venda.cart = []; render(); },
   fillPaymentTotal(){
     const V = state.ui.venda; const sub = V.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
-    const total = Math.max(0, sub - computeDiscountAmount(sub, V.discount, V.discountType));
+    const total = Math.max(0, sub - computeDiscountAmount(sub, V.discount, V.discountType) + Math.max(0, parseFloat(V.shipping)||0));
     if(V.payments.length===1){ V.payments[0].amount = total.toFixed(2); render(); }
   },
   vendaSearchEnter(){ const r = searchProducts(state.ui.venda.search); if(r.length) actions.addToCart({dataset:{id:r[0].id}}); },
@@ -3860,7 +3863,8 @@ const actions_vendas = {
     if(V.cart.length===0){ notify.err('Adicione ao menos um produto.'); return; }
     const subtotal = V.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
     const discount = computeDiscountAmount(subtotal, V.discount, V.discountType);
-    const total = Math.max(0, subtotal-discount);
+    const vship = Math.max(0, parseFloat(V.shipping)||0);
+    const total = Math.max(0, subtotal-discount+vship);
     const paid = V.payments.reduce((a,p)=>a+Math.max(0, parseFloat(p.amount)||0),0);
     if(Math.abs(+(total-paid).toFixed(2))>0.009){ notify.err('O valor pago precisa ser igual ao total da venda.'); return; }
     const customer = state.customers.find(c=>c.id===V.customerId);
@@ -3868,7 +3872,7 @@ const actions_vendas = {
       id:uid('venda'), date:new Date().toISOString(), customerId:V.customerId||null,
       customerName: customer? customer.name : 'Consumidor Final',
       items: V.cart.map(i=>({productId:i.productId,name:i.name,qty:i.qty,unitPrice:i.unitPrice,subtotal:+(i.qty*i.unitPrice).toFixed(2)})),
-      subtotal:+subtotal.toFixed(2), discount:+discount.toFixed(2), total:+total.toFixed(2),
+      subtotal:+subtotal.toFixed(2), discount:+discount.toFixed(2), shipping:+vship.toFixed(2), total:+total.toFixed(2),
       payments: V.payments.filter(p=>parseFloat(p.amount)>0).map(p=>({method:p.method, amount:+parseFloat(p.amount).toFixed(2)})),
       status:'concluida'
     };
@@ -3879,7 +3883,7 @@ const actions_vendas = {
       return item ? {...p, stock: Math.max(0, p.stock-item.qty)} : p;
     });
     persist('products');
-    state.ui.venda = {customerId:'',sellerId:V.sellerId||'',search:'',cart:[],discount:0,discountType:'value',payments:[{method:'Dinheiro',amount:''}]};
+    state.ui.venda = {customerId:'',sellerId:V.sellerId||'',search:'',cart:[],discount:0,discountType:'value',shipping:0,payments:[{method:'Dinheiro',amount:''}]};
     state.ui.vendaView='lista';
     render();
   },
@@ -4729,7 +4733,7 @@ function relTables(T, from, to){
     (s.payments||[]).forEach(x=>{ meth[x.method]=(meth[x.method]||0)+x.amount; });
     const d=localDay(s.date); day[d]=(day[d]||0)+s.total;
   });
-  const disc = sales.reduce((a,s)=>a+(s.discount||0),0), profit = revenue-cost-disc;
+  const disc = sales.reduce((a,s)=>a+(s.discount||0),0), profit = revenue-cost-disc-sales.reduce((a,s)=>a+(s.shipping||0),0);
   const T_ = [];
   const want = k => (T==='geral' && k!=='vendedor') || T===k;
   if(want('lucro')) T_.push({key:'lucro', title:'Lucratividade', head:['Vendas','Receita','Custo','Descontos','Lucro líquido','Margem'], rows:[[sales.length, 'R$ '+f2(revenue), 'R$ '+f2(cost), 'R$ '+f2(disc), 'R$ '+f2(profit), revenue>0?pc(profit/revenue*100):'0,0%']]});
@@ -5319,6 +5323,7 @@ function printReceipt(saleId){
     <hr>
     <div class="tot"><span>Subtotal</span><span>${brl(s.subtotal)}</span></div>
     <div class="tot"><span>Desconto</span><span>${brl(s.discount)}</span></div>
+    ${s.shipping>0?`<div class="tot"><span>Frete</span><span>${brl(s.shipping)}</span></div>`:''}
     <div class="tot grand"><span>TOTAL</span><span>${brl(s.total)}</span></div>
     <hr>
     ${s.payments.map(pm=>`<div class="tot"><span>${pm.method}</span><span>${brl(pm.amount)}</span></div>`).join('')}
@@ -5694,6 +5699,7 @@ function renderSaleDetailIfAny(){
     </table>
     <div class="flex-between" style="font-size:14px;"><span class="muted">Subtotal</span><span>${brl(s.subtotal)}</span></div>
     <div class="flex-between" style="font-size:14px;"><span class="muted">Desconto</span><span>${brl(s.discount)}</span></div>
+    ${s.shipping>0?`<div class="flex-between" style="font-size:14px;"><span class="muted">Frete</span><span>${brl(s.shipping)}</span></div>`:''}
     <div class="flex-between serif" style="font-size:18px;margin:6px 0 12px;color:var(--plum);"><span>Total</span><span>${brl(s.total)}</span></div>
     <div style="font-size:14px;"><b>Pagamento:</b> ${s.payments.map(p=>p.method+' ('+brl(p.amount)+')').join(', ')}</div>`;
   return modalWrap('Venda · '+fmtDate(s.date), body);
