@@ -591,7 +591,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-j';
+const APP_VERSION = '2026.10.14-k';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1920,7 +1920,7 @@ function persist(key){
 }
 
 /* ================= render engine ================= */
-const BTN_PRESETS = [['','Padrão'],['#1DA851','Verde'],['#17204A','Marinho'],['#0B6EF3','Azul'],['#7B2CBF','Roxo'],['#C2185B','Pink'],['#E53935','Vermelho'],['#F0A81F','Dourado'],['#EF6C00','Laranja'],['#00897B','Turquesa'],['#37474F','Grafite'],['#6D4C41','Marrom'],['#111111','Preto']];
+const BTN_PRESETS = [['','Cor do cabeçalho'],['#1DA851','Verde'],['#17204A','Marinho'],['#0B6EF3','Azul'],['#7B2CBF','Roxo'],['#C2185B','Pink'],['#E53935','Vermelho'],['#F0A81F','Dourado'],['#EF6C00','Laranja'],['#00897B','Turquesa'],['#37474F','Grafite'],['#6D4C41','Marrom'],['#111111','Preto']];
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza'],['#F3EEFA','Lavanda'],['#E8E3F6','Lilás'],['#FDE8E4','Pêssego'],['#FBE4EC','Rosa bebê'],['#E3F1FB','Azul bebê'],['#DDEFE5','Verde claro'],['#EEF5DC','Pistache'],['#FCF3C9','Amarelo claro'],['#F2E8DC','Bege'],['#DADDE6','Cinza azulado']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
 const HERO_PRESETS = [['','Padrão'],['#17204A','Azul do login'],['#0D1230','Azul noite'],['#0B2A5B','Azul marinho'],['#123F8C','Azul royal'],['#1D5FBF','Azul'],['#0E6BA8','Azul oceano'],['#1B7FA8','Azul petróleo'],['#2F80ED','Azul claro'],['#1E3A8A','Índigo'],['#3B1F5C','Roxo'],['#5B2A86','Violeta'],['#7A1F5C','Magenta'],['#4A1230','Vinho'],['#7A1F2B','Vermelho'],['#8A3B12','Terracota'],['#5A2A0E','Marrom'],['#0F3B33','Verde floresta'],['#14532D','Verde'],['#0F766E','Verde água'],['#1F2937','Grafite'],['#111111','Preto']];
@@ -4879,8 +4879,8 @@ function renderAparencia(){
     </div>
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Botões do catálogo</h3>
-      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor dos botões <b>Comprar agora</b>, <b>Adicionar ao carrinho</b> e <b>Enviar pedido</b> na página pública. O texto muda sozinho para branco ou preto, conforme a cor. Fica salva no servidor.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(BTN_PRESETS,p.catBtnColor,'setCatBtn','Botões','#1DA851')}</div>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor dos botões <b>Comprar agora</b>, <b>Adicionar ao carrinho</b> e <b>Enviar pedido</b> na página pública. Sem escolher nada, os botões usam a <b>cor do cabeçalho</b>. O texto muda sozinho para branco ou preto, conforme a cor. Fica salva no servidor.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(BTN_PRESETS,p.catBtnColor,'setCatBtn','Botões',p.catHeaderColor||'#17204A')}</div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor
         <input type="color" data-field="prefs.catBtnColor" value="${p.catBtnColor||'#1DA851'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
       ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta cor no servidor.</p>'}

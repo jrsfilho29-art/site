@@ -412,7 +412,7 @@ function card($p){
     $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink).'"';
     $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink)).'"';
   }
-  $btn = '<div class="cb"><button type="button" class="cb-buy" data-cb="buy">Comprar agora</button><button type="button" class="cb-add" data-cb="add">Adicionar ao carrinho</button></div>';
+  $btn = '<div class="cb"><button type="button" class="cb-buy" data-cb="buy">Comprar agora</button><button type="button" class="cb-add" data-cb="add"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2L21 8H6"/></svg>Adicionar ao carrinho</button></div>';
   $low = '';
   if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%</span>';
   if($__new) $low .= '<span class="tag-new">Novidade</span>';
@@ -460,15 +460,14 @@ if($__op){
 <?php endif; ?>
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="<?= e($__base) ?>logo.png">
+<?php $__hc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_color']); $__hc = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){} if(!preg_match('/^#[0-9a-fA-F]{6}$/', $__hc)) $__hc = ''; ?>
 <?php
 $__bc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_btn']); $__bc = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){}
-if(preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)){
-  $__n = hexdec(substr($__bc, 1)); $__lum = 0.299*(($__n>>16)&255) + 0.587*(($__n>>8)&255) + 0.114*($__n&255);
-  $__tx = $__lum > 150 ? '#1a1a1a' : '#ffffff';
-  echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!important;color:'.$__tx.'!important;box-shadow:0 3px 10px rgba(0,0,0,.18)!important}.cb-buy:hover,.lb-buy:hover,.lb-add:hover{filter:brightness(.92)}.cb-add{background:#fff!important;color:'.$__bc.'!important;box-shadow:inset 0 0 0 1.5px '.$__bc.'!important}.cb-add:hover{background:'.$__bc.'!important;color:'.$__tx.'!important}</style>'."\n";
-}
+if(!preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)) $__bc = ($__hc !== '') ? $__hc : '#17204A';   /* sem cor própria: botões seguem a cor do cabeçalho */
+$__n = hexdec(substr($__bc, 1)); $__lum = 0.299*(($__n>>16)&255) + 0.587*(($__n>>8)&255) + 0.114*($__n&255);
+$__tx = $__lum > 150 ? '#1a1a1a' : '#ffffff';
+echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!important;color:'.$__tx.'!important;box-shadow:0 4px 12px rgba(0,0,0,.18)!important}.cb-buy:hover,.lb-buy:hover,.lb-add:hover,#of-s:hover{filter:brightness(1.12)}.cb-add{background:'.$__bc.'14!important;color:'.$__bc.'!important;box-shadow:inset 0 0 0 1.5px '.$__bc.'55!important}.cb-add:hover{background:'.$__bc.'!important;color:'.$__tx.'!important}</style>'."\n";
 ?>
-<?php $__hc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_color']); $__hc = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){} if(!preg_match('/^#[0-9a-fA-F]{6}$/', $__hc)) $__hc = ''; ?>
 <style>
   :root{--ink:#141A3C;--plum:#17204A;--plum-dark:#0D1230;--gold:#F0A81F;--gold-soft:#FBD98A;--gold-deep:#9A6400;--cream:#F1F1F8;--line:#D9DBEC;--muted:#5A6088;--tint:#E9EAF6;
     --lattice:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23F0A81F' stroke-width='1'%3E%3Crect x='6' y='6' width='28' height='28'/%3E%3Crect x='6' y='6' width='28' height='28' transform='rotate(45 20 20)'/%3E%3Ccircle cx='20' cy='20' r='2.5'/%3E%3C/g%3E%3C/svg%3E");}
@@ -800,13 +799,11 @@ if(preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)){
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
   .cta-wa{position:fixed!important;top:auto!important;right:auto!important;left:14px;bottom:18px;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
   .cta-wa:hover{opacity:1;}
-  .cb{display:flex;flex-direction:column;gap:6px;margin-top:auto;}
-  .cb button{font:inherit;font-size:12.5px;font-weight:700;padding:9px 8px;border-radius:999px;border:none;cursor:pointer;line-height:1.1;}
-  .cb-buy{background:#25D366;color:#073B1B;box-shadow:0 3px 10px rgba(37,211,102,.3);}
-  .cb-buy:hover{background:#1FB85A;}
-  .cb-add{background:#fff;color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum);}
-  .cb-add:hover{background:var(--plum);color:#fff;}
-  @media (max-width:560px){.cb button{font-size:11.5px;padding:8px 4px;}}
+  .cb{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
+  .cb button{font-family:inherit;font-weight:700;border:none;cursor:pointer;line-height:1.1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;transition:filter .12s,background .12s,color .12s;}
+  .cb-buy{font-size:13px;padding:12px 8px;text-transform:uppercase;letter-spacing:.6px;}
+  .cb-add{font-size:12px;padding:9px 6px;}
+  @media (max-width:560px){.cb-buy{font-size:11.5px;padding:11px 4px;letter-spacing:.3px;}.cb-add{font-size:11px;padding:8px 3px;gap:4px;}.cb-add svg{display:none;}}
 </style>
 </head>
 <body>
@@ -839,7 +836,7 @@ if(preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-h</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-i</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
