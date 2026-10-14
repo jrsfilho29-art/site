@@ -847,7 +847,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-k</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-l</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1016,9 +1016,9 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   document.addEventListener('click',function(e){
     var t=e.target;
     var cbb=t.closest&&t.closest('[data-cb]');
-    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))showAdded(cc);}return;}
+    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))openCart();}return;}
     if(t.id==='at-open'){$('atoast').className='atoast';openCart();return;}
-    if(t.id==='lb-add'){if(cur&&add(cur)){var cc2=cur;close();showAdded(cc2);}return;}
+    if(t.id==='lb-add'){if(cur&&add(cur)){openCart();}return;}
     if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
     if(t.closest&&t.closest('#cfab')){openCart();return;}
     if(t.id==='ct-x'||t.id==='ct-more'||t.id==='ct-oc'){closeCart();return;}
