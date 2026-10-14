@@ -289,7 +289,7 @@ try{
 
     $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
     $__px = json_decode((string)getMeta($pdo, 'pix'), true);
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'catalogBtn'=>(string)getMeta($pdo, 'catalog_btn'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -412,6 +412,10 @@ try{
       if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('catalogColor', $d['settings'])){
         $__cc = (string)$d['settings']['catalogColor'];
         setMeta($pdo, 'catalog_color', preg_match('/^#[0-9a-fA-F]{6}$/', $__cc) ? strtolower($__cc) : '');
+      }
+      if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('catalogBtn', $d['settings'])){
+        $__cb = (string)$d['settings']['catalogBtn'];
+        setMeta($pdo, 'catalog_btn', preg_match('/^#[0-9a-fA-F]{6}$/', $__cb) ? strtolower($__cb) : '');
       }
       if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('commissionMain', $d['settings'])){
         setMeta($pdo, 'commission_main', (string)max(0, min(100, round((float)str_replace(',', '.', (string)$d['settings']['commissionMain']), 2))));

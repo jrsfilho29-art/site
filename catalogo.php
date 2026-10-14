@@ -460,6 +460,14 @@ if($__op){
 <?php endif; ?>
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="<?= e($__base) ?>logo.png">
+<?php
+$__bc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_btn']); $__bc = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){}
+if(preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)){
+  $__n = hexdec(substr($__bc, 1)); $__lum = 0.299*(($__n>>16)&255) + 0.587*(($__n>>8)&255) + 0.114*($__n&255);
+  $__tx = $__lum > 150 ? '#1a1a1a' : '#ffffff';
+  echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!important;color:'.$__tx.'!important;box-shadow:0 3px 10px rgba(0,0,0,.18)!important}.cb-buy:hover,.lb-buy:hover,.lb-add:hover{filter:brightness(.92)}.cb-add{background:#fff!important;color:'.$__bc.'!important;box-shadow:inset 0 0 0 1.5px '.$__bc.'!important}.cb-add:hover{background:'.$__bc.'!important;color:'.$__tx.'!important}</style>'."\n";
+}
+?>
 <?php $__hc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_color']); $__hc = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){} if(!preg_match('/^#[0-9a-fA-F]{6}$/', $__hc)) $__hc = ''; ?>
 <style>
   :root{--ink:#141A3C;--plum:#17204A;--plum-dark:#0D1230;--gold:#F0A81F;--gold-soft:#FBD98A;--gold-deep:#9A6400;--cream:#F1F1F8;--line:#D9DBEC;--muted:#5A6088;--tint:#E9EAF6;
@@ -831,7 +839,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-g</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-h</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
