@@ -590,7 +590,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-zc';
+const APP_VERSION = '2026.10.13-zd';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1642,7 +1642,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1690,6 +1690,7 @@ function syncApplyPulled(j){
   let codesAdded = false;
   if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
   if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
+  if(d.settings && typeof d.settings.catalogColor==='string' && (d.settings.catalogColor==='' || heroOk(d.settings.catalogColor))){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = d.settings.catalogColor; persist('prefs'); }
   if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
@@ -2101,6 +2102,12 @@ function handleFieldInput(t){
     val = t.dataset.mask==='phone' ? maskPhone(t.value) : maskCep(t.value);
     if(val !== t.value) t.value = val;
   }
+  if(path==='prefs.catHeaderColor'){
+    if(!heroOk(val)){ notify.err('Cor muito clara: o texto branco do topo do catálogo ficaria difícil de ler. Escolha uma cor escura.'); const el=document.querySelector('input[data-field="prefs.catHeaderColor"]'); if(el) el.value=(state.prefs&&state.prefs.catHeaderColor)||'#17204A'; return; }
+    state.prefs = state.prefs||{}; state.prefs.catHeaderColor = val; persist('prefs'); syncSchedulePush();
+    document.querySelectorAll('[data-action="setCatHeader"]').forEach(btn=>{ const sp=btn.firstElementChild, on=(btn.dataset.color||'').toUpperCase()===String(val).toUpperCase(); if(sp){ sp.style.borderColor=on?'var(--plum)':'var(--line)'; sp.style.boxShadow=on?'0 0 0 2px var(--tint)':'none'; } });
+    return;
+  }
   if(path==='prefs.heroColor' || path==='prefs.bgColor'){   /* sem render: o seletor de cor do navegador não pode ser refeito enquanto se arrasta */
     const hero = path==='prefs.heroColor', ok = hero ? heroOk(val) : bgOk(val), cur = (state.prefs && state.prefs[hero?'heroColor':'bgColor']) || '';
     if(!ok){ notify.err(hero ? 'Cor muito clara: o texto branco do cabeçalho ficaria difícil de ler. Escolha uma cor escura.' : 'Cor muito escura: o texto ficaria difícil de ler. Escolha uma cor clara.'); const el=document.querySelector('input[data-field="'+path+'"]'); if(el) el.value = cur || (hero?'#0D1230':'#F1F1F8'); return; }
@@ -2113,7 +2120,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain)/.test(path)) syncSchedulePush(); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain|catHeaderColor)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -2708,6 +2715,7 @@ const actions_online = {
   },
   setHero(t){ state.prefs = state.prefs||{}; state.prefs.heroColor = t.dataset.color||''; persist('prefs'); render(); },
   setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; state.prefs.bgStyle = ''; persist('prefs'); render(); },
+  setCatHeader(t){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = t.dataset.color||''; persist('prefs'); syncSchedulePush(); render(); },
   setBgLogin(){ state.prefs = state.prefs||{}; state.prefs.bgStyle = 'login'; state.prefs.bgColor = ''; persist('prefs'); render(); },
   toggleOnlineSound(){
     state.prefs = state.prefs||{}; state.prefs.soundOnline = !soundOn(); persist('prefs');
@@ -4774,6 +4782,14 @@ function renderAparencia(){
       <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(BG_PRESETS,p.bgStyle==='login'?'__login':p.bgColor,'setBg','Fundo','#F1F1F8')}<button type="button" data-action="setBgLogin" title="Pano de fundo da tela de login" aria-label="Fundo da tela de login" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;width:64px;font-size:11.5px;color:var(--muted);"><span style="width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 25% 15%,#222C66,#17204A 45%,#0D1230 100%);border:3px solid ${p.bgStyle==='login'?'var(--plum)':'var(--line)'};box-shadow:${p.bgStyle==='login'?'0 0 0 2px var(--tint)':'none'};"></span>Fundo do login</button></div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (clara)
         <input type="color" data-field="prefs.bgColor" value="${p.bgColor||'#F1F1F8'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+    </div>
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Cabeçalho do catálogo</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor do topo da página pública que seus clientes veem (seuperfume.net/catalogo.php). Fica salva no servidor, para todos os aparelhos.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS,p.catHeaderColor,'setCatHeader','Catálogo','#17204A')}</div>
+      <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
+        <input type="color" data-field="prefs.catHeaderColor" value="${p.catHeaderColor||'#17204A'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+      ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta cor no servidor.</p>'}
     </div>
   </div>`;
 }
