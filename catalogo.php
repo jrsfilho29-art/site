@@ -412,7 +412,7 @@ function card($p){
     $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink).'"';
     $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink)).'"';
   }
-  $btn = '<span class="buy">Ver detalhes</span>';
+  $btn = '<div class="cb"><button type="button" class="cb-buy" data-cb="buy">Comprar agora</button><button type="button" class="cb-add" data-cb="add">Adicionar ao carrinho</button></div>';
   $low = '';
   if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%</span>';
   if($__new) $low .= '<span class="tag-new">Novidade</span>';
@@ -792,6 +792,13 @@ if($__op){
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
   .cta-wa{position:fixed!important;top:auto!important;right:auto!important;left:14px;bottom:18px;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
   .cta-wa:hover{opacity:1;}
+  .cb{display:flex;flex-direction:column;gap:6px;margin-top:auto;}
+  .cb button{font:inherit;font-size:12.5px;font-weight:700;padding:9px 8px;border-radius:999px;border:none;cursor:pointer;line-height:1.1;}
+  .cb-buy{background:#25D366;color:#073B1B;box-shadow:0 3px 10px rgba(37,211,102,.3);}
+  .cb-buy:hover{background:#1FB85A;}
+  .cb-add{background:#fff;color:var(--plum);box-shadow:inset 0 0 0 1.5px var(--plum);}
+  .cb-add:hover{background:var(--plum);color:#fff;}
+  @media (max-width:560px){.cb button{font-size:11.5px;padding:8px 4px;}}
 </style>
 </head>
 <body>
@@ -824,7 +831,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-f</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-g</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -903,7 +910,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function grand(){return total()+shipCost();}
   function drawShip(){
     var box=$('dl-box');if(!box)return;
-    box.style.display=SHIP?'block':'none';if(!SHIP)return;
+    box.style.display=SHIP?'block':'none';if(!SHIP){$('ct-t').textContent=brl(total());return;}
     var pk=$('dl-pk');pk.style.display=SHIP.pickup?'':'none';
     if(dl.q&&(dl.sub!==total()||dl.units!==count())){dl.q=null;dl.opts=[];shipMsg('O valor do carrinho mudou. Toque em Calcular frete de novo.',true);}
     var bs=$('dl-mode').querySelectorAll('button');for(var k=0;k<bs.length;k++)bs[k].className=bs[k].getAttribute('data-dl')===dl.mode?'on':'';
@@ -970,6 +977,8 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function close(){lb.className='lb';if($('ct').className.indexOf('on')<0)document.body.style.overflow='';}
   document.addEventListener('click',function(e){
     var t=e.target;
+    var cbb=t.closest&&t.closest('[data-cb]');
+    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))toast('Adicionado ao carrinho ✓');}return;}
     if(t.id==='lb-add'){if(cur&&add(cur)){close();toast('Adicionado ao carrinho ✓');}return;}
     if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
     if(t.closest&&t.closest('#cfab')){openCart();return;}
