@@ -864,7 +864,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-o</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-p</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1026,6 +1026,12 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('of-e').textContent='';drawCart();
     $('ct').className='ct on';document.body.style.overflow='hidden';
   }
+  function buyNow(c){
+    var id=c.getAttribute('data-id'),has=false;cart.forEach(function(i){if(i.id===id)has=true;});
+    if(!has&&!add(c))return;
+    openCart();
+    setTimeout(function(){var f=$('ct-f');if(f&&f.scrollIntoView)try{f.scrollIntoView({block:'start',behavior:'smooth'});}catch(e){}},60);
+  }
   function closeCart(){$('ct').className='ct';document.body.style.overflow='';}
   function open(c){
     var ci=c.querySelector('.imgwrap img'),s=ci?ci.getAttribute('src'):'',im=$('lb-i');
@@ -1044,11 +1050,11 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     var wal=t.closest&&t.closest('a[href*="wa.me/"]');
     if(wal){try{var wu=new URL(wal.href),wph=wu.pathname.replace(/\D/g,'');if(wph){e.preventDefault();waGo(wph,wu.searchParams.get('text')||'');return;}}catch(er){}}
     var cbb=t.closest&&t.closest('[data-cb]');
-    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))openCart();}return;}
+    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy')buyNow(cc);else if(add(cc))showAdded(cc);}return;}
     if(t.id==='okpop-x'||t.id==='okpop'){$('okpop').className='okpop';var okb=$('ct-ok');if(okb&&okb.scrollIntoView)try{okb.scrollIntoView({block:'start'});}catch(e){}return;}
     if(t.id==='at-open'){$('atoast').className='atoast';openCart();return;}
-    if(t.id==='lb-add'){if(cur&&add(cur)){openCart();}return;}
-    if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
+    if(t.id==='lb-add'){if(cur&&add(cur)){close();showAdded(cur);}return;}
+    if(t.id==='lb-buy'){if(cur)buyNow(cur);return;}
     if(t.closest&&t.closest('#cfab')){openCart();return;}
     if(t.id==='ct-x'||t.id==='ct-more'||t.id==='ct-oc'){closeCart();return;}
     if(t.id==='ct'&&(!window._lbd||window._lbd===t)){closeCart();return;}
