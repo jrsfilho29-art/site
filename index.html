@@ -393,7 +393,7 @@
   .cx-hero .segbar button:hover{background:rgba(255,255,255,.14);}
   .cx-hero .segbar button.on{background:var(--gold);border-color:var(--gold);color:#141A3C;}
   /* ===== Catálogo On ===== */
-  .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:radial-gradient(circle at 92% -10%,rgba(240,168,31,.38),transparent 38%),linear-gradient(135deg,var(--hero-a,#0D1230) 0%,var(--hero-b,#17204A) 55%,var(--hero-c,#2A3470) 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+  .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:var(--hero-a,#0D1230);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
   .cx-hero p{margin:0;color:#C9CDEA;font-size:13px;}
   .cx-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-q';
+const APP_VERSION = '2026.10.13-r';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1896,8 +1896,8 @@ function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) 
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
   const hc = state.prefs && state.prefs.heroColor, rs = document.documentElement.style;
-  if(hc && heroOk(hc)){ rs.setProperty('--hero-a',heroMix(hc,0)); rs.setProperty('--hero-b',heroMix(hc,.1)); rs.setProperty('--hero-c',heroMix(hc,.22)); }
-  else { rs.removeProperty('--hero-a'); rs.removeProperty('--hero-b'); rs.removeProperty('--hero-c'); }
+  if(hc && heroOk(hc)){ rs.setProperty('--hero-a',hc); }
+  else { rs.removeProperty('--hero-a'); }
   const bg = state.prefs && state.prefs.bgColor;
   document.body.style.background = (bg && bgOk(bg)) ? bg : '';
   document.documentElement.style.removeProperty('--cream');   /* cor de fundo personalizada foi removida: volta ao padrão */
