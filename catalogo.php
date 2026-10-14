@@ -829,9 +829,9 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   @media (max-width:560px){.ct-box{width:100%!important;border-radius:0!important;}}
   .cb{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
   .cb button{font-family:inherit;font-weight:700;border:none;cursor:pointer;line-height:1.1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;transition:filter .12s,background .12s,color .12s;}
-  .cb-buy{font-size:13px;padding:12px 8px;text-transform:uppercase;letter-spacing:.6px;}
-  .cb-add{font-size:12px;padding:9px 6px;}
-  @media (max-width:560px){.cb-buy{font-size:11.5px;padding:11px 4px;letter-spacing:.3px;}.cb-add{font-size:11px;padding:8px 3px;gap:4px;}.cb-add svg{display:none;}}
+  .cb-buy{font-size:11.5px;padding:8px 8px;text-transform:uppercase;letter-spacing:.4px;}
+  .cb-add{font-size:11px;padding:7px 6px;}
+  @media (max-width:560px){.cb-buy{font-size:10.5px;padding:7px 4px;letter-spacing:.2px;}.cb-add{font-size:10.5px;padding:6px 3px;gap:4px;}.cb-add svg{display:none;}}
 </style>
 </head>
 <body>
@@ -864,7 +864,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-p</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-q</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
