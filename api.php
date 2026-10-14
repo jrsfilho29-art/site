@@ -170,6 +170,7 @@ function ensureOnlineOrders($pdo){
     note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
     items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0, seller_id VARCHAR(30), seller_name VARCHAR(80)
   )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  try{ $pdo->query('SELECT sale_id FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN sale_id VARCHAR(60)'); }catch(Throwable $e2){} }
   try{ $pdo->query('SELECT paid_at FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN paid_at VARCHAR(30)'); }catch(Throwable $e2){} }
   try{ $pdo->query('SELECT items, payment, total, seller_id, seller_name FROM online_orders LIMIT 1'); }
   catch(Throwable $e){
@@ -186,7 +187,7 @@ try{
       'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
       'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
-      'paidAt'=>s($o['paid_at'] ?? ''), 'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
+      'paidAt'=>s($o['paid_at'] ?? ''), 'saleId'=>s($o['sale_id'] ?? ''), 'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
       'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
     ], $r)]);
   }
@@ -203,6 +204,17 @@ try{
     out(200, ['ok'=>true]);
   }
 
+  if($action === 'onlineorder_sale'){
+    ensureOnlineOrders($pdo);
+    $q = $pdo->prepare('UPDATE online_orders SET sale_id = ? WHERE id = ?'); $q->execute([substr((string)($req['saleId'] ?? ''), 0, 60), (string)($req['id'] ?? '')]);
+    out(200, ['ok'=>true]);
+  }
+  if($action === 'onlineorder_delete'){
+    if($authRole !== 'admin') fail(403, 'Apenas o administrador pode excluir pedidos online.');
+    ensureOnlineOrders($pdo);
+    $q = $pdo->prepare('DELETE FROM online_orders WHERE id = ?'); $q->execute([(string)($req['id'] ?? '')]);
+    out(200, ['ok'=>true, 'deleted'=>$q->rowCount()]);
+  }
   if($action === 'onlineorders_clear'){
     if($authRole !== 'admin') fail(403, 'Apenas o administrador pode apagar os pedidos online.');
     ensureOnlineOrders($pdo);

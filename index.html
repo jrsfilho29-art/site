@@ -606,12 +606,12 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-l';
+const APP_VERSION = '2026.10.14-m';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
 const ADMIN_TABS = ['relatorios','servidor','usuarios'];
-const ADMIN_ACTIONS = new Set(['cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
+const ADMIN_ACTIONS = new Set(['onlineDelete','cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
 function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
 function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
@@ -2731,12 +2731,35 @@ function renderOnline(){
             ${paid&&o.status!=='cancelado'?`<button class="btn btn-ghost" data-action="onlineUnpaid" data-id="${esc(o.id)}">Desmarcar</button>`:''}
             ${open&&sellable?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
             ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
+            ${isAdmin()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="onlineDelete" data-id="${esc(o.id)}" title="Excluir este pedido (e devolver os produtos ao estoque, se já viraram venda)">Excluir</button>`:''}
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
           </div></div>`;
       }).join('')}</div>`;
   return head + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
 }
 const actions_online = {
+  async onlineDelete(t){
+    if(!isAdmin()) return;
+    const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
+    const sale = o.saleId ? state.sales.find(x=>x.id===o.saleId) : null;
+    const restore = !!(sale && sale.status!=='cancelada');
+    const its = onlineItems(o);
+    const msg = restore
+      ? 'Excluir o pedido de '+o.customerName+'?\n\nEste pedido já virou venda: a venda será CANCELADA e os produtos voltam ao estoque:\n'+(sale.items||[]).map(i=>'• '+i.qty+'× '+i.name).join('\n')+'\n\nNão dá para desfazer.'
+      : 'Excluir o pedido de '+o.customerName+' ('+its.map(i=>i.qty+'× '+i.name).join(', ')+')?\n\nEle ainda não virou venda, então o estoque não foi alterado e não há nada a devolver.\n(Se você já lançou uma venda para este pedido antes desta atualização, cancele a venda em Vendas para devolver ao estoque.)\n\nNão dá para desfazer.';
+    if(!confirm(msg)) return;
+    try{ await syncCall('onlineorder_delete',{id:o.id}); }
+    catch(e){ notify.err(e.message||'Não foi possível excluir o pedido.'); return; }
+    if(restore){
+      state.sales = state.sales.map(s=> s.id===sale.id ? {...s,status:'cancelada'} : s); persist('sales');
+      state.products = state.products.map(p=>{ const it = (sale.items||[]).find(i=>i.productId===p.id); return it ? {...p, stock:p.stock+it.qty} : p; });
+      persist('products');
+    }
+    ONLINE.orders = ONLINE.orders.filter(x=>x.id!==o.id);
+    if(state.ui.ooOpen) delete state.ui.ooOpen[o.id];
+    render();
+    notify.ok(restore ? 'Pedido excluído. Venda cancelada e produtos devolvidos ao estoque.' : 'Pedido excluído.');
+  },
   ooToggle(t){ state.ui.ooOpen = state.ui.ooOpen||{}; state.ui.ooOpen[t.dataset.id] = !state.ui.ooOpen[t.dataset.id]; render(); },
   setOnlineFilter(t){ state.ui.onlineFilter = t.dataset.f; render(); },
   async refreshOnline(){ ONLINE.err=''; await fetchOnlineOrders(false); if(ONLINE.err) notify.err(ONLINE.err); else notify.ok('Pedidos atualizados.'); },
@@ -2807,7 +2830,7 @@ const actions_online = {
       state.customers.push(c); persist('customers');
     }
     const V = state.ui.venda;
-    V.customerId = c.id;
+    V.customerId = c.id; V.onlineOrderId = o.id;
     V.sellerId = (o.sellerId && sellersList().some(x=>x.id===o.sellerId)) ? o.sellerId : '';
     { const its0 = onlineItems(o); const sum0 = its0.reduce((a,i)=>a+i.qty*i.unitPrice,0); V.shipping = (o.total>0 && o.total>sum0+0.009) ? +(o.total-sum0).toFixed(2) : 0; }
     const miss=[];
@@ -3841,7 +3864,7 @@ const actions_vendas = {
   filterCaixaMethod(t){ const m=t.dataset.method||''; state.ui.caixaMethod = (state.ui.caixaMethod===m)?'':m; render(); },
   setVendaStatusFilter(t){ vendaFilters().status = t.dataset.status||''; render(); },
   clearVendaFilters(){ state.ui.vf = {q:'',status:'',method:'',from:'',to:''}; render(); },
-  clearCart(){ if(!state.ui.venda.cart.length) return; if(!confirm('Esvaziar o carrinho?')) return; state.ui.venda.cart = []; render(); },
+  clearCart(){ if(!state.ui.venda.cart.length) return; if(!confirm('Esvaziar o carrinho?')) return; state.ui.venda.cart = []; state.ui.venda.onlineOrderId = ''; render(); },
   fillPaymentTotal(){
     const V = state.ui.venda; const sub = V.cart.reduce((a,i)=>a+i.qty*i.unitPrice,0);
     const total = Math.max(0, sub - computeDiscountAmount(sub, V.discount, V.discountType) + Math.max(0, parseFloat(V.shipping)||0));
@@ -3900,13 +3923,14 @@ const actions_vendas = {
       status:'concluida'
     };
     if(V.sellerId && sellersList().some(x=>x.id===V.sellerId)){ sale.sellerId = V.sellerId; sale.sellerName = sellerNameOf(V.sellerId); }
+    if(V.onlineOrderId){ const oo = ONLINE.orders.find(x=>x.id===V.onlineOrderId); if(oo && sale.items.every(si=>onlineItems(oo).some(oi=>oi.productId===si.productId))){ oo.saleId = sale.id; try{ syncCall('onlineorder_sale',{id:oo.id,saleId:sale.id}).catch(()=>{}); }catch(e){} } }
     state.sales.unshift(sale); persist('sales');
     state.products = state.products.map(p=>{
       const item = sale.items.find(i=>i.productId===p.id);
       return item ? {...p, stock: Math.max(0, p.stock-item.qty)} : p;
     });
     persist('products');
-    state.ui.venda = {customerId:'',sellerId:V.sellerId||'',search:'',cart:[],discount:0,discountType:'value',shipping:0,payments:[{method:'Dinheiro',amount:''}]};
+    state.ui.venda = {customerId:'',sellerId:V.sellerId||'',onlineOrderId:'',search:'',cart:[],discount:0,discountType:'value',shipping:0,payments:[{method:'Dinheiro',amount:''}]};
     state.ui.vendaView='lista';
     render();
   },
