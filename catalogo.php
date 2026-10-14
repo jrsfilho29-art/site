@@ -717,6 +717,8 @@ if($__op){
   <?php if($__hc !== ''): ?>header{background:<?= e($__hc) ?> !important;}
   <?php endif; ?>
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
+  .cta-wa{position:fixed!important;top:auto!important;right:auto!important;left:14px;bottom:18px;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
+  .cta-wa:hover{opacity:1;}
 </style>
 </head>
 <body>
@@ -726,7 +728,7 @@ if($__op){
     <p>Catálogo de Perfumes</p>
     <div class="hero-tools">
       <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Buscar perfume..." aria-label="Buscar perfume" autocomplete="off"></label>
-<?php if($WHATSAPP !== ''): ?>      <a class="cta-wa" target="_blank" rel="noopener" href="https://wa.me/<?= e($WHATSAPP) ?>?text=<?= rawurlencode('Olá! Vi o catálogo da Essência e gostaria de ajuda.') ?>">Falar no WhatsApp</a>
+<?php if($WHATSAPP !== ''): ?>      <a class="cta-wa" target="_blank" rel="noopener" href="https://wa.me/<?= e($WHATSAPP) ?>?text=<?= rawurlencode('Olá! Vi o catálogo da Essência e gostaria de ajuda.') ?>" aria-label="Falar no WhatsApp" title="Falar no WhatsApp"><svg viewBox="0 0 32 32" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M16 3.2A12.700 12.700 0 0 0 5.100 22.300L3.200 28.800l6.700-1.800A12.700 12.700 0 1 0 16 3.200zm0 2.200a10.500 10.500 0 1 1-5.400 19.500l-.4-.2-4 1 1.100-3.900-.3-.4A10.500 10.500 0 0 1 16 5.400zm-4.200 5.300c-.2 0-.6.100-.9.400-.3.300-1.200 1.200-1.200 2.900s1.200 3.400 1.400 3.600c.2.200 2.400 3.800 5.900 5.100 2.900 1.100 3.500.9 4.100.8.600-.1 2-.8 2.200-1.600.3-.8.3-1.400.2-1.600-.1-.1-.3-.2-.7-.4s-2-1-2.300-1.100c-.3-.1-.5-.2-.8.200-.2.300-.9 1.100-1.100 1.300-.2.200-.4.300-.7.100-.4-.2-1.400-.5-2.700-1.600-1-.9-1.700-2-1.900-2.400-.2-.4 0-.6.200-.8l.5-.6c.2-.2.200-.4.300-.6.100-.2 0-.4 0-.6l-1-2.400c-.2-.6-.5-.5-.7-.5z"/></svg></a>
 <?php endif; ?>    </div>
   </header>
   <ol class="steps"><li><b>1</b><span>Escolha<small>seus perfumes favoritos</small></span></li><li><b>2</b><span>Monte o carrinho<small>ajuste as quantidades</small></span></li><li><b>3</b><span>Envie o pedido<small>a loja combina o resto</small></span></li></ol>
@@ -749,7 +751,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-a</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-b</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
