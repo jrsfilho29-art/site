@@ -562,7 +562,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-u';
+const APP_VERSION = '2026.10.13-v';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2216,7 +2216,7 @@ const actions_login = {
 };
 
 /* ================= shell + sidebar ================= */
-const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
+const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',vendedores:'Vendedores',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
 
 function renderTopbar(){
   const today = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
@@ -2273,6 +2273,7 @@ function renderSidebar(){
     ['online','inbox','Pedidos online'],
     ['caixa','wallet','Caixa'],
     ['relatorios','chart','Relatórios'],
+    ['vendedores','users','Vendedores'],
     ['aparencia','palette','Aparência'],
     ['servidor','cloud','Servidor'],
     ['usuarios','key','Usuários'],
@@ -2315,6 +2316,7 @@ function renderTab(){
     case 'caixa': return renderCaixa();
     case 'relatorios': return renderRelatorios();
     case 'servidor': return renderServidor();
+    case 'vendedores': return renderVendedores();
     case 'aparencia': return renderAparencia();
     case 'usuarios': return renderUsuarios();
     default: return '';
@@ -3029,6 +3031,9 @@ const actions_produtos = {
     standardizeImportedImages(newProducts.filter(p=>p.image).map(p=>p.id));
   },
   editProduto(t){ const p = state.products.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'produto', data:{...p}}; render(); },
+  sellerSend(t){ state.ui.catSeller = t.dataset.id||''; state.ui.catMsg=''; state.ui.catalogoSubView='enviar'; state.tab='catalogo'; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
+  printVendedores(){ const o=state.ui.relType; state.ui.relType='vendedor'; try{ actions.printRelatorio(); } finally{ state.ui.relType=o; } },
+  exportVendedores(){ const o=state.ui.relType; state.ui.relType='vendedor'; try{ actions.exportRelatorio(); } finally{ state.ui.relType=o; } },
   setCatSeller(t){ state.ui.catSeller = t.dataset.id||''; state.ui.catMsg=''; render(); },
   addSeller(){
     const name = String(state.ui.newSellerName||'').trim(), ph = String(state.ui.newSellerPhone||'').replace(/\D/g,'');
@@ -4251,6 +4256,64 @@ function catalogPublicUrl(sid){
 function catalogDefaultMsg(){ const v = currentSeller(); return (v ? 'Olá! Aqui é '+v.name+', da Essência. ' : 'Olá! ')+'Veja o catálogo de perfumes e escolha o seu: '+catalogPublicUrl(); }
 function catalogMsg(){ return state.ui.catMsg!==undefined && state.ui.catMsg!=='' ? state.ui.catMsg : catalogDefaultMsg(); }
 function waPhone(ph){ let d=String(ph||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return d; }
+/* ================= vendedores ================= */
+function renderVendedores(){
+  const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
+  const from = state.ui.relFrom, to = state.ui.relTo;
+  const filtered = state.sales.filter(x=> x.status!=='cancelada' && localDay(x.date)>=from && localDay(x.date)<=to);
+  const sellerRows = sellersByPeriod(filtered);
+  const totalComm = sellerRows.reduce((a,o)=>a+o.comm,0);
+  const nSellers = sellersList().length + 1;
+  const adm = isAdmin();
+  return `
+  <div class="cx-hero"><div><h2 class="serif">Vendedores</h2><p>Cadastro, links do catálogo, vendas e comissões</p>
+    <div class="cx-stats"><div class="cx-stat"><b>${nSellers}</b><span>vendedor(es)</span></div>${adm?`<div class="cx-stat"><b>${filtered.length}</b><span>vendas no período</span></div><div class="cx-stat"><b>${brl(totalComm)}</b><span>comissão a pagar</span></div>`:''}</div></div></div>
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${wa?'':'border-color:var(--gold-deep);'}">
+    <b>WhatsApp da loja (vendedor principal)</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Número para onde o cliente é levado ao tocar em <b>Escolher este perfume</b> no catálogo, para finalizar a compra com você.${wa?'':' <b class="danger-c">Ainda não cadastrado: o botão não aparece no catálogo.</b>'}</p>
+    <label class="field" style="max-width:260px;margin-bottom:4px;"><span class="lbl">Telefone com DDD</span>
+      <input data-field="prefs.storeWhatsapp" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(maskPhone((state.prefs&&state.prefs.storeWhatsapp)||''))}"></label>
+    <span class="hint">Salvo e enviado ao servidor automaticamente (com a sincronização ligada), e o catálogo online passa a usar este número.</span>
+  </div>
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>Equipe de vendedores</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Cadastre quem mais atende clientes. Cada vendedor ganha um <b>link próprio do catálogo</b>: o botão de WhatsApp e os pedidos desse link vão para ele, e o pedido aparece em <b>Pedidos online</b> com o nome do vendedor.</p>
+    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;"><div><div style="font-size:14px;font-weight:600;">Loja (principal)</div><div class="muted2" style="font-size:12px;">Vendas sem vendedor escolhido</div></div>
+      <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.commissionMain" value="${esc((state.prefs&&state.prefs.commissionMain)||'')}" placeholder="0"> %</label></div>
+    ${sellersList().length===0 ? '<p class="muted2" style="font-size:13px;margin-bottom:10px;">Nenhum vendedor extra cadastrado.</p>' : sellersList().map((v,vi)=>`
+    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;">
+      <div style="min-width:0;"><div style="font-size:14px;font-weight:600;">${esc(v.name)}</div><div class="muted2" style="font-size:12px;">${esc(maskPhone(waPhone(v.phone).replace(/^55/,'')))}</div></div>
+      <div class="flex gap" style="flex-wrap:wrap;align-items:center;">
+        <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.sellers.${vi}.commission" value="${esc(v.commission||'')}" placeholder="0"> %</label>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="sellerSend" data-id="${esc(v.id)}">Enviar catálogo como ${esc(v.name.split(' ')[0])}</button>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="copySellerLink" data-id="${esc(v.id)}">Copiar link</button>
+        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;color:var(--danger);" data-action="removeSeller" data-id="${esc(v.id)}">Remover</button>
+      </div>
+    </div>`).join('')}
+    <div class="flex gap flex-wrap" style="align-items:flex-end;margin-top:12px;">
+      <label class="field" style="flex:1;min-width:160px;margin:0;"><span class="lbl">Nome do vendedor</span><input data-field="ui.newSellerName" maxlength="60" placeholder="Ex.: Maria" value="${esc(state.ui.newSellerName||'')}"></label>
+      <label class="field" style="width:190px;margin:0;"><span class="lbl">WhatsApp com DDD</span><input data-field="ui.newSellerPhone" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(state.ui.newSellerPhone||'')}"></label>
+      <button class="btn btn-gold" data-action="addSeller">${icon('plus')} Adicionar vendedor</button>
+    </div>
+    ${(!isAdmin() && sellersList().length) ? '<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam vendedores no servidor.</p>' : ''}
+  </div>
+${adm ? `  <div class="card" style="padding:18px;margin-bottom:16px;">
+    <b>Vendas e comissões por vendedor</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Comissão calculada sobre o total de cada venda (já com desconto), usando o percentual definido acima.</p>
+    <div class="flex gap flex-wrap mb2" style="align-items:end;">
+      <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.relFrom" value="${from}"></label>
+      <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.relTo" value="${to}"></label>
+      <button class="btn btn-gold" data-action="printVendedores">${icon('printer')} Imprimir</button>
+      <button class="btn btn-ghost" data-action="exportVendedores">${icon('download')} Exportar CSV</button>
+    </div>
+    <div class="table-wrap">${sellerRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table>
+      <thead><tr><th>Vendedor</th><th style="text-align:right;">Vendas</th><th style="text-align:right;">Total vendido</th><th style="text-align:right;">% do total</th><th style="text-align:right;">% comissão</th><th style="text-align:right;">Comissão a pagar</th></tr></thead>
+      <tbody>${sellerRows.map(o=>`<tr><td>${esc(o.name)}</td><td style="text-align:right;">${o.n}</td><td style="text-align:right;">${brl(o.total)}</td><td style="text-align:right;">${o.share.toFixed(1).replace('.',',')}%</td><td style="text-align:right;">${String(o.pct).replace('.',',')}%</td><td style="text-align:right;font-weight:600;">${brl(o.comm)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td><b>Total</b></td><td style="text-align:right;"><b>${sellerRows.reduce((a,o)=>a+o.n,0)}</b></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.total,0))}</b></td><td style="text-align:right;"><b>100%</b></td><td></td><td style="text-align:right;"><b>${brl(totalComm)}</b></td></tr></tfoot>
+    </table>`}</div>
+  </div>` : ''}`;
+}
+
 function renderCatalogoEnviar(){
   const url = catalogPublicUrl();
   const msg = catalogMsg();
@@ -4260,13 +4323,6 @@ function renderCatalogoEnviar(){
   const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
   const pixType = (state.prefs&&state.prefs.pixType)||'random', pixOk = !!String((state.prefs&&state.prefs.pixKey)||'').trim();
   return `
-  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${wa?'':'border-color:var(--gold-deep);'}">
-    <b>WhatsApp da loja (vendedor principal)</b>
-    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Número para onde o cliente é levado ao tocar em <b>Escolher este perfume</b> no catálogo, para finalizar a compra com você.${wa?'':' <b class="danger-c">Ainda não cadastrado: o botão não aparece no catálogo.</b>'}</p>
-    <label class="field" style="max-width:260px;margin-bottom:4px;"><span class="lbl">Telefone com DDD</span>
-      <input data-field="prefs.storeWhatsapp" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(maskPhone((state.prefs&&state.prefs.storeWhatsapp)||''))}"></label>
-    <span class="hint">Salvo e enviado ao servidor automaticamente (com a sincronização ligada), e o catálogo online passa a usar este número.</span>
-  </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${pixOk?'':'border-color:var(--gold-deep);'}">
     <b>Receber por PIX</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Quando o cliente escolhe <b>PIX</b> no carrinho do catálogo, ele recebe na hora o <b>QR Code e o código "copia e cola"</b> já com o valor do pedido, para pagar no app do banco.${pixOk?'':' <b class="danger-c">Ainda não cadastrado: o cliente não verá o código PIX.</b>'}</p>
@@ -4283,28 +4339,6 @@ function renderCatalogoEnviar(){
         <input data-field="prefs.pixCity" maxlength="15" placeholder="Ex.: Joao Pessoa" value="${esc((state.prefs&&state.prefs.pixCity)||'')}"></label>
     </div>
     <span class="hint">Use o nome e a cidade como estão no cadastro da sua chave no banco. Salvo e enviado ao servidor automaticamente. O dinheiro cai direto na sua conta; confira o pagamento no extrato antes de entregar.</span>
-  </div>
-  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
-    <b>Outros vendedores</b>
-    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Cadastre quem mais atende clientes. Cada vendedor ganha um <b>link próprio do catálogo</b>: o botão de WhatsApp e os pedidos desse link vão para ele, e o pedido aparece em <b>Pedidos online</b> com o nome do vendedor.</p>
-    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;"><div><div style="font-size:14px;font-weight:600;">Loja (principal)</div><div class="muted2" style="font-size:12px;">Vendas sem vendedor escolhido</div></div>
-      <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.commissionMain" value="${esc((state.prefs&&state.prefs.commissionMain)||'')}" placeholder="0"> %</label></div>
-    ${sellersList().length===0 ? '<p class="muted2" style="font-size:13px;margin-bottom:10px;">Nenhum vendedor extra cadastrado.</p>' : sellersList().map((v,vi)=>`
-    <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap;">
-      <div style="min-width:0;"><div style="font-size:14px;font-weight:600;">${esc(v.name)}</div><div class="muted2" style="font-size:12px;">${esc(maskPhone(waPhone(v.phone).replace(/^55/,'')))}</div></div>
-      <div class="flex gap" style="flex-wrap:wrap;align-items:center;">
-        <label class="muted2" style="font-size:12px;display:flex;align-items:center;gap:4px;">Comissão <input type="number" min="0" max="100" step="0.1" inputmode="decimal" style="width:70px;padding:5px 7px;" data-field="prefs.sellers.${vi}.commission" value="${esc(v.commission||'')}" placeholder="0"> %</label>
-        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="setCatSeller" data-id="${esc(v.id)}">Enviar como ${esc(v.name.split(' ')[0])}</button>
-        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;" data-action="copySellerLink" data-id="${esc(v.id)}">Copiar link</button>
-        <button class="btn btn-ghost" style="padding:6px 10px;font-size:12.5px;color:var(--danger);" data-action="removeSeller" data-id="${esc(v.id)}">Remover</button>
-      </div>
-    </div>`).join('')}
-    <div class="flex gap flex-wrap" style="align-items:flex-end;margin-top:12px;">
-      <label class="field" style="flex:1;min-width:160px;margin:0;"><span class="lbl">Nome do vendedor</span><input data-field="ui.newSellerName" maxlength="60" placeholder="Ex.: Maria" value="${esc(state.ui.newSellerName||'')}"></label>
-      <label class="field" style="width:190px;margin:0;"><span class="lbl">WhatsApp com DDD</span><input data-field="ui.newSellerPhone" data-mask="phone" inputmode="tel" placeholder="(11) 99999-9999" value="${esc(state.ui.newSellerPhone||'')}"></label>
-      <button class="btn btn-gold" data-action="addSeller">${icon('plus')} Adicionar vendedor</button>
-    </div>
-    ${(!isAdmin() && sellersList().length) ? '<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam vendedores no servidor.</p>' : ''}
   </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Convite</b>
@@ -4561,7 +4595,7 @@ function relTables(T, from, to){
   });
   const disc = sales.reduce((a,s)=>a+(s.discount||0),0), profit = revenue-cost-disc;
   const T_ = [];
-  const want = k => T==='geral' || T===k;
+  const want = k => (T==='geral' && k!=='vendedor') || T===k;
   if(want('lucro')) T_.push({key:'lucro', title:'Lucratividade', head:['Vendas','Receita','Custo','Descontos','Lucro líquido','Margem'], rows:[[sales.length, 'R$ '+f2(revenue), 'R$ '+f2(cost), 'R$ '+f2(disc), 'R$ '+f2(profit), revenue>0?pc(profit/revenue*100):'0,0%']]});
   if(want('vendedor')){ const sr=sellersByPeriod(sales); T_.push({key:'vendedor', title:'Vendas por vendedor e comissão', head:['Vendedor','Vendas','Total vendido','% do total','% comissão','Comissão a pagar'], rows:sr.map(o=>[o.name,o.n,'R$ '+f2(o.total),pc(o.share),pc(o.pct),'R$ '+f2(o.comm)]), foot:sr.length?['Total',sr.reduce((a,o)=>a+o.n,0),'R$ '+f2(sr.reduce((a,o)=>a+o.total,0)),'100%','','R$ '+f2(sr.reduce((a,o)=>a+o.comm,0))]:null}); }
   if(want('produto')) T_.push({key:'produto', title:'Vendas por produto', head:['Código','Produto','Qtd. vendida','Receita','Custo','Lucro'], rows:Object.entries(prod).sort((a,b)=>b[1].qty-a[1].qty).map(([n,v])=>[v.sku,n,v.qty,'R$ '+f2(v.rev),'R$ '+f2(v.cost),'R$ '+f2(v.rev-v.cost)])});
@@ -4604,16 +4638,15 @@ function renderRelatorios(){
   const custRows = Object.entries(perCust).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
   const perDay = {}; filtered.forEach(s=>{ const k=localDay(s.date); perDay[k]=(perDay[k]||0)+s.total; });
   const dayKeys = Object.keys(perDay).sort(); const maxD = dayKeys.reduce((a,k)=>Math.max(a,perDay[k]),0)||1;
-  const sellerRows = sellersByPeriod(filtered);
   const lowStock = state.products.filter(p=>p.stock<=(p.minStock||0));
   const stockValueCost = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
   const stockValueSale = state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
 
   return `
-  <div class="cx-hero"><div><h2 class="serif">Relatórios</h2><p>Lucratividade, vendas por vendedor, comissões e estoque</p></div></div>
+  <div class="cx-hero"><div><h2 class="serif">Relatórios</h2><p>Lucratividade, vendas, pagamentos e estoque</p></div></div>
   <div class="flex gap flex-wrap mb3" style="align-items:end;">
     <label class="field" style="margin-bottom:0;min-width:210px;"><span class="lbl">Tipo de relatório</span>
-      <select data-field="ui.relType">${REL_TYPES.map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
+      <select data-field="ui.relType">${REL_TYPES.filter(r=>r[0]!=='vendedor').map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.relFrom" value="${from}"></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.relTo" value="${to}"></label>
     <button class="btn btn-gold" data-action="printRelatorio">${icon('printer')} Imprimir relatório</button>
@@ -4637,13 +4670,6 @@ function renderRelatorios(){
     ${show('cliente')?`    <div><h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Melhores clientes</h3>
       <div class="table-wrap">${custRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table><thead><tr><th>Cliente</th><th style="text-align:right;">Compras</th><th style="text-align:right;">Total</th></tr></thead><tbody>${custRows.map(([n,v])=>`<tr><td>${esc(n)}</td><td style="text-align:right;">${v.n}</td><td style="text-align:right;">${brl(v.total)}</td></tr>`).join('')}</tbody></table>`}</div></div>`:''}
   </div>
-  ${show('vendedor')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:4px;">Vendas por vendedor e comissão</h3>
-  <p class="muted2" style="font-size:12px;margin:0 0 10px;">Comissão calculada sobre o total de cada venda (já com desconto). Defina o percentual de cada vendedor em Catálogo On &rarr; Enviar aos clientes.</p>
-  <div class="table-wrap mb3">${sellerRows.length===0?`<div style="padding:18px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período.</div>`:`<table>
-    <thead><tr><th>Vendedor</th><th style="text-align:right;">Vendas</th><th style="text-align:right;">Total vendido</th><th style="text-align:right;">% do total</th><th style="text-align:right;">% comissão</th><th style="text-align:right;">Comissão a pagar</th></tr></thead>
-    <tbody>${sellerRows.map(o=>`<tr><td>${esc(o.name)}</td><td style="text-align:right;">${o.n}</td><td style="text-align:right;">${brl(o.total)}</td><td style="text-align:right;">${o.share.toFixed(1).replace('.',',')}%</td><td style="text-align:right;">${String(o.pct).replace('.',',')}%</td><td style="text-align:right;font-weight:600;">${brl(o.comm)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td><b>Total</b></td><td style="text-align:right;"><b>${sellerRows.reduce((a,o)=>a+o.n,0)}</b></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.total,0))}</b></td><td style="text-align:right;"><b>100%</b></td><td></td><td style="text-align:right;"><b>${brl(sellerRows.reduce((a,o)=>a+o.comm,0))}</b></td></tr></tfoot>
-  </table>`}</div>`:''}
   ${show('pagamento')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Formas de pagamento</h3>
   <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">${Object.entries(perMethod).sort((a,b)=>b[1]-a[1]).map(([m,v])=>`<div class="card" style="padding:12px;"><div class="muted" style="font-size:11px;margin-bottom:4px;">${esc(m)}</div><div class="serif" style="font-size:17px;color:var(--plum);">${brl(v)}</div></div>`).join('') || `<p class="muted2" style="font-size:13px;">Sem pagamentos no período.</p>`}</div>`:''}
   ${show('produto')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Vendas por produto</h3>
