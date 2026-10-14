@@ -95,13 +95,14 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
   if(!$want) $jerr(422, 'Seu carrinho está vazio.');
   $items = []; $total = 0.0; $units = 0;
   try{
-    $st = $pdo->prepare('SELECT id,name,sale_price,stock FROM products WHERE id = ? AND active = 1 AND stock > 0');
+    $__pc = true; try{ $pdo->query('SELECT promo_price FROM products LIMIT 1'); }catch(Throwable $__e){ $__pc = false; }
+    $st = $pdo->prepare('SELECT id,name,sale_price,'.($__pc ? 'promo_price,' : '').'stock FROM products WHERE id = ? AND active = 1 AND stock > 0');
     foreach($want as $pid => $q){
       $st->execute([$pid]); $pr = $st->fetch();
       if(!$pr) $jerr(404, 'Um dos produtos não está mais disponível. Atualize a página e confira seu carrinho.');
       if($q > 20) $jerr(422, 'Quantidade inválida.');
       if($q > (int)$pr['stock']) $jerr(422, 'Só temos '.(int)$pr['stock'].' unidade(s) de '.$pr['name'].'.');
-      $price = (float)$pr['sale_price'];
+      $price = eff_price($pr);
       $items[] = ['productId'=>$pr['id'], 'name'=>$pr['name'], 'qty'=>$q, 'unitPrice'=>$price];
       $total += $price * $q; $units += $q;
     }
@@ -195,7 +196,8 @@ if(isset($_GET['ogimg'])){
 try{
   $cats = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
   $subs = $pdo->query('SELECT name, category FROM subcategories ORDER BY name')->fetchAll();
-  $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll();
+  try{ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,promo_price,is_new,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }
+  catch(Throwable $__e){ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }
 }catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
 
 $coll = class_exists('Collator') ? new Collator('pt_BR') : null;
@@ -203,6 +205,7 @@ if($coll) $coll->setAttribute(Collator::NUMERIC_COLLATION, Collator::ON);
 function cmpName($a, $b){ global $coll; $x=(string)$a['name']; $y=(string)$b['name'];
   return $coll ? $coll->compare($x,$y) : strnatcasecmp($x,$y); }
 function brl($v){ return 'R$ '.number_format((float)$v, 2, ',', '.'); }
+function eff_price($p){ $pr = (float)($p['promo_price'] ?? 0); $sp = (float)$p['sale_price']; return ($pr > 0 && $pr < $sp) ? $pr : $sp; }
 function lower($s){ return mb_strtolower(trim((string)$s), 'UTF-8'); }
 
 /* categoria > subgrupo > produtos (mesma lógica do sistema) */
@@ -234,6 +237,8 @@ foreach($groups as &$g){
 unset($g);
 
 function card($p){
+  $__eff = eff_price($p); $__promo = $__eff < (float)$p['sale_price']; $__new = !empty($p['is_new']);
+  $__pct = $__promo ? (int)round((1 - $__eff / (float)$p['sale_price']) * 100) : 0;
   $img = (string)$p['image'];
   if(strncmp($img, 'data:', 5) === 0) $src = 'catalogo.php?img='.rawurlencode($p['id']).'&v='.substr(md5($img), 0, 8);
   elseif(preg_match('#^https?://#i', $img)) $src = $img;
@@ -243,19 +248,25 @@ function card($p){
   $brand = trim((string)$p['brand']);
   $meta = '<div class="cat">'.(($brand !== '' || $vol !== '') ? e($brand).($brand !== '' && $vol !== '' ? ' · ' : '').e($vol) : '&nbsp;').'</div>';
   $meta_txt = trim($brand.($brand !== '' && $vol !== '' ? ' · ' : '').$vol);
-  $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($p['sale_price'])).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
+  $attrs = ' data-name="'.e($p['name']).'" data-meta="'.e($meta_txt).'" data-price="'.e(brl($__eff)).'" data-desc="'.e(trim((string)($p['description'] ?? ''))).'"';
   global $WHATSAPP, $__base, $SELLER_ID;
-  $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format((float)$p['sale_price'], 2, '.', '')).'" data-st="'.(int)min(20, (int)$p['stock']).'"';
+  if($__promo) $attrs .= ' data-promo="1" data-old="'.e(brl($p['sale_price'])).'"';
+  if($__new) $attrs .= ' data-new="1"';
+  $attrs .= ' data-id="'.e($p['id']).'" data-pv="'.e(number_format($__eff, 2, '.', '')).'" data-st="'.(int)min(20, (int)$p['stock']).'"';
   if($WHATSAPP !== ''){
     $plink = $__base.'catalogo.php?p='.rawurlencode($p['id']).($SELLER_ID !== '' ? '&vend='.rawurlencode($SELLER_ID) : '');   /* o WhatsApp mostra a foto do produto na prévia deste link */
     $__d = substr($WHATSAPP, 2); $__ph = strlen($__d) >= 10 ? '('.substr($__d,0,2).') '.substr($__d,2,strlen($__d)-6).'-'.substr($__d,-4) : $__d;
     $attrs .= ' data-ph="'.e($__ph).'"';
-    $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink).'"';
-    $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink)).'"';
+    $attrs .= ' data-msg="'.e('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink).'"';
+    $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($__eff).'). Quero finalizar a compra! '.$plink)).'"';
   }
   $btn = '<span class="buy">Ver detalhes</span>';
-  $low = ((int)$p['stock'] > 0 && (int)$p['stock'] <= 3) ? '<span class="tag-low">Últimas unidades</span>' : '';
-  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
+  $low = '';
+  if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%</span>';
+  if($__new) $low .= '<span class="tag-new">Novidade</span>';
+  if((int)$p['stock'] > 0 && (int)$p['stock'] <= 3) $low .= '<span class="tag-low">Últimas unidades</span>';
+  if($low !== '') $low = '<div class="tags">'.$low.'</div>';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').brl($__eff).'</div>'.$btn.'</div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -272,7 +283,7 @@ header('X-Content-Type-Options: nosniff');
 $__op = null;
 if(isset($_GET['p'])){ foreach($prods as $__x){ if((string)$__x['id'] === (string)$_GET['p']){ $__op = $__x; break; } } }
 if($__op){
-  $__ot = trim((string)$__op['name']).' — '.brl($__op['sale_price']);
+  $__ot = trim((string)$__op['name']).' — '.brl(eff_price($__op));
   $__od = 'Escolhi este perfume na Essência. '.trim((string)$__op['brand'].' '.(is_numeric($__op['volume']) ? $__op['volume'].'ml' : (string)$__op['volume']));
   $__oi = (strncmp((string)$__op['image'], 'data:', 5) === 0) ? $__base.'catalogo.php?ogimg='.rawurlencode($__op['id']).'&v='.substr(md5((string)$__op['image']),0,8) : (preg_match('#^https?://#i', (string)$__op['image']) ? (string)$__op['image'] : '');
 ?>
@@ -566,7 +577,8 @@ if($__op){
   .catsec h2{font-size:26px;font-weight:400;padding:0 0 14px;margin-bottom:18px;}
   .catsec h2::after{width:70px;height:4px;}
   .catsec h3{display:inline-flex;background:#FFF3D6;color:var(--gold-deep);padding:5px 13px;border-radius:999px;margin:6px 0 14px;font-size:12px;}
-  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;align-items:stretch;}
+  .card{height:100%;}
   .card{border-radius:16px;box-shadow:var(--shadow-s);background:#fff;position:relative;transition:transform .18s ease,box-shadow .18s ease;}
   .card:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
   .imgwrap{margin:7px 7px 0;border-radius:12px;background:linear-gradient(160deg,#F4F5FC,#FFF);padding:8px;}
@@ -600,6 +612,18 @@ if($__op){
     .catsec h2{font-size:21px;}
     .tag-low{top:6px;left:6px;font-size:8.5px;padding:2px 6px;}
   }
+  .tags{position:absolute;top:8px;left:8px;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+  .tags .tag-low{position:static;}
+  .tag-promo,.tag-new{font-size:10.5px;font-weight:800;letter-spacing:.03em;padding:4px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(13,18,48,.18);}
+  .tag-promo{background:#D6334F;color:#fff;}
+  .tag-new{background:var(--gold);color:var(--plum-dark);}
+  .price .old{display:block;font-size:11px;font-weight:500;color:var(--muted);text-decoration:line-through;line-height:1.1;}
+  .lb-p .old,.lb-price .old{font-size:13px;font-weight:400;color:var(--muted);text-decoration:line-through;margin-right:8px;}
+  .nav a.hot{border-color:#D6334F;color:#B8213C;}
+  .nav a.hot.on{background:#D6334F;border-color:#D6334F;color:#fff;}
+  .nav a.nv{border-color:var(--gold);color:var(--gold-deep);}
+  .nav a.nv.on{background:var(--gold);border-color:var(--gold);color:var(--plum-dark);}
+  @media (max-width:640px){.tags{top:6px;left:6px;gap:3px;}.tag-promo,.tag-new{font-size:9px;padding:2px 6px;}.price .old{font-size:9.5px;}}
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
 </style>
 </head>
@@ -614,8 +638,9 @@ if($__op){
 <?php endif; ?>    </div>
   </header>
   <ol class="steps"><li><b>1</b><span>Escolha<small>seus perfumes favoritos</small></span></li><li><b>2</b><span>Monte o carrinho<small>ajuste as quantidades</small></span></li><li><b>3</b><span>Envie o pedido<small>a loja combina o resto</small></span></li></ol>
-<?php if(count($groups) > 1): ?>
-  <nav class="nav" id="tabs"><a href="#" data-cat="all" class="on">Todos</a><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
+<?php $nPromo = 0; $nNovo = 0; foreach($prods as $__q){ if(eff_price($__q) < (float)$__q['sale_price']) $nPromo++; if(!empty($__q['is_new'])) $nNovo++; } ?>
+<?php if(count($groups) > 1 || $nPromo || $nNovo): ?>
+  <nav class="nav" id="tabs"><a href="#" data-cat="all" class="on">Todos</a><?php if($nPromo): ?><a href="#" data-cat="f-promo" class="hot">Promoções <span><?= $nPromo ?></span></a><?php endif; ?><?php if($nNovo): ?><a href="#" data-cat="f-novo" class="nv">Novidades <span><?= $nNovo ?></span></a><?php endif; ?><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
 <?php endif; ?>
   <div class="wrap">
 <?php if(!$groups): ?>
@@ -632,7 +657,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-w</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-x</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -719,7 +744,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if(s){im.src=s;im.alt=c.getAttribute('data-name')||'';im.parentNode.style.display='';}else{im.removeAttribute('src');im.parentNode.style.display='none';}
     $('lb-b').textContent=c.getAttribute('data-meta')||'';
     $('lb-n').textContent=c.getAttribute('data-name')||'';
-    $('lb-p').textContent=c.getAttribute('data-price')||'';
+    var lp=$('lb-p'),old=c.getAttribute('data-old');lp.textContent='';if(old){var so=document.createElement('s');so.className='old';so.textContent=old;lp.appendChild(so);}lp.appendChild(document.createTextNode(c.getAttribute('data-price')||''));
     var d=c.getAttribute('data-desc')||'',de=$('lb-d');
     de.textContent=d||'Sem descrição cadastrada.';de.className='lb-desc'+(d?'':' empty');
     cur=c;$('lb-box').classList.toggle('ni',!s);
@@ -797,10 +822,10 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function apply(){
     var t=norm(q?q.value:''),any=false;
     secs.forEach(function(sec){
-      var on=active==='all'||sec.id===active,vis=0;
+      var fl=active.indexOf('f-')===0,on=active==='all'||fl||sec.id===active,vis=0;
       [].slice.call(sec.querySelectorAll('.grid')).forEach(function(g){
         var n=0;[].slice.call(g.querySelectorAll('.card')).forEach(function(c){
-          var m=!t||norm((c.getAttribute('data-name')||'')+' '+(c.getAttribute('data-meta')||'')).indexOf(t)>-1;
+          var m=(!t||norm((c.getAttribute('data-name')||'')+' '+(c.getAttribute('data-meta')||'')).indexOf(t)>-1)&&(active!=='f-promo'||c.getAttribute('data-promo')==='1')&&(active!=='f-novo'||c.getAttribute('data-new')==='1');
           c.style.display=m?'':'none';if(m)n++;});
         g.style.display=n?'':'none';var h=g.previousElementSibling;if(h&&h.tagName==='H3')h.style.display=n?'':'none';vis+=n;});
       sec.style.display=(on&&vis)?'':'none';if(on&&vis)any=true;});
@@ -809,9 +834,10 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   if(q)q.addEventListener('input',apply);
   if(tabs)tabs.addEventListener('click',function(e){
     var a=e.target.closest('a[data-cat]');if(!a)return;e.preventDefault();
-    active=a.getAttribute('data-cat');[].slice.call(tabs.querySelectorAll('a')).forEach(function(x){x.className=x===a?'on':'';});
+    active=a.getAttribute('data-cat');[].slice.call(tabs.querySelectorAll('a')).forEach(function(x){x.classList.toggle('on',x===a);});
     apply();var w=document.querySelector('.wrap');if(w&&window.scrollY>w.offsetTop)window.scrollTo(0,Math.max(0,w.offsetTop-60));
   });
+  if(tabs){var mf=/[?&]f=(promo|novo)\b/.exec(location.search);if(mf){var ta=tabs.querySelector('a[data-cat="f-'+mf[1]+'"]');if(ta)ta.click();}}
 })();
 </script>
 </body>

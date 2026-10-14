@@ -585,7 +585,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-w';
+const APP_VERSION = '2026.10.13-y';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1044,12 +1044,12 @@ function buildCatalogPageHTML(list){
     const metaTxt = [p.brand||'', p.volume? (String(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':'')) : ''].filter(Boolean).join(' · ');
     const waNum = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
     const waAttr = waNum ? ` data-wa="${esc('https://wa.me/'+(waNum.length<=11?'55'+waNum:waNum)+'?text='+encodeURIComponent('Olá! Escolhi este perfume no catálogo da Essência: '+p.name+' ('+brl(p.salePrice)+'). Quero finalizar a compra!'))}"` : '';
-    return `<div class="card" data-name="${esc(p.name)}" data-meta="${esc(metaTxt)}" data-price="${esc(brl(p.salePrice))}" data-desc="${esc((p.description||'').trim())}"${waAttr}>
+    return `<div class="card" data-name="${esc(p.name)}" data-meta="${esc(metaTxt)}" data-price="${esc(brl(effPrice(p)))}" data-desc="${esc((p.description||'').trim())}"${waAttr}>
       <div class="imgwrap">${img}${soldOut}</div>
       <div class="info">
         ${`<div class="cat">${(p.brand||p.volume)?'':'&nbsp;'}${esc(p.brand||'')}${p.brand&&p.volume?' · ':''}${p.volume? esc(p.volume)+(/^\d+([.,]\d+)?$/.test(String(p.volume).trim())?'ml':''):''}</div>`}
         <div class="name">${esc(p.name)}</div>
-        <div class="price">${brl(p.salePrice)}</div>
+        <div class="price">${brl(effPrice(p))}</div>
         <span class="buy">Ver detalhes</span>
       </div>
     </div>`;
@@ -2744,7 +2744,7 @@ const actions_online = {
       if(p.stock<=0){ miss.push(i.name+' (sem estoque)'); return; }
       const q = Math.min(i.qty, p.stock); if(q<i.qty) miss.push(i.name+' (só '+p.stock+' em estoque)');
       const ex = V.cart.find(x=>x.productId===p.id);
-      if(ex) ex.qty = Math.min(p.stock, ex.qty+q); else V.cart.push({productId:p.id, name:p.name, qty:q, unitPrice:p.salePrice, stock:p.stock});
+      if(ex) ex.qty = Math.min(p.stock, ex.qty+q); else V.cart.push({productId:p.id, name:p.name, qty:q, unitPrice:effPrice(p), stock:p.stock});
     });
     if(!V.cart.length){ notify.err('Nenhum item do pedido pode ser vendido: '+miss.join('; ')); return; }
     const pm = PAYMENT_METHODS.find(m=>m.toLowerCase()===String(o.payment||'').toLowerCase());
@@ -2804,7 +2804,7 @@ function renderProductCard(p, sel){
           <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
           <div class="pc-code">${p.sku? 'Cód. '+esc(p.sku) : '&nbsp;'}</div>
           ${state.prefs.showPrices!==false ? `
-          <div class="pc-price"><b>${brl(p.salePrice)}</b>${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
+          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
           <div class="pc-stock">
             <div class="row${zero||low?' bad':''}"><span>Estoque</span><span>${p.stock} de ${cap}${zero||low?' · repor':''}</span></div>
             <div class="pc-bar${zero?' zero':low?' low':''}"><i style="width:${pct}%"></i></div>
@@ -2983,7 +2983,7 @@ function renderProdutos(){
 
 const actions_produtos = {
   toggleAddMenu(){ state.ui.addMenuOpen = !state.ui.addMenuOpen; render(); },
-  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',stock:0,minStock:0,description:''}}; render(); },
+  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',promoPrice:'',isNew:false,stock:0,minStock:0,description:''}}; render(); },
   openExportProducts(){
     state.ui.addMenuOpen=false;
     const list = currentProductExportList();
@@ -3057,6 +3057,7 @@ const actions_produtos = {
   sellerSend(t){ state.ui.catSeller = t.dataset.id||''; state.ui.catMsg=''; state.ui.catalogoSubView='enviar'; state.tab='catalogo'; if(state.currentUser) sessionSave(state.currentUser, state.tab); render(); },
   printVendedores(){ const o=state.ui.relType; state.ui.relType='vendedor'; try{ actions.printRelatorio(); } finally{ state.ui.relType=o; } },
   exportVendedores(){ const o=state.ui.relType; state.ui.relType='vendedor'; try{ actions.exportRelatorio(); } finally{ state.ui.relType=o; } },
+  setCatCampaign(t){ state.ui.catCampaign = t.dataset.k||''; state.ui.catMsg=''; render(); },
   setCatSeller(t){ state.ui.catSeller = t.dataset.id||''; state.ui.catMsg=''; render(); },
   addSeller(){
     const name = String(state.ui.newSellerName||'').trim(), ph = String(state.ui.newSellerPhone||'').replace(/\D/g,'');
@@ -3221,6 +3222,8 @@ const actions_produtos = {
       costPrice: Math.max(0, parseFloat(d.costPrice)||0),
       salePrice: Math.max(0, parseFloat(d.salePrice)||0),
       markup: Math.max(0, parseFloat(d.markup)||0),
+      promoPrice: (()=>{ const v=parseFloat(d.promoPrice)||0, sp=parseFloat(d.salePrice)||0; return (v>0 && v<sp) ? +v.toFixed(2) : 0; })(),
+      isNew: !!d.isNew,
       stock: Math.max(0, parseInt(d.stock)||0),
       minStock: Math.max(0, parseInt(d.minStock)||0),
       maxStock: d.maxStock? Math.max(0, parseInt(d.maxStock)||0) : null,
@@ -3783,7 +3786,7 @@ const actions_vendas = {
       if(existing.qty+1>p.stock){ notify.err('Quantidade maior que o estoque disponível.'); return; }
       existing.qty++;
     } else {
-      V.cart.push({productId:p.id, name:p.name, qty:1, unitPrice:p.salePrice, stock:p.stock});
+      V.cart.push({productId:p.id, name:p.name, qty:1, unitPrice:effPrice(p), stock:p.stock});
     }
     V.search='';
     render();
@@ -4060,7 +4063,7 @@ const actions_pedidos = {
     const P = state.ui.pedido;
     const existing = P.cart.find(i=>i.productId===p.id);
     if(existing){ existing.qty++; }
-    else { P.cart.push({productId:p.id, name:p.name, qty:1, unitPrice:p.salePrice}); }
+    else { P.cart.push({productId:p.id, name:p.name, qty:1, unitPrice:effPrice(p)}); }
     P.search='';
     render();
   },
@@ -4269,14 +4272,30 @@ function sellersByPeriod(sales){
   const grand = Object.values(per).reduce((a,o)=>a+o.total,0);
   return Object.values(per).map(o=>{ const pct=commissionOf(o.id); return Object.assign(o,{share: grand>0?o.total/grand*100:0, pct, comm: o.total*pct/100}); }).sort((a,b)=>b.total-a.total);
 }
+function promoOn(p){ const pr=parseFloat(p&&p.promoPrice)||0; return pr>0 && pr<(parseFloat(p.salePrice)||0); }
+function effPrice(p){ return promoOn(p) ? parseFloat(p.promoPrice) : (parseFloat(p&&p.salePrice)||0); }
+function promoPct(p){ return promoOn(p) ? Math.round((1-effPrice(p)/p.salePrice)*100) : 0; }
 function sellersList(){ return (state.prefs && Array.isArray(state.prefs.sellers)) ? state.prefs.sellers : []; }
 function currentSeller(){ const id = state.ui.catSeller||''; return id ? sellersList().find(x=>x.id===id) || null : null; }
 function catalogPublicUrl(sid){
   const base = /^https?:/i.test(location.protocol) && location.hostname ? new URL('catalogo.php', location.href).href : 'https://seuperfume.net/catalogo.php';
   const id = sid===undefined ? (currentSeller()?currentSeller().id:'') : sid;
-  return id ? base + '?vend=' + encodeURIComponent(id) : base;
+  const f = state.ui.catCampaign==='promo' ? 'promo' : state.ui.catCampaign==='novo' ? 'novo' : '';
+  const qs = [id ? 'vend='+encodeURIComponent(id) : '', f ? 'f='+f : ''].filter(Boolean).join('&');
+  return qs ? base + '?' + qs : base;
 }
-function catalogDefaultMsg(){ const v = currentSeller(); return (v ? 'Olá! Aqui é '+v.name+', da Essência. ' : 'Olá! ')+'Veja o catálogo de perfumes e escolha o seu: '+catalogPublicUrl(); }
+function campaignList(kind){ return state.products.filter(p=> p.active!==false && p.stock>0 && (kind==='promo' ? promoOn(p) : !!p.isNew)); }
+function catalogDefaultMsg(){
+  const v = currentSeller(), hi = v ? 'Olá! Aqui é '+v.name+', da Essência. ' : 'Olá! ', k = state.ui.catCampaign;
+  if(k==='promo' || k==='novo'){
+    const l = campaignList(k), max = 8;
+    const lines = l.slice(0,max).map(p=> k==='promo' ? '• '+p.name+' — de '+brl(p.salePrice)+' por *'+brl(effPrice(p))+'*' : '• '+p.name+' — '+brl(effPrice(p)));
+    if(l.length>max) lines.push('• e mais '+(l.length-max)+' produto(s)...');
+    const head = k==='promo' ? '🔥 *Promoções da Essência!* Aproveite os preços especiais:' : '✨ *Novidades na Essência!* Acabaram de chegar:';
+    return hi+head+(lines.length?'\n'+lines.join('\n'):'')+'\n\nVeja tudo e peça pelo catálogo: '+catalogPublicUrl();
+  }
+  return hi+'Veja o catálogo de perfumes e escolha o seu: '+catalogPublicUrl();
+}
 function catalogMsg(){ return state.ui.catMsg!==undefined && state.ui.catMsg!=='' ? state.ui.catMsg : catalogDefaultMsg(); }
 function waPhone(ph){ let d=String(ph||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return d; }
 /* ================= vendedores ================= */
@@ -4345,7 +4364,14 @@ function renderCatalogoEnviar(){
   const semFone = state.customers.filter(c=>!waPhone(c.phone)).length;
   const wa = String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,'');
   const pixType = (state.prefs&&state.prefs.pixType)||'random', pixOk = !!String((state.prefs&&state.prefs.pixKey)||'').trim();
+  const camp = state.ui.catCampaign||'', nPromo = campaignList('promo').length, nNovo = campaignList('novo').length;
   return `
+  <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>O que enviar aos clientes</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Escolha o assunto: a mensagem já vem pronta com os produtos, e o link abre o catálogo direto na aba certa. Marque os produtos em <b>Produtos &rarr; editar</b> (preço promocional e Novidade).</p>
+    <div class="segbar" style="flex-wrap:wrap;"><button class="${!camp?'on':''}" data-action="setCatCampaign" data-k="">Catálogo completo</button><button class="${camp==='promo'?'on':''}" data-action="setCatCampaign" data-k="promo">🔥 Promoções (${nPromo})</button><button class="${camp==='novo'?'on':''}" data-action="setCatCampaign" data-k="novo">✨ Novidades (${nNovo})</button></div>
+    ${camp && campaignList(camp).length===0 ? `<p class="danger-c" style="font-size:12.5px;margin:10px 0 0;">Nenhum produto ${camp==='promo'?'em promoção':'marcado como novidade'} (e disponível em estoque). A mensagem seguirá sem lista de produtos.</p>` : ''}
+  </div>
   <div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;${pixOk?'':'border-color:var(--gold-deep);'}">
     <b>Receber por PIX</b>
     <p class="muted" style="font-size:12.5px;margin:6px 0 10px;">Quando o cliente escolhe <b>PIX</b> no carrinho do catálogo, ele recebe na hora o <b>QR Code e o código "copia e cola"</b> já com o valor do pedido, para pagar no app do banco.${pixOk?'':' <b class="danger-c">Ainda não cadastrado: o cliente não verá o código PIX.</b>'}</p>
@@ -4422,7 +4448,7 @@ function renderCatalogoCard(p){
         <div class="pc-body">
           <div class="pc-brand"><span>${p.brand? esc(p.brand) : '&nbsp;'}</span>${p.volume? `<span class="vol">${esc(p.volume)}ml</span>`:''}</div>
           <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
-          <div class="pc-price"><b>${brl(p.salePrice)}</b></div>
+          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}</div>
           <div class="pc-meta">${p.sku?'Cód. '+esc(p.sku)+' · ':''}${out?'sem estoque':p.stock+' em estoque'}${p.category?' · '+esc(p.category):''}</div>
           ${p.description?`<div class="pc-desc">${esc(p.description)}</div>`:''}
           <div style="margin-top:auto;"><button class="btn ${inactive?'btn-gold':'btn-ghost'} pc-btn" data-action="toggleProductActive" data-id="${p.id}">
@@ -5457,6 +5483,10 @@ function renderProdutoModal(d){
       <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" value="${esc(d.costPrice)}"></label>
       <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" min="0" data-field="ui.modal.data.markup" value="${esc(d.markup)}"></label>
       <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
+    </div>
+    <div class="grid grid-2" style="align-items:end;">
+      <label class="field"><span class="lbl">Preço promocional (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.promoPrice" value="${esc(d.promoPrice||'')}" placeholder="vazio = sem promoção"><span class="hint">${(parseFloat(d.promoPrice)||0)>0 && (parseFloat(d.promoPrice)||0)>=(parseFloat(d.salePrice)||0) ? '<b class="danger-c">Precisa ser menor que o preço de venda.</b>' : 'Aparece riscado no catálogo, com o desconto em %.'}</span></label>
+      <label class="field" style="display:flex;align-items:center;gap:8px;padding-bottom:20px;"><input type="checkbox" data-field="ui.modal.data.isNew" ${d.isNew?'checked':''}> <span><b>Novidade</b> <span class="muted2" style="font-size:12px;">(selo no catálogo)</span></span></label>
     </div>
     <div class="grid grid-3">
       <label class="field"><span class="lbl">Estoque inicial / atual</span><input type="number" min="0" data-field="ui.modal.data.stock" value="${esc(d.stock)}"><span class="hint">Quantidade disponível</span></label>
