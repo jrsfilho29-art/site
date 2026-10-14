@@ -684,6 +684,16 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .pay button.on{border-color:var(--gold);background:#FFF6DF;box-shadow:inset 0 0 0 1px var(--gold);}
   .toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:130;background:var(--plum);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center;}
   .toast.on{opacity:1;transform:translateX(-50%);}
+  .atoast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:131;width:min(92vw,380px);background:#fff;color:var(--plum);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(13,18,48,.28);padding:10px 12px;display:none;align-items:center;gap:10px;opacity:0;transition:.25s;}
+  .atoast.on{display:flex;opacity:1;transform:translateX(-50%);}
+  .atoast img,.atoast .at-ph{width:46px;height:46px;border-radius:8px;object-fit:cover;background:#eef0fa;flex:none;}
+  .atoast .at-m{flex:1;min-width:0;}
+  .atoast .at-t{font-size:11.5px;font-weight:700;color:#1a8f4a;}
+  .atoast .at-n{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .atoast .at-q{font-size:12px;color:var(--muted,#6b6f85);}
+  .atoast button{font-family:inherit;font-size:12.5px;font-weight:700;border:none;border-radius:10px;padding:9px 12px;cursor:pointer;flex:none;background:var(--plum);color:#fff;}
+  .incart{position:absolute;left:6px;bottom:6px;z-index:2;background:rgba(26,143,74,.95);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+  .imgwrap{position:relative;}
   .ct .lb-x{top:10px;right:10px;}
   .ct .of-t{padding-right:40px;}
   .ct .of-ok{display:block;}
@@ -836,7 +846,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-i</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-j</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -881,6 +891,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><div class="pixbox" id="ct-pix" style="display:none"><h4>Pague com PIX</h4><div class="pv" id="ct-pixv"></div><div class="pq" id="ct-pixq"></div><textarea class="pc" id="ct-pixc" readonly rows="3" aria-label="Código PIX copia e cola"></textarea><button type="button" class="lb-act lb-buy" id="ct-pixb" style="margin-top:10px">Copiar código PIX</button><div class="ph">Abra o app do seu banco, escolha <b>PIX &rarr; Pagar com QR Code</b> (ou <b>Copia e Cola</b>) e confira o valor. Depois envie o comprovante no WhatsApp.</div></div><a class="lb-act lb-buy" id="ct-paid" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center;background:#25D366;color:#073B1B">Já fiz o pagamento — avisar a loja</a><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
 </div></div>
 <div class="toast" id="toast" role="status"></div>
+<div class="atoast" id="atoast" role="status" aria-live="polite"></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
 document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
@@ -903,7 +914,28 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function count(){return cart.reduce(function(a,i){return a+i.qty;},0);}
   function total(){return cart.reduce(function(a,i){return a+i.qty*i.price;},0);}
   function toast(m){var t=$('toast');t.textContent=m;t.className='toast on';clearTimeout(toast._t);toast._t=setTimeout(function(){t.className='toast';},2200);}
-  function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());}
+  function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());markCards();}
+  function markCards(){
+    var cs=document.querySelectorAll('.card[data-id]');
+    for(var k=0;k<cs.length;k++){
+      var c=cs[k],id=c.getAttribute('data-id'),q=0;cart.forEach(function(i){if(i.id===id)q=i.qty;});
+      var w=c.querySelector('.imgwrap'),b=c.querySelector('.incart');if(!w)continue;
+      if(q>0){if(!b){b=document.createElement('span');b.className='incart';w.appendChild(b);}b.textContent=q+(q===1?' no carrinho':' no carrinho');}
+      else if(b)b.parentNode.removeChild(b);
+    }
+  }
+  function showAdded(c){
+    var id=c.getAttribute('data-id'),it=null;cart.forEach(function(i){if(i.id===id)it=i;});if(!it)return;
+    var a=$('atoast');a.innerHTML='';
+    var im=document.createElement(it.img?'img':'div');if(it.img){im.src=it.img;im.alt='';}else im.className='at-ph';a.appendChild(im);
+    var m=document.createElement('div');m.className='at-m';
+    var t=document.createElement('div');t.className='at-t';t.textContent='✓ Adicionado ao carrinho';
+    var n=document.createElement('div');n.className='at-n';n.textContent=it.name;
+    var q=document.createElement('div');q.className='at-q';q.textContent=it.qty+(it.qty===1?' unidade':' unidades')+' · '+brl(it.qty*it.price)+' · carrinho: '+count()+(count()===1?' item':' itens');
+    m.appendChild(t);m.appendChild(n);m.appendChild(q);a.appendChild(m);
+    var bt=document.createElement('button');bt.type='button';bt.id='at-open';bt.textContent='Ver carrinho';a.appendChild(bt);
+    a.className='atoast on';clearTimeout(showAdded._t);showAdded._t=setTimeout(function(){a.className='atoast';},3800);
+  }
   function add(c){
     var id=c.getAttribute('data-id'),it=null;cart.forEach(function(i){if(i.id===id)it=i;});
     if(it){if(it.qty>=it.max){toast('Máximo disponível: '+it.max+' un.');return false;}it.qty++;}
@@ -960,7 +992,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     var bs=$('pay').querySelectorAll('button');for(var k=0;k<bs.length;k++)bs[k].className=bs[k].getAttribute('data-pay')===pay?'on':'';
   }
   function openCart(){
-    close();$('toast').className='toast';
+    close();$('toast').className='toast';$('atoast').className='atoast';
     $('ct-main').style.display='block';$('ct-ok').style.display='none';
     $('of-n').value=$('of-n').value||ls('ess_c_n');$('of-p').value=$('of-p').value||ls('ess_c_p');
     pay=pay||ls('ess_c_pay');
@@ -983,8 +1015,9 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   document.addEventListener('click',function(e){
     var t=e.target;
     var cbb=t.closest&&t.closest('[data-cb]');
-    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))toast('Adicionado ao carrinho ✓');}return;}
-    if(t.id==='lb-add'){if(cur&&add(cur)){close();toast('Adicionado ao carrinho ✓');}return;}
+    if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))showAdded(cc);}return;}
+    if(t.id==='at-open'){$('atoast').className='atoast';openCart();return;}
+    if(t.id==='lb-add'){if(cur&&add(cur)){var cc2=cur;close();showAdded(cc2);}return;}
     if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
     if(t.closest&&t.closest('#cfab')){openCart();return;}
     if(t.id==='ct-x'||t.id==='ct-more'||t.id==='ct-oc'){closeCart();return;}
