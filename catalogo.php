@@ -832,6 +832,13 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .imgwrap img{object-fit:contain;object-position:center;background:#fff;mix-blend-mode:multiply;border-radius:10px;}
   .imgwrap .noimg{width:100%;text-align:center;}
   @media (max-width:640px){.imgwrap{margin:4px 4px 0;padding:1px;border-radius:9px;}}
+  /* sem vão entre foto e texto: o card se ajusta ao conteúdo (mais ou menos informações) */
+  .grid{align-items:start!important;}
+  .card{height:auto!important;}
+  .card .info{flex:none!important;}
+  .card .name,.card .name{min-height:0!important;}
+  .card .price{margin-top:4px!important;}
+  .card .cb{margin-top:6px!important;}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -885,7 +892,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-x</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-y</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
