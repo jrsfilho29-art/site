@@ -824,7 +824,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-d</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-e</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -866,7 +866,7 @@ if($__op){
     <button type="button" class="of-b" id="ct-more">Continuar escolhendo</button>
   </form>
 </div>
-<div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><div class="pixbox" id="ct-pix" style="display:none"><h4>Pague com PIX</h4><div class="pv" id="ct-pixv"></div><div class="pq" id="ct-pixq"></div><textarea class="pc" id="ct-pixc" readonly rows="3" aria-label="Código PIX copia e cola"></textarea><button type="button" class="lb-act lb-buy" id="ct-pixb" style="margin-top:10px">Copiar código PIX</button><div class="ph">Abra o app do seu banco, escolha <b>PIX &rarr; Pagar com QR Code</b> (ou <b>Copia e Cola</b>) e confira o valor. Depois envie o comprovante no WhatsApp.</div></div><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
+<div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><div class="pixbox" id="ct-pix" style="display:none"><h4>Pague com PIX</h4><div class="pv" id="ct-pixv"></div><div class="pq" id="ct-pixq"></div><textarea class="pc" id="ct-pixc" readonly rows="3" aria-label="Código PIX copia e cola"></textarea><button type="button" class="lb-act lb-buy" id="ct-pixb" style="margin-top:10px">Copiar código PIX</button><div class="ph">Abra o app do seu banco, escolha <b>PIX &rarr; Pagar com QR Code</b> (ou <b>Copia e Cola</b>) e confira o valor. Depois envie o comprovante no WhatsApp.</div></div><a class="lb-act lb-buy" id="ct-paid" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center;background:#25D366;color:#073B1B">Já fiz o pagamento — avisar a loja</a><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
 </div></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
@@ -1017,6 +1017,8 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       var nn=sent.reduce(function(a,i){return a+i.qty;},0);
       $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+(home&&dl.q&&dl.q.mode==='combine'?' + frete a combinar':'')+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+(j.pix?' para confirmar e combinar a entrega. Faça o pagamento abaixo:':' para combinar pagamento e entrega.');
       var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
+      var pd=$('ct-paid'),oid=String(j.id||'').replace(/^ped_/,'').slice(0,8).toUpperCase();
+      if(WA&&pay==='PIX'){pd.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Já fiz o pagamento do meu pedido'+(oid?' '+oid:'')+' ('+brl(tot)+', '+pay+') em nome de '+n+'.'+(pay==='PIX'?' Segue o comprovante:':''));pd.style.display='block';}else pd.style.display='none';
       showPix(j.pix);
       cart=[];saveCart();fab();$('of-o').value='';
       $('ct-main').style.display='none';$('ct-ok').style.display='block';

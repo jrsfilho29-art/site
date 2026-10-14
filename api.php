@@ -165,6 +165,7 @@ function ensureOnlineOrders($pdo){
     note VARCHAR(500), status VARCHAR(20) NOT NULL DEFAULT \'novo\', ip_hash VARCHAR(40),
     items TEXT, payment VARCHAR(30), total DECIMAL(12,2) NOT NULL DEFAULT 0, seller_id VARCHAR(30), seller_name VARCHAR(80)
   )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  try{ $pdo->query('SELECT paid_at FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN paid_at VARCHAR(30)'); }catch(Throwable $e2){} }
   try{ $pdo->query('SELECT items, payment, total, seller_id, seller_name FROM online_orders LIMIT 1'); }
   catch(Throwable $e){
     foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0', 'seller_id VARCHAR(30)', 'seller_name VARCHAR(80)'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
@@ -180,9 +181,14 @@ try{
       'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'productId'=>s($o['product_id']), 'productName'=>s($o['product_name']),
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
       'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
-      'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
+      'paidAt'=>s($o['paid_at'] ?? ''), 'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
       'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
     ], $r)]);
+  }
+  if($action === 'onlineorder_paid'){
+    ensureOnlineOrders($pdo);
+    $q = $pdo->prepare('UPDATE online_orders SET paid_at = ? WHERE id = ?'); $q->execute([!empty($req['paid']) ? gmdate('Y-m-d\TH:i:s\Z') : '', (string)($req['id'] ?? '')]);
+    out(200, ['ok'=>true]);
   }
   if($action === 'onlineorder_status'){
     ensureOnlineOrders($pdo);
