@@ -542,7 +542,8 @@ if($__op){
   /* ===== repaginada: vitrine premium ===== */
   :root{--shadow-s:0 1px 3px rgba(13,18,48,.06),0 6px 18px rgba(13,18,48,.07);--shadow-m:0 4px 10px rgba(13,18,48,.08),0 20px 40px rgba(13,18,48,.15);}
   body{background:linear-gradient(180deg,#EEF0FA 0,#F7F5F0 340px);}
-  header{padding:46px 20px 70px;border-radius:0 0 34px 34px;background:radial-gradient(circle at 80% -20%,rgba(240,168,31,.35),transparent 42%),linear-gradient(160deg,#222C66 0%,#17204A 48%,#0D1230 100%);box-shadow:0 14px 34px rgba(13,18,48,.28);}
+  header{padding:46px 20px 70px;border-radius:0 0 34px 34px;background:var(--plum);box-shadow:0 14px 34px rgba(13,18,48,.28);}
+  header::before{display:none;}
   header h1{font-size:40px;letter-spacing:.2em;padding-left:.2em;}
   header p{font-size:11.5px;letter-spacing:.3em;color:var(--gold-soft);}
   header .logo{filter:drop-shadow(0 4px 14px rgba(240,168,31,.35));}
@@ -563,17 +564,18 @@ if($__op){
   .catsec h2{font-size:26px;font-weight:400;padding:0 0 14px;margin-bottom:18px;}
   .catsec h2::after{width:70px;height:4px;}
   .catsec h3{display:inline-flex;background:#FFF3D6;color:var(--gold-deep);padding:5px 13px;border-radius:999px;margin:6px 0 14px;font-size:12px;}
-  .grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:22px;}
-  .card{border-radius:22px;box-shadow:var(--shadow-s);background:#fff;position:relative;transition:transform .18s ease,box-shadow .18s ease;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;}
+  .card{border-radius:16px;box-shadow:var(--shadow-s);background:#fff;position:relative;transition:transform .18s ease,box-shadow .18s ease;}
   .card:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
-  .imgwrap{margin:10px 10px 0;border-radius:16px;background:linear-gradient(160deg,#F4F5FC,#FFF);padding:14px;}
+  .imgwrap{margin:7px 7px 0;border-radius:12px;background:linear-gradient(160deg,#F4F5FC,#FFF);padding:8px;}
   .imgwrap img{background:transparent;transition:transform .25s ease;}
   .card:hover .imgwrap img{transform:scale(1.06);}
   .tag-low{position:absolute;top:10px;left:10px;z-index:1;background:#FFF3D6;color:var(--gold-deep);font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:4px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(13,18,48,.12);}
-  .info{padding:10px 16px 18px;}
-  .cat{color:var(--gold-deep);font-weight:600;}
-  .name{font-size:15px;font-weight:600;color:var(--ink);}
-  .price{font-size:23px;font-weight:700;margin:8px 0 14px;letter-spacing:-.01em;}
+  .info{padding:7px 11px 12px;}
+  .cat{color:var(--gold-deep);font-weight:600;font-size:10px;}
+  .name{font-size:12.5px;font-weight:600;color:var(--ink);}
+  .price{font-size:17px;font-weight:700;margin:5px 0 9px;letter-spacing:-.01em;}
+  .buy{font-size:12px;padding:7px 10px;}
   .buy{background:linear-gradient(135deg,#222C66,#0D1230);box-shadow:0 6px 14px rgba(23,32,74,.28);transition:transform .12s,box-shadow .12s;}
   .card:hover .buy{background:linear-gradient(135deg,var(--gold),#E09410);color:var(--plum-dark);box-shadow:0 6px 14px rgba(240,168,31,.4);}
   footer{padding:30px 20px 40px;border-top:1px solid var(--line);margin:0 20px;}
@@ -584,14 +586,16 @@ if($__op){
     .steps{margin:-30px 12px 0;gap:6px;}
     .steps li{flex-direction:column;text-align:center;gap:6px;padding:10px 6px;font-size:11.5px;border-radius:14px;}
     .steps small{display:none;}
-    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
     .steps b{flex:none;width:28px;min-width:28px;}
-    .card{border-radius:18px;}
-    .imgwrap{margin:7px 7px 0;padding:8px;border-radius:13px;}
-    .info{padding:8px 10px 14px;}
-    .price{font-size:18px;}
+    .card{border-radius:12px;}
+    .imgwrap{margin:5px 5px 0;padding:5px;border-radius:9px;}
+    .info{padding:5px 7px 9px;}
+    .name{font-size:11px;}
+    .price{font-size:14px;margin:4px 0 7px;}
+    .buy{font-size:11px;padding:6px 4px;}
     .catsec h2{font-size:21px;}
-    .tag-low{top:8px;left:8px;font-size:9.5px;padding:3px 8px;}
+    .tag-low{top:6px;left:6px;font-size:8.5px;padding:2px 6px;}
   }
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
 </style>
@@ -625,7 +629,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-u</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-v</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
