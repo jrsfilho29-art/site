@@ -277,7 +277,7 @@ try{
 
     $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
     $__px = json_decode((string)getMeta($pdo, 'pix'), true);
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color')];
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
     out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
   }
 
@@ -402,6 +402,11 @@ try{
       }
       if($authRole === 'admin' && isset($d['settings']) && is_array($d['settings']) && array_key_exists('commissionMain', $d['settings'])){
         setMeta($pdo, 'commission_main', (string)max(0, min(100, round((float)str_replace(',', '.', (string)$d['settings']['commissionMain']), 2))));
+      }
+      if($authRole === 'admin' && isset($d['settings']['shipping']) && is_array($d['settings']['shipping'])){
+        $__h = $d['settings']['shipping'];
+        $__n = function($v){ $x = (float)str_replace(',', '.', (string)$v); return ($x > 0 && $x < 100000) ? round($x, 2) : 0; };
+        setMeta($pdo, 'shipping', json_encode(['on'=>!empty($__h['on']), 'pickup'=>!isset($__h['pickup']) || !empty($__h['pickup']), 'free'=>$__n($__h['free'] ?? 0), 'def'=>(isset($__h['def']) && $__h['def'] !== null && $__h['def'] !== '') ? $__n($__h['def']) : null, 'days'=>mb_substr(trim(strip_tags((string)($__h['days'] ?? ''))), 0, 40), 'rules'=>mb_substr(strip_tags((string)($__h['rules'] ?? '')), 0, 3000)], JSON_UNESCAPED_UNICODE));
       }
       if($authRole === 'admin' && isset($d['settings']['pix']) && is_array($d['settings']['pix'])){
         $__p = $d['settings']['pix'];

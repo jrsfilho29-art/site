@@ -591,7 +591,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-d';
+const APP_VERSION = '2026.10.14-e';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1643,7 +1643,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1692,6 +1692,7 @@ function syncApplyPulled(j){
   if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
   if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
   if(d.settings && typeof d.settings.catalogColor==='string' && (d.settings.catalogColor==='' || heroOk(d.settings.catalogColor))){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = d.settings.catalogColor; persist('prefs'); }
+  if(d.settings && d.settings.shipping && typeof d.settings.shipping==='object'){ const sh=d.settings.shipping; state.prefs = state.prefs||{}; state.prefs.shipOn=!!sh.on; state.prefs.shipPickup=sh.pickup!==false; state.prefs.shipFree=sh.free||''; state.prefs.shipDef=sh.def===null||sh.def===undefined?'':String(sh.def); state.prefs.shipDays=sh.days||''; state.prefs.shipRules=sh.rules||''; persist('prefs'); }
   if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
@@ -2129,7 +2130,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain|catHeaderColor)/.test(path)) syncSchedulePush(); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain|catHeaderColor|ship)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -4283,8 +4284,9 @@ function renderCatalogo(){
     <button class="${subView==='vitrine'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="vitrine">${icon('book',15)} Vitrine pública</button>
     <button class="${subView==='produtos'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="produtos">${icon('edit',15)} Produtos do Catálogo</button>
     <button class="${subView==='enviar'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="enviar">${icon('send',15)} Enviar aos clientes</button>
+    <button class="${subView==='frete'?'on':''}" role="tab" data-action="setCatalogoSubView" data-view="frete">${icon('send',15)} Frete</button>
   </div>
-  ${subView==='produtos' ? renderCatalogoProdutos() : subView==='enviar' ? renderCatalogoEnviar() : renderCatalogoVitrine()}
+  ${subView==='produtos' ? renderCatalogoProdutos() : subView==='enviar' ? renderCatalogoEnviar() : subView==='frete' ? renderCatalogoFrete() : renderCatalogoVitrine()}
   `;
 }
 
@@ -4381,6 +4383,27 @@ ${adm ? `  <div class="card" style="padding:18px;margin-bottom:16px;">
   </div>` : ''}`;
 }
 
+function shipCfg(){ const p=state.prefs||{}; const f=v=>{ const n=parseFloat(String(v||'').replace(',','.')); return isFinite(n)&&n>0?n:0; };
+  return { on:!!p.shipOn, pickup:p.shipPickup!==false, free:f(p.shipFree), def:String(p.shipDef||'').trim()===''?null:f(p.shipDef), days:String(p.shipDays||'').slice(0,40), rules:String(p.shipRules||'').slice(0,3000) }; }
+function renderCatalogoFrete(){
+  const p=state.prefs||{};
+  const on=!!p.shipOn;
+  return `<div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
+    <b>Frete no catálogo</b>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Quando ligado, o cliente informa o CEP no carrinho e vê o valor do frete e o prazo. O valor é somado ao total do pedido (e ao PIX). As regras são suas, por cidade ou estado — não é consulta em tempo real dos Correios.</p>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:14px;"><input type="checkbox" data-field="prefs.shipOn" ${on?'checked':''}> Calcular frete no catálogo</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:14px;font-size:14px;"><input type="checkbox" data-field="prefs.shipPickup" ${p.shipPickup!==false?'checked':''}> Oferecer "Retirar na loja" (grátis)</label>
+    <div class="flex gap flex-wrap" style="margin-bottom:10px;">
+      <label class="field" style="width:170px;margin:0;"><span class="lbl">Frete grátis acima de (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipFree" value="${esc(p.shipFree||'')}" placeholder="0 = nunca"></label>
+      <label class="field" style="width:170px;margin:0;"><span class="lbl">Frete padrão (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipDef" value="${esc(p.shipDef||'')}" placeholder="vazio = a combinar"></label>
+      <label class="field" style="width:170px;margin:0;"><span class="lbl">Prazo padrão</span><input data-field="prefs.shipDays" maxlength="40" value="${esc(p.shipDays||'')}" placeholder="Ex.: 3 a 5 dias úteis"></label>
+    </div>
+    <label class="field" style="margin-bottom:6px;"><span class="lbl">Regras por cidade ou estado (uma por linha)</span>
+      <textarea data-field="prefs.shipRules" rows="6" style="width:100%;font-family:monospace;font-size:13px;" placeholder="Campinas-SP = 10,00 | 1 dia útil&#10;São Paulo-SP = 15,00 | 2 dias úteis&#10;SP = 25,00 | 3 a 4 dias úteis&#10;RJ = 35,00">${esc(p.shipRules||'')}</textarea></label>
+    <span class="hint" style="display:block;font-size:12px;">Formato: <b>Cidade-UF = valor | prazo</b> ou <b>UF = valor | prazo</b> (o prazo é opcional). A cidade vale mais que o estado; o que não estiver na lista usa o frete padrão (ou "a combinar" se vazio). Valor 0 = grátis.</span>
+    ${!isAdmin()?'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam o frete no servidor.</p>':''}
+  </div>`;
+}
 function renderCatalogoEnviar(){
   const url = catalogPublicUrl();
   const msg = catalogMsg();
