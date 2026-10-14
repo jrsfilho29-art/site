@@ -585,7 +585,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-z';
+const APP_VERSION = '2026.10.13-za';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2783,7 +2783,7 @@ function vialHTML(p){
   const cap = Math.max(min*3, 10, p.stock);
   const pct = Math.max(0, Math.min(100, Math.round((p.stock/cap)*100)));
   const cls = p.stock<=0 ? 'zero' : (p.stock<=min ? 'low' : '');
-  return `<span class="vial ${cls}" title="${p.stock} de ${cap}"><i style="height:${pct}%"></i></span>`;
+  return `<span class="vial ${cls}" title="${p.stock} un."><i style="height:${pct}%"></i></span>`;
 }
 function renderProductCard(p, sel){
   const min = p.minStock||0, zero = p.stock<=0, low = !zero && p.stock<=min;
@@ -2806,8 +2806,7 @@ function renderProductCard(p, sel){
           ${state.prefs.showPrices!==false ? `
           <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
           <div class="pc-stock">
-            <div class="row${zero||low?' bad':''}"><span>Estoque</span><span>${p.stock} de ${cap}${zero||low?' · repor':''}</span></div>
-            <div class="pc-bar${zero?' zero':low?' low':''}"><i style="width:${pct}%"></i></div>
+            <div class="row${zero||low?' bad':''}"><span>Estoque</span><span>${p.stock} un.${zero||low?' · repor':''}</span></div>
           </div>
           <div class="pc-act">
             <button class="btn btn-ghost" data-action="editProduto" data-id="${p.id}">${icon('edit')} Editar</button>
