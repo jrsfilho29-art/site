@@ -416,9 +416,8 @@ function card($p){
   $low = '';
   if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%<i class="of"> OFF</i></span>';
   if($__new) $low .= '<span class="tag-new">Novidade</span>';
-  if($__last) $low .= '<span class="tag-low">Últimas unidades</span>';
-  $__save = $__promo ? '<div class="save">Economize '.brl((float)$p['sale_price'] - $__eff).'</div>' : '';
-  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').brl($__eff).'</div>'.$__save.$btn.'</div></div>';
+  $__save = ($__promo || $__last) ? '<div class="pinfo">'.($__promo ? '<span class="save">Economize '.brl((float)$p['sale_price'] - $__eff).'</span>' : '').($__last ? '<span class="last">Últimas unidades</span>' : '').'</div>' : '';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price"><b>'.brl($__eff).'</b>'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').'</div>'.$__save.$btn.'</div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -814,9 +813,13 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   /* selos organizados: promoção à esquerda, novidade à direita, últimas unidades na base */
   .imgwrap .tag-promo{position:absolute;top:8px;left:8px;z-index:1;}
   .imgwrap .tag-new{position:absolute;top:8px;right:8px;z-index:1;}
-  .imgwrap .tag-low{position:absolute;top:auto;bottom:8px;left:auto;right:8px;z-index:1;}
-  .tag-promo .of{font-style:normal;}.save{font-size:11px;font-weight:700;color:#1a8f4a;margin:-2px 0 6px;line-height:1.2;}
-  @media (max-width:640px){.tag-promo .of{display:none;}.imgwrap .tag-promo{top:5px;left:5px;}.imgwrap .tag-new{top:5px;right:5px;}.imgwrap .tag-low{bottom:5px;right:5px;}.save{font-size:9.5px;margin:-3px 0 5px;}}
+  .card .price{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 7px;margin:4px 0 3px;}
+  .card .price b{font-weight:800;}
+  .card .price .old{display:inline;font-size:11.5px;}
+  .pinfo{display:flex;flex-wrap:wrap;gap:3px 6px;align-items:center;margin:0 0 7px;min-height:0;}
+  .pinfo .last{font-size:10px;font-weight:700;color:var(--gold-deep);background:#FFF3D6;border-radius:999px;padding:2px 7px;}
+  .tag-promo .of{font-style:normal;}.save{font-size:11px;font-weight:700;color:#1a8f4a;line-height:1.2;}
+  @media (max-width:640px){.tag-promo .of{display:none;}.imgwrap .tag-promo{top:5px;left:5px;}.imgwrap .tag-new{top:5px;right:5px;}.card .price .old{font-size:9.5px;}.pinfo .last{font-size:8.5px;padding:1px 5px;}.save{font-size:9.5px;}}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -870,7 +873,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-r</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-s</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
