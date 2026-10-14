@@ -821,7 +821,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .bdg{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 6px;}
   .bdg .tag-promo,.bdg .tag-new{position:static;display:inline-block;text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1;padding:5px 8px;border-radius:6px;box-shadow:none;}
   .card .price{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 7px;margin:4px 0 3px;}
-  .card .price b{font-weight:800;}
+  .card .price,.card .price b,.lb-price,#lb-p{font-weight:400!important;}
   .card .price .old{display:inline;font-size:11.5px;}
   .pinfo{display:flex;flex-wrap:wrap;gap:3px 6px;align-items:center;margin:0 0 7px;min-height:0;}
   .pinfo .last{font-size:10px;font-weight:700;color:var(--gold-deep);background:#FFF3D6;border-radius:999px;padding:2px 7px;}
@@ -880,7 +880,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-v</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-w</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
