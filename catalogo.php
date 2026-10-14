@@ -542,8 +542,10 @@ if($__op){
   /* ===== repaginada: vitrine premium ===== */
   :root{--shadow-s:0 1px 3px rgba(13,18,48,.06),0 6px 18px rgba(13,18,48,.07);--shadow-m:0 4px 10px rgba(13,18,48,.08),0 20px 40px rgba(13,18,48,.15);}
   body{background:linear-gradient(180deg,#EEF0FA 0,#F7F5F0 340px);}
-  header{padding:46px 20px 70px;border-radius:0 0 34px 34px;background:var(--plum);box-shadow:0 14px 34px rgba(13,18,48,.28);}
+  header{padding:46px 20px 52px;border-radius:0 0 34px 34px;background:var(--plum);box-shadow:0 14px 34px rgba(13,18,48,.28);}
   header::before{display:none;}
+  .hero-tools{position:static;}
+  .cta-wa{position:absolute;top:16px;right:18px;padding:8px 16px;font-size:13px;box-shadow:0 6px 16px rgba(37,211,102,.3);z-index:3;}
   header h1{font-size:40px;letter-spacing:.2em;padding-left:.2em;}
   header p{font-size:11.5px;letter-spacing:.3em;color:var(--gold-soft);}
   header .logo{filter:drop-shadow(0 4px 14px rgba(240,168,31,.35));}
@@ -551,7 +553,7 @@ if($__op){
   .search input{padding:16px 22px 16px 50px;font-size:16px;box-shadow:0 12px 30px rgba(0,0,0,.32);}
   .search svg{left:19px;width:20px;height:20px;}
   .cta-wa{box-shadow:0 8px 20px rgba(37,211,102,.35);padding:11px 26px;}
-  .steps{position:relative;list-style:none;margin:-34px auto 0;padding:0;max-width:760px;display:flex;gap:10px;justify-content:center;z-index:2;}
+  .steps{position:relative;list-style:none;margin:-26px auto 0;padding:0;max-width:760px;display:flex;gap:10px;justify-content:center;z-index:2;}
   .steps li{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-s);font-size:13px;font-weight:600;color:var(--plum);}
   .steps b{flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--plum-dark);display:flex;align-items:center;justify-content:center;font-size:14px;}
   .steps small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:1px;}
@@ -581,7 +583,8 @@ if($__op){
   footer{padding:30px 20px 40px;border-top:1px solid var(--line);margin:0 20px;}
   .cfab{box-shadow:0 12px 30px rgba(13,18,48,.38);}
   @media (max-width:640px){
-    header{padding:30px 14px 56px;border-radius:0 0 26px 26px;}
+    header{padding:30px 14px 50px;border-radius:0 0 26px 26px;}
+    .cta-wa{top:10px;right:10px;padding:6px 12px;font-size:12px;}
     header h1{font-size:31px;}
     .steps{margin:-30px 12px 0;gap:6px;}
     .steps li{flex-direction:column;text-align:center;gap:6px;padding:10px 6px;font-size:11.5px;border-radius:14px;}
@@ -629,7 +632,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-v</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-w</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
