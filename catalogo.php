@@ -864,7 +864,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-n</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-o</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -933,6 +933,14 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function count(){return cart.reduce(function(a,i){return a+i.qty;},0);}
   function total(){return cart.reduce(function(a,i){return a+i.qty*i.price;},0);}
   function toast(m){var t=$('toast');t.textContent=m;t.className='toast on';clearTimeout(toast._t);toast._t=setTimeout(function(){t.className='toast';},2200);}
+  /* abre direto o WhatsApp (aplicativo) e, se não abrir, a página do WhatsApp */
+  function waGo(ph,tx){
+    var q='phone='+ph+'&text='+encodeURIComponent(tx||''),web='https://api.whatsapp.com/send?'+q,app='whatsapp://send?'+q,done=false;
+    function stop(){done=true;window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',stop);}
+    window.addEventListener('blur',stop);document.addEventListener('visibilitychange',stop);
+    setTimeout(function(){window.removeEventListener('blur',stop);document.removeEventListener('visibilitychange',stop);if(!done)location.href=web;},1300);
+    location.href=app;
+  }
   function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';document.body.classList.toggle('has-cart',n>0);$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());markCards();}
   function markCards(){
     var cs=document.querySelectorAll('.card[data-id]');
@@ -1033,6 +1041,8 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function close(){lb.className='lb';if($('ct').className.indexOf('on')<0)document.body.style.overflow='';}
   document.addEventListener('click',function(e){
     var t=e.target;
+    var wal=t.closest&&t.closest('a[href*="wa.me/"]');
+    if(wal){try{var wu=new URL(wal.href),wph=wu.pathname.replace(/\D/g,'');if(wph){e.preventDefault();waGo(wph,wu.searchParams.get('text')||'');return;}}catch(er){}}
     var cbb=t.closest&&t.closest('[data-cb]');
     if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))openCart();}return;}
     if(t.id==='okpop-x'||t.id==='okpop'){$('okpop').className='okpop';var okb=$('ct-ok');if(okb&&okb.scrollIntoView)try{okb.scrollIntoView({block:'start'});}catch(e){}return;}
