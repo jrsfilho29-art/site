@@ -591,7 +591,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-f';
+const APP_VERSION = '2026.10.14-g';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1692,7 +1692,7 @@ function syncApplyPulled(j){
   if(d.settings && Array.isArray(d.settings.sellers)){ state.prefs = state.prefs||{}; state.prefs.sellers = d.settings.sellers; persist('prefs'); }
   if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
   if(d.settings && typeof d.settings.catalogColor==='string' && (d.settings.catalogColor==='' || heroOk(d.settings.catalogColor))){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = d.settings.catalogColor; persist('prefs'); }
-  if(d.settings && d.settings.shipping && typeof d.settings.shipping==='object'){ const sh=d.settings.shipping; state.prefs = state.prefs||{}; state.prefs.shipOn=!!sh.on; state.prefs.shipPickup=sh.pickup!==false; state.prefs.shipFree=sh.free||''; state.prefs.shipDef=sh.def===null||sh.def===undefined?'':String(sh.def); state.prefs.shipDays=sh.days||''; state.prefs.shipRules=sh.rules||''; persist('prefs'); }
+  if(d.settings && d.settings.shipping && typeof d.settings.shipping==='object'){ const sh=d.settings.shipping; state.prefs = state.prefs||{}; state.prefs.shipOn=!!sh.on; state.prefs.shipPickup=sh.pickup!==false; state.prefs.shipFree=sh.free||''; state.prefs.shipDef=sh.def===null||sh.def===undefined?'':String(sh.def); state.prefs.shipDays=sh.days||''; state.prefs.shipRules=sh.rules||''; state.prefs.shipMode=sh.mode==='distance'?'distance':'rules'; state.prefs.shipOrigin=sh.origin||''; state.prefs.shipPkgKg=sh.pkgKg||''; state.prefs.shipBase=sh.base||''; state.prefs.shipPer100=sh.per100||''; state.prefs.shipPerKg=sh.perKg||''; state.prefs.shipAdd=sh.add||''; state.prefs.shipExpress=!!sh.express; state.prefs.shipExpMult=sh.expMult||''; persist('prefs'); }
   if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
@@ -4384,21 +4384,38 @@ ${adm ? `  <div class="card" style="padding:18px;margin-bottom:16px;">
 }
 
 function shipCfg(){ const p=state.prefs||{}; const f=v=>{ const n=parseFloat(String(v||'').replace(',','.')); return isFinite(n)&&n>0?n:0; };
-  return { on:!!p.shipOn, pickup:p.shipPickup!==false, free:f(p.shipFree), def:String(p.shipDef||'').trim()===''?null:f(p.shipDef), days:String(p.shipDays||'').slice(0,40), rules:String(p.shipRules||'').slice(0,3000) }; }
+  return { on:!!p.shipOn, pickup:p.shipPickup!==false, free:f(p.shipFree), def:String(p.shipDef||'').trim()===''?null:f(p.shipDef), days:String(p.shipDays||'').slice(0,40), rules:String(p.shipRules||'').slice(0,3000),
+    mode:p.shipMode==='distance'?'distance':'rules', origin:String(p.shipOrigin||'').replace(/\D/g,'').slice(0,8), pkgKg:f(p.shipPkgKg), base:f(p.shipBase), per100:f(p.shipPer100), perKg:f(p.shipPerKg), add:f(p.shipAdd), express:!!p.shipExpress, expMult:f(p.shipExpMult) }; }
 function renderCatalogoFrete(){
   const p=state.prefs||{};
   const on=!!p.shipOn;
   return `<div class="card" style="padding:18px;max-width:720px;margin-bottom:16px;">
     <b>Frete no catálogo</b>
-    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Quando ligado, o cliente informa o CEP no carrinho e vê o valor do frete e o prazo. O valor é somado ao total do pedido (e ao PIX). As regras são suas, por cidade ou estado — não é consulta em tempo real dos Correios.</p>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 12px;">Quando ligado, o cliente informa o CEP no carrinho e vê o valor do frete e o prazo. O valor é somado ao total do pedido (e ao PIX). Você escolhe: regras suas por cidade/estado, ou estimativa automática por distância entre o CEP da loja e o do cliente.</p>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:14px;"><input type="checkbox" data-field="prefs.shipOn" ${on?'checked':''}> Calcular frete no catálogo</label>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:14px;font-size:14px;"><input type="checkbox" data-field="prefs.shipPickup" ${p.shipPickup!==false?'checked':''}> Oferecer "Retirar na loja" (grátis)</label>
+    <label class="field" style="max-width:360px;margin-bottom:12px;"><span class="lbl">Como calcular o valor</span>
+      <select data-field="prefs.shipMode"><option value="rules" ${p.shipMode!=='distance'?'selected':''}>Pelas minhas regras (cidade / estado)</option><option value="distance" ${p.shipMode==='distance'?'selected':''}>Por distância entre CEPs (estimativa)</option></select></label>
+    ${p.shipMode==='distance'?`<div style="border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px;">
+      <p class="muted" style="font-size:12.5px;margin:0 0 10px;">O sistema pega o <b>CEP do cliente</b>, calcula a distância até o <b>CEP da loja</b> e estima o frete com a fórmula abaixo: <b>base + valor por 100 km + valor por kg + acréscimo</b>. É uma estimativa parecida com a lógica dos Correios, não o preço oficial. Compare com uma simulação real nos Correios e ajuste os valores até ficar próximo. Campo vazio usa o valor sugerido.</p>
+      <div class="flex gap flex-wrap">
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">CEP da loja (origem)</span><input data-field="prefs.shipOrigin" inputmode="numeric" maxlength="9" placeholder="00000-000" value="${esc(p.shipOrigin||'')}"></label>
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">Peso por perfume (kg)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipPkgKg" value="${esc(p.shipPkgKg||'')}" placeholder="0,4"></label>
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">Valor base (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipBase" value="${esc(p.shipBase||'')}" placeholder="15,00"></label>
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">+ por 100 km (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipPer100" value="${esc(p.shipPer100||'')}" placeholder="2,50"></label>
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">+ por kg (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipPerKg" value="${esc(p.shipPerKg||'')}" placeholder="4,00"></label>
+        <label class="field" style="width:150px;margin:0 0 8px;"><span class="lbl">Acréscimo fixo (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipAdd" value="${esc(p.shipAdd||'')}" placeholder="0,00 (embalagem)"></label>
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;margin:4px 0 8px;font-size:14px;"><input type="checkbox" data-field="prefs.shipExpress" ${p.shipExpress?'checked':''}> Oferecer também a opção <b>Expressa</b> (mais rápida e mais cara)</label>
+      ${p.shipExpress?`<label class="field" style="width:200px;margin:0;"><span class="lbl">Expresso custa × o econômico</span><input type="number" min="1" step="0.1" inputmode="decimal" data-field="prefs.shipExpMult" value="${esc(p.shipExpMult||'')}" placeholder="1,6"></label>`:''}
+      <p class="muted2" style="font-size:12px;margin:8px 0 0;">Se não conseguir localizar o CEP, o sistema usa as regras de cidade/estado abaixo como reserva.</p>
+    </div>`:''}
     <div class="flex gap flex-wrap" style="margin-bottom:10px;">
       <label class="field" style="width:170px;margin:0;"><span class="lbl">Frete grátis acima de (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipFree" value="${esc(p.shipFree||'')}" placeholder="0 = nunca"></label>
       <label class="field" style="width:170px;margin:0;"><span class="lbl">Frete padrão (R$)</span><input type="number" min="0" step="0.01" inputmode="decimal" data-field="prefs.shipDef" value="${esc(p.shipDef||'')}" placeholder="vazio = a combinar"></label>
       <label class="field" style="width:170px;margin:0;"><span class="lbl">Prazo padrão</span><input data-field="prefs.shipDays" maxlength="40" value="${esc(p.shipDays||'')}" placeholder="Ex.: 3 a 5 dias úteis"></label>
     </div>
-    <label class="field" style="margin-bottom:6px;"><span class="lbl">Regras por cidade ou estado (uma por linha)</span>
+    <label class="field" style="margin-bottom:6px;"><span class="lbl">Regras por cidade ou estado (uma por linha) — também servem de reserva</span>
       <textarea data-field="prefs.shipRules" rows="6" style="width:100%;font-family:monospace;font-size:13px;" placeholder="Campinas-SP = 10,00 | 1 dia útil&#10;São Paulo-SP = 15,00 | 2 dias úteis&#10;SP = 25,00 | 3 a 4 dias úteis&#10;RJ = 35,00">${esc(p.shipRules||'')}</textarea></label>
     <span class="hint" style="display:block;font-size:12px;">Formato: <b>Cidade-UF = valor | prazo</b> ou <b>UF = valor | prazo</b> (o prazo é opcional). A cidade vale mais que o estado; o que não estiver na lista usa o frete padrão (ou "a combinar" se vazio). Valor 0 = grátis.</span>
     ${!isAdmin()?'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam o frete no servidor.</p>':''}

@@ -406,7 +406,7 @@ try{
       if($authRole === 'admin' && isset($d['settings']['shipping']) && is_array($d['settings']['shipping'])){
         $__h = $d['settings']['shipping'];
         $__n = function($v){ $x = (float)str_replace(',', '.', (string)$v); return ($x > 0 && $x < 100000) ? round($x, 2) : 0; };
-        setMeta($pdo, 'shipping', json_encode(['on'=>!empty($__h['on']), 'pickup'=>!isset($__h['pickup']) || !empty($__h['pickup']), 'free'=>$__n($__h['free'] ?? 0), 'def'=>(isset($__h['def']) && $__h['def'] !== null && $__h['def'] !== '') ? $__n($__h['def']) : null, 'days'=>mb_substr(trim(strip_tags((string)($__h['days'] ?? ''))), 0, 40), 'rules'=>mb_substr(strip_tags((string)($__h['rules'] ?? '')), 0, 3000)], JSON_UNESCAPED_UNICODE));
+        setMeta($pdo, 'shipping', json_encode(['on'=>!empty($__h['on']), 'pickup'=>!isset($__h['pickup']) || !empty($__h['pickup']), 'free'=>$__n($__h['free'] ?? 0), 'def'=>(isset($__h['def']) && $__h['def'] !== null && $__h['def'] !== '') ? $__n($__h['def']) : null, 'days'=>mb_substr(trim(strip_tags((string)($__h['days'] ?? ''))), 0, 40), 'rules'=>mb_substr(strip_tags((string)($__h['rules'] ?? '')), 0, 3000), 'mode'=>(($__h['mode'] ?? '') === 'distance') ? 'distance' : 'rules', 'origin'=>substr(preg_replace('/\D/', '', (string)($__h['origin'] ?? '')), 0, 8), 'pkgKg'=>$__n($__h['pkgKg'] ?? 0), 'base'=>$__n($__h['base'] ?? 0), 'per100'=>$__n($__h['per100'] ?? 0), 'perKg'=>$__n($__h['perKg'] ?? 0), 'add'=>$__n($__h['add'] ?? 0), 'express'=>!empty($__h['express']), 'expMult'=>$__n($__h['expMult'] ?? 0)], JSON_UNESCAPED_UNICODE));
       }
       if($authRole === 'admin' && isset($d['settings']['pix']) && is_array($d['settings']['pix'])){
         $__p = $d['settings']['pix'];

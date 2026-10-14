@@ -92,13 +92,83 @@ function ship_quote($ship, $city, $uf, $sub){
   if($price <= 0 || ($free > 0 && $sub >= $free)) return ['mode'=>'free', 'price'=>0.0, 'days'=>$days, 'label'=>'Frete grátis'];
   return ['mode'=>'paid', 'price'=>round($price, 2), 'days'=>$days, 'label'=>'Frete '.ship_money($price)];
 }
-function ship_viacep($cep){
-  $url = 'https://viacep.com.br/ws/'.$cep.'/json/'; $raw = false;
-  if(function_exists('curl_init')){ $c = curl_init($url); curl_setopt_array($c, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>6, CURLOPT_CONNECTTIMEOUT=>4]); $raw = curl_exec($c); curl_close($c); }
-  if(!$raw){ $raw = @file_get_contents($url, false, stream_context_create(['http'=>['timeout'=>6]])); }
-  $j = json_decode((string)$raw, true);
-  if(!is_array($j) || !empty($j['erro']) || empty($j['localidade'])) return null;
-  return ['street'=>(string)($j['logradouro'] ?? ''), 'district'=>(string)($j['bairro'] ?? ''), 'city'=>(string)$j['localidade'], 'uf'=>(string)($j['uf'] ?? '')];
+function ship_http($url){
+  $raw = false;
+  if(function_exists('curl_init')){ $c = curl_init($url); curl_setopt_array($c, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>6, CURLOPT_CONNECTTIMEOUT=>4, CURLOPT_FOLLOWLOCATION=>true, CURLOPT_USERAGENT=>'essencia-catalogo']); $raw = curl_exec($c); curl_close($c); }
+  if(!$raw){ $raw = @file_get_contents($url, false, stream_context_create(['http'=>['timeout'=>6, 'header'=>"User-Agent: essencia-catalogo\r\n"]])); }
+  return $raw;
+}
+/* centro aproximado de cada estado (reserva quando o CEP não tem coordenadas) */
+$UFC = ['AC'=>[-9.97,-67.81],'AL'=>[-9.67,-35.74],'AP'=>[0.03,-51.07],'AM'=>[-3.12,-60.02],'BA'=>[-12.97,-38.50],'CE'=>[-3.73,-38.52],'DF'=>[-15.79,-47.88],'ES'=>[-20.32,-40.34],'GO'=>[-16.68,-49.25],'MA'=>[-2.53,-44.30],'MT'=>[-15.60,-56.10],'MS'=>[-20.45,-54.62],'MG'=>[-19.92,-43.94],'PA'=>[-1.46,-48.50],'PB'=>[-7.12,-34.86],'PR'=>[-25.43,-49.27],'PE'=>[-8.05,-34.88],'PI'=>[-5.09,-42.80],'RJ'=>[-22.91,-43.17],'RN'=>[-5.79,-35.21],'RS'=>[-30.03,-51.22],'RO'=>[-8.76,-63.90],'RR'=>[2.82,-60.67],'SC'=>[-27.59,-48.55],'SP'=>[-23.55,-46.63],'SE'=>[-10.91,-37.07],'TO'=>[-10.18,-48.33]];
+/* dados do CEP: cidade, UF, rua, bairro e coordenadas (BrasilAPI; reserva ViaCEP). Guarda em cache por 30 dias. */
+function ship_geo($cep){
+  global $UFC;
+  $cep = preg_replace('/\D/', '', (string)$cep); if(strlen($cep) !== 8) return null;
+  $f = sys_get_temp_dir().'/ess_cep_'.$cep.'.json';
+  if(is_file($f) && filemtime($f) > time() - 2592000){ $j = json_decode((string)@file_get_contents($f), true); if(is_array($j)) return $j; }
+  $g = null;
+  $j = json_decode((string)ship_http('https://brasilapi.com.br/api/cep/v2/'.$cep), true);
+  if(is_array($j) && !empty($j['city']) && !empty($j['state'])){
+    $co = $j['location']['coordinates'] ?? [];
+    $g = ['street'=>(string)($j['street'] ?? ''), 'district'=>(string)($j['neighborhood'] ?? ''), 'city'=>(string)$j['city'], 'uf'=>strtoupper((string)$j['state']),
+          'lat'=>isset($co['latitude']) && $co['latitude'] !== '' ? (float)$co['latitude'] : null, 'lng'=>isset($co['longitude']) && $co['longitude'] !== '' ? (float)$co['longitude'] : null, 'approx'=>false];
+  }
+  if(!$g){
+    $v = json_decode((string)ship_http('https://viacep.com.br/ws/'.$cep.'/json/'), true);
+    if(is_array($v) && empty($v['erro']) && !empty($v['localidade'])) $g = ['street'=>(string)($v['logradouro'] ?? ''), 'district'=>(string)($v['bairro'] ?? ''), 'city'=>(string)$v['localidade'], 'uf'=>strtoupper((string)($v['uf'] ?? '')), 'lat'=>null, 'lng'=>null, 'approx'=>false];
+  }
+  if(!$g) return null;
+  if($g['lat'] === null || $g['lng'] === null || ($g['lat'] == 0 && $g['lng'] == 0)){
+    if(isset($UFC[$g['uf']])){ $g['lat'] = $UFC[$g['uf']][0]; $g['lng'] = $UFC[$g['uf']][1]; $g['approx'] = true; } else { $g['lat'] = null; $g['lng'] = null; }
+  }
+  @file_put_contents($f, json_encode($g, JSON_UNESCAPED_UNICODE));
+  return $g;
+}
+function ship_km($la1, $lo1, $la2, $lo2){
+  $r = 6371; $a = deg2rad($la2 - $la1); $b = deg2rad($lo2 - $lo1);
+  $h = sin($a/2)**2 + cos(deg2rad($la1)) * cos(deg2rad($la2)) * sin($b/2)**2;
+  return 2 * $r * asin(min(1, sqrt($h)));
+}
+/* estimativa por distância: devolve lista de opções [{id,label,price,days,mode}] ou null */
+function ship_dist_options($ship, $dest, $sub, $units){
+  global $UFC;
+  $o = ship_geo($ship['origin'] ?? '');
+  if(!$o || $o['lat'] === null || !$dest || $dest['lat'] === null) return null;
+  $km = ship_km($o['lat'], $o['lng'], $dest['lat'], $dest['lng']) * 1.25;   /* distância rodoviária ≈ 1,25 × linha reta */
+  if($o['uf'] === $dest['uf'] && $km < 15) $km = 15;
+  $pk = (float)($ship['pkgKg'] ?? 0); if($pk <= 0) $pk = 0.4;
+  $w = max(0.3, $pk * max(1, (int)$units));
+  $base = (float)($ship['base'] ?? 0); if($base <= 0) $base = 15;
+  $p100 = (float)($ship['per100'] ?? 0); if($p100 <= 0) $p100 = 2.5;
+  $pkg = (float)($ship['perKg'] ?? 0); if($pkg <= 0) $pkg = 4;
+  $std = $base + $p100 * ($km / 100) + $pkg * $w + (float)($ship['add'] ?? 0);
+  $std = ceil($std * 10) / 10;
+  $d1 = max(2, (int)ceil($km / 450) + 2);
+  $opts = [['id'=>'eco', 'name'=>'Econômico', 'price'=>$std, 'days'=>$d1.($d1 === 1 ? ' dia útil' : ' dias úteis')]];
+  if(!empty($ship['express'])){
+    $m = (float)($ship['expMult'] ?? 0); if($m < 1) $m = 1.6;
+    $d2 = max(1, (int)ceil($km / 800) + 1);
+    $opts[] = ['id'=>'exp', 'name'=>'Expresso', 'price'=>ceil($std * $m * 10) / 10, 'days'=>$d2.($d2 === 1 ? ' dia útil' : ' dias úteis')];
+  }
+  $free = (float)($ship['free'] ?? 0);
+  foreach($opts as $i => &$q){
+    if($i === 0 && $free > 0 && $sub >= $free){ $q['price'] = 0.0; $q['mode'] = 'free'; $q['label'] = $q['name'].' · Frete grátis'; }
+    else { $q['mode'] = 'paid'; $q['label'] = $q['name'].' · '.ship_money($q['price']); }
+  }
+  unset($q);
+  return $opts;
+}
+/* opções de frete para um destino (modo distância com reserva nas regras) */
+function ship_options($ship, $cep, $city, $uf, $sub, $units){
+  global $UFC;
+  if(($ship['mode'] ?? 'rules') === 'distance'){
+    $dest = ship_geo($cep);
+    if(!$dest && isset($UFC[strtoupper($uf)])) $dest = ['city'=>$city, 'uf'=>strtoupper($uf), 'lat'=>$UFC[strtoupper($uf)][0], 'lng'=>$UFC[strtoupper($uf)][1], 'approx'=>true];
+    $o = ship_dist_options($ship, $dest, $sub, $units);
+    if($o) return $o;
+  }
+  $q = ship_quote($ship, $city, $uf, $sub); $q['id'] = 'regra'; $q['name'] = 'Entrega';
+  return [$q];
 }
 /* consulta de frete */
 if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'frete'){
@@ -108,16 +178,17 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'frete'){
   if($ho === '' || $ho !== $hh){ http_response_code(403); echo json_encode(['ok'=>false, 'error'=>'Origem não permitida.']); exit; }
   if(empty($SHIP['on'])){ echo json_encode(['ok'=>false, 'error'=>'Frete indisponível.']); exit; }
   $in = json_decode((string)file_get_contents('php://input'), true); if(!is_array($in)) $in = [];
-  $cep = preg_replace('/\D/', '', (string)($in['cep'] ?? '')); $sub = max(0, (float)($in['sub'] ?? 0));
+  $cep = preg_replace('/\D/', '', (string)($in['cep'] ?? '')); $sub = max(0, (float)($in['sub'] ?? 0)); $units = max(1, min(500, (int)($in['units'] ?? 1)));
   $city = trim(strip_tags((string)($in['city'] ?? ''))); $uf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)($in['uf'] ?? '')));
   $addr = null;
   if($city === '' || strlen($uf) !== 2){
     if(strlen($cep) !== 8){ echo json_encode(['ok'=>false, 'error'=>'Informe um CEP com 8 dígitos.']); exit; }
-    $addr = ship_viacep($cep);
+    $addr = ship_geo($cep);
     if(!$addr){ echo json_encode(['ok'=>false, 'manual'=>true, 'error'=>'Não localizamos esse CEP. Informe cidade e estado.']); exit; }
     $city = $addr['city']; $uf = strtoupper($addr['uf']);
   }
-  echo json_encode(['ok'=>true, 'address'=>$addr, 'city'=>$city, 'uf'=>$uf, 'quote'=>ship_quote($SHIP, $city, $uf, $sub)], JSON_UNESCAPED_UNICODE); exit;
+  $opts = ship_options($SHIP, $cep, $city, $uf, $sub, $units);
+  echo json_encode(['ok'=>true, 'address'=>$addr ? ['street'=>$addr['street'], 'district'=>$addr['district']] : null, 'city'=>$city, 'uf'=>$uf, 'options'=>$opts, 'estimate'=>(($SHIP['mode'] ?? 'rules') === 'distance')], JSON_UNESCAPED_UNICODE); exit;
 }
 
 /* ---------- pedido feito pelo cliente no catálogo ---------- */
@@ -179,8 +250,10 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
       $dcity = $cl('city', 80); $duf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)($dv['uf'] ?? '')));
       $dst = $cl('street', 120); $dnum = $cl('number', 20);
       if(strlen($dcep) !== 8 || $dcity === '' || strlen($duf) !== 2 || $dst === '' || $dnum === '') $jerr(422, 'Preencha o endereço de entrega (CEP, rua, número, cidade e estado).');
-      $q = ship_quote($SHIP, $dcity, $duf, $total); $shipCost = (float)$q['price'];
-      $dl = 'ENTREGA: '.$dst.', '.$dnum.($cl('comp', 60) !== '' ? ' - '.$cl('comp', 60) : '').($cl('district', 80) !== '' ? ', '.$cl('district', 80) : '').' - '.$dcity.'/'.$duf.' - CEP '.substr($dcep, 0, 5).'-'.substr($dcep, 5).' | '.($q['mode'] === 'combine' ? 'Frete a combinar' : ($q['mode'] === 'free' ? 'Frete grátis' : 'Frete '.ship_money($shipCost))).($q['days'] !== '' ? ' ('.$q['days'].')' : '');
+      $opts = ship_options($SHIP, $dcep, $dcity, $duf, $total, $units); $q = $opts[0];
+      foreach($opts as $__o){ if(($dv['service'] ?? '') === $__o['id']){ $q = $__o; break; } }
+      $shipCost = (float)$q['price'];
+      $dl = 'ENTREGA: '.$dst.', '.$dnum.($cl('comp', 60) !== '' ? ' - '.$cl('comp', 60) : '').($cl('district', 80) !== '' ? ', '.$cl('district', 80) : '').' - '.$dcity.'/'.$duf.' - CEP '.substr($dcep, 0, 5).'-'.substr($dcep, 5).' | '.($q['mode'] === 'combine' ? 'Frete a combinar' : (($q['name'] ?? '') !== '' && $q['id'] !== 'regra' ? $q['name'].' - ' : '').($q['mode'] === 'free' ? 'Frete grátis' : 'Frete '.ship_money($shipCost))).($q['days'] !== '' ? ' ('.$q['days'].')' : '');
     } elseif(!empty($SHIP['pickup'])){ $dl = 'RETIRADA NA LOJA'; }
     elseif(($dv['mode'] ?? '') !== 'home') $jerr(422, 'Escolha como deseja receber (entrega).');
     if($dl !== '') $note = mb_substr($dl.($note !== '' ? ' || Obs.: '.$note : ''), 0, 500);
@@ -751,7 +824,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-c</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-d</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -774,6 +847,7 @@ if($__op){
       <div id="dl-home" style="display:none">
         <div class="dl-row"><input id="dl-cep" inputmode="numeric" maxlength="9" placeholder="CEP" autocomplete="postal-code"><button type="button" id="dl-calc" class="dl-btn">Calcular frete</button></div>
         <div class="dl-msg" id="dl-msg"></div>
+        <div class="pay" id="dl-opts" style="display:none;grid-template-columns:1fr;margin-bottom:8px"></div>
         <div id="dl-fields" style="display:none">
           <input id="dl-street" maxlength="120" placeholder="Rua / Avenida" autocomplete="address-line1">
           <div class="dl-row"><input id="dl-num" maxlength="20" placeholder="Número" style="max-width:110px"><input id="dl-comp" maxlength="60" placeholder="Complemento (opcional)"></div>
@@ -803,7 +877,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function $(i){return document.getElementById(i);}
   var WA=<?= json_encode($WHATSAPP) ?>,SELLER=<?= json_encode($SELLER_ID) ?>,SELLERN=<?= json_encode($SELLER_NAME) ?>;
   var SHIP=<?= json_encode(!empty($SHIP['on']) ? ['pickup'=>!empty($SHIP['pickup'])] : null) ?>;
-  var cur=null,cart=[],pay='',dl={mode:'',q:null};
+  var cur=null,cart=[],pay='',dl={mode:'',q:null,opts:[]};
   function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||'';localStorage.setItem(k,v);}catch(e){return '';}}
   function brl(v){return 'R$ '+(Math.round(v*100)/100).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
   function mask(v){v=v.replace(/\D/g,'').slice(0,11);if(v.length>6)return '('+v.slice(0,2)+') '+v.slice(2,v.length>10?7:6)+'-'+v.slice(v.length>10?7:6);if(v.length>2)return '('+v.slice(0,2)+') '+v.slice(2);return v;}
@@ -831,9 +905,11 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     var box=$('dl-box');if(!box)return;
     box.style.display=SHIP?'block':'none';if(!SHIP)return;
     var pk=$('dl-pk');pk.style.display=SHIP.pickup?'':'none';
-    if(dl.q&&dl.sub!==total()){dl.q=null;shipMsg('O valor do carrinho mudou. Toque em Calcular frete de novo.',true);}
+    if(dl.q&&(dl.sub!==total()||dl.units!==count())){dl.q=null;dl.opts=[];shipMsg('O valor do carrinho mudou. Toque em Calcular frete de novo.',true);}
     var bs=$('dl-mode').querySelectorAll('button');for(var k=0;k<bs.length;k++)bs[k].className=bs[k].getAttribute('data-dl')===dl.mode?'on':'';
     $('dl-home').style.display=dl.mode==='home'?'block':'none';
+    var ob=$('dl-opts');ob.innerHTML='';
+    if(dl.mode==='home'&&dl.opts&&dl.opts.length){ob.style.display='grid';dl.opts.forEach(function(o,ix){var bt=document.createElement('button');bt.type='button';bt.setAttribute('data-opt',ix);bt.className=(dl.q&&dl.q.id===o.id)?'on':'';bt.textContent=(o.mode==='combine'||!o.name?'':o.name+' · ')+(o.mode==='combine'?'Frete a combinar':(o.mode==='free'?'Frete grátis':brl(o.price)))+(o.days&&o.mode!=='combine'?' · '+o.days:'');ob.appendChild(bt);});}else ob.style.display='none';
     var sh=$('ct-sh'),q=dl.q;
     if(dl.mode==='home'&&q){sh.style.display='flex';$('ct-shv').textContent=q.mode==='combine'?'a combinar':(q.mode==='free'?'Grátis':brl(q.price));}else sh.style.display='none';
     $('ct-t').textContent=brl(grand());
@@ -843,15 +919,15 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     var cep=$('dl-cep').value.replace(/\D/g,''),city=$('dl-fields').style.display==='block'?$('dl-city').value.trim():'',uf=$('dl-fields').style.display==='block'?$('dl-uf').value.trim():'';
     if(cep.length!==8){shipMsg('Informe um CEP com 8 dígitos.',true);return;}
     var b=$('dl-calc');b.disabled=true;b.textContent='Calculando...';shipMsg('');
-    fetch('catalogo.php?a=frete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cep:cep,city:city,uf:uf,sub:total()})})
+    fetch('catalogo.php?a=frete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cep:cep,city:city,uf:uf,sub:total(),units:count()})})
     .then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro ao calcular.'};});})
     .then(function(j){
       b.disabled=false;b.textContent='Calcular frete';
-      if(!j.ok){dl.q=null;$('dl-fields').style.display='block';shipMsg(j.error||'Não foi possível calcular.',true);drawShip();return;}
-      dl.q=j.quote;dl.sub=total();$('dl-fields').style.display='block';
+      if(!j.ok){dl.q=null;dl.opts=[];$('dl-fields').style.display='block';shipMsg(j.error||'Não foi possível calcular.',true);drawShip();return;}
+      dl.opts=j.options||[];dl.q=dl.opts[0]||null;dl.sub=total();dl.units=count();dl.est=!!j.estimate;$('dl-fields').style.display='block';
       if(j.address){$('dl-street').value=j.address.street||$('dl-street').value;$('dl-dist').value=j.address.district||$('dl-dist').value;}
       $('dl-city').value=j.city;$('dl-uf').value=j.uf;
-      var q=j.quote;shipMsg(q.label+(q.days&&q.mode!=='combine'?' · prazo: '+q.days:'')+' — '+j.city+'/'+j.uf);
+      shipMsg(j.city+'/'+j.uf+(dl.est?' · valores estimados':''));
       drawShip();
     }).catch(function(){b.disabled=false;b.textContent='Calcular frete';shipMsg('Sem conexão. Tente novamente.',true);});
   }
@@ -900,6 +976,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if(t.id==='ct-x'||t.id==='ct-more'||t.id==='ct-oc'){closeCart();return;}
     if(t.id==='ct'&&(!window._lbd||window._lbd===t)){closeCart();return;}
     if(t.id==='dl-calc'){shipCalc();return;}
+    if(t.getAttribute&&t.getAttribute('data-opt')!==null&&t.parentNode&&t.parentNode.id==='dl-opts'){dl.q=dl.opts[+t.getAttribute('data-opt')]||dl.q;drawShip();return;}
     if(t.getAttribute&&t.getAttribute('data-dl')){dl.mode=t.getAttribute('data-dl');$('of-e').textContent='';drawCart();return;}
     if(t.getAttribute&&t.getAttribute('data-pay')){pay=t.getAttribute('data-pay');ls('ess_c_pay',pay);$('of-e').textContent='';drawCart();return;}
     var op=t.getAttribute&&t.getAttribute('data-op');
@@ -912,7 +989,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if(c&&!lb.contains(t)){open(c);return;}
     if((t===lb&&(!window._lbd||window._lbd===lb))||(t.closest&&t.closest('.lb-x')&&t.id!=='ct-x'))close();
   });
-  document.addEventListener('input',function(e){var er=$('of-e');if(er&&e.target.closest&&e.target.closest('#ct-f'))er.textContent='';if(e.target.id==='dl-cep'){var cv=e.target.value.replace(/\D/g,'').slice(0,8);e.target.value=cv.length>5?cv.slice(0,5)+'-'+cv.slice(5):cv;dl.q=null;drawShip();}if(e.target.id==='dl-city'||e.target.id==='dl-uf'){dl.q=null;drawShip();}if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
+  document.addEventListener('input',function(e){var er=$('of-e');if(er&&e.target.closest&&e.target.closest('#ct-f'))er.textContent='';if(e.target.id==='dl-cep'){var cv=e.target.value.replace(/\D/g,'').slice(0,8);e.target.value=cv.length>5?cv.slice(0,5)+'-'+cv.slice(5):cv;dl.q=null;dl.opts=[];drawShip();}if(e.target.id==='dl-city'||e.target.id==='dl-uf'){dl.q=null;dl.opts=[];drawShip();}if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
   document.addEventListener('submit',function(e){
     if(e.target.id!=='ct-f')return;e.preventDefault();
     var n=$('of-n').value.trim(),ph=$('of-p').value.replace(/\D/g,''),er=$('of-e'),btn=$('of-s');
@@ -923,7 +1000,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if(SHIP){
       if(!dl.mode){er.textContent='Escolha como deseja receber: retirar ou entrega.';return;}
       if(dl.mode==='home'){
-        dv={mode:'home',cep:$('dl-cep').value,street:$('dl-street').value,number:$('dl-num').value,comp:$('dl-comp').value,district:$('dl-dist').value,city:$('dl-city').value,uf:$('dl-uf').value};
+        dv={mode:'home',service:dl.q?dl.q.id:'',cep:$('dl-cep').value,street:$('dl-street').value,number:$('dl-num').value,comp:$('dl-comp').value,district:$('dl-dist').value,city:$('dl-city').value,uf:$('dl-uf').value};
         if(!dl.q){er.textContent='Toque em "Calcular frete" para ver o valor da entrega.';return;}
         if(!dv.street.trim()||!dv.number.trim()||!dv.city.trim()||dv.uf.trim().length!==2){er.textContent='Preencha rua, número, cidade e UF da entrega.';return;}
       }else dv={mode:'pickup'};
