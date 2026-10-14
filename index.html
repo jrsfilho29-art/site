@@ -383,9 +383,17 @@
   .pc-act .icon-btn{border:1px solid var(--line);border-radius:7px;width:32px;display:flex;align-items:center;justify-content:center;}
   .pc-act .icon-btn:hover{background:#FADFE6;border-color:#E9B6C2;}
 
+
+  /* abas/filtros em pílulas, no mesmo estilo do Catálogo On */
+  .segbar{background:transparent;padding:0;gap:8px;flex-wrap:wrap;border-radius:0;}
+  .segbar button{border:1.5px solid var(--line);background:var(--paper);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500;color:var(--ink);}
+  .segbar button:hover{border-color:var(--plum);background:var(--tint);}
+  .segbar button.on{background:var(--plum);border-color:var(--plum);color:#fff;font-weight:600;box-shadow:0 2px 6px rgba(23,32,74,.22);}
+  .cx-hero .segbar button{background:transparent;border-color:rgba(255,255,255,.28);color:#D7DAF0;}
+  .cx-hero .segbar button:hover{background:rgba(255,255,255,.14);}
+  .cx-hero .segbar button.on{background:var(--gold);border-color:var(--gold);color:#141A3C;}
   /* ===== Catálogo On ===== */
-  .cx-hero{position:relative;overflow:hidden;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:linear-gradient(135deg,#0D1230 0%,#17204A 55%,#2A3470 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
-  .cx-hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(240,168,31,.35),transparent 65%);pointer-events:none;}
+  .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:radial-gradient(circle at 92% -10%,rgba(240,168,31,.38),transparent 38%),linear-gradient(135deg,#0D1230 0%,#17204A 55%,#2A3470 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
   .cx-hero p{margin:0;color:#C9CDEA;font-size:13px;}
   .cx-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
@@ -394,8 +402,14 @@
   .cx-stat span{font-size:11px;color:#C9CDEA;}
   .cx-stat.hot{background:rgba(240,168,31,.22);border-color:rgba(240,168,31,.5);}
   .cx-hero-act{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;}
-  .cx-hero-act .btn-ghost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff;}
-  .cx-hero-act .btn-ghost:hover{background:rgba(255,255,255,.22);}
+  .cx-hero .btn-ghost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff;}
+  .cx-hero .btn-ghost:hover{background:rgba(255,255,255,.22);}
+  .cx-hero .btn-ghost:disabled{opacity:.5;}
+  .cx-hero .muted,.cx-hero .muted2{color:#C9CDEA;}
+  .cx-hero h2.plum{color:#fff;}
+  .cx-hero .segbar{background:transparent;}
+  .cx-hero .segbar button .pill{background:rgba(255,255,255,.2);color:inherit;}
+  .cx-hero .bgpick{margin-left:0;}
   .cx-tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
   .cx-tabs::-webkit-scrollbar{display:none;}
   .cx-tabs button{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;background:none;border:none;padding:10px 16px;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;border-radius:8px 8px 0 0;transition:color .12s,background .12s;}
@@ -549,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-k';
+const APP_VERSION = '2026.10.13-l';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2337,7 +2351,17 @@ function renderDashboard(){
   const topMax = top.length ? top[0][1].rev : 1;
 
   return `
-  <div class="flex gap flex-wrap mb3" style="align-items:center;">
+  <div class="cx-hero">
+    <div>
+      <h2 class="serif">Painel</h2>
+      <p>Resumo da loja · ${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</p>
+      <div class="cx-stats">
+        <div class="cx-stat"><b>${salesToday.length}</b><span>vendas hoje</span></div>
+        <div class="cx-stat"><b>${brl(revenueToday)}</b><span>faturado hoje</span></div>
+        <div class="cx-stat${lowStock.length>0?' hot':''}"><b>${lowStock.length}</b><span>produto(s) em alerta</span></div>
+      </div>
+    </div>
+    <div class="flex gap flex-wrap" style="align-items:center;">
     <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
@@ -2345,6 +2369,7 @@ function renderDashboard(){
       <span class="muted2" style="font-size:12px;">Fundo</span>
       ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
       <input type="color" data-field="prefs.bgColor" value="${(state.prefs&&state.prefs.bgColor)||'#F1F1F8'}" title="Outra cor (use cores claras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
+    </div>
     </div>
   </div>
   <div class="grid grid-4 kpi-grid mb3">
@@ -2476,10 +2501,7 @@ function renderClientes(){
   else list.sort(coll);
   const chips = [['','Todos'],['inativos','Sem comprar há 60+ dias'+(nInativos?' ('+nInativos+')':'')],['fiado','Devendo (fiado)'+(nFiado?' ('+nFiado+')':'')],['nunca','Nunca compraram']];
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Clientes</h2>
-      <p class="muted">${state.customers.length} cliente(s) cadastrado(s)</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Clientes</h2><p>${state.customers.length} cliente(s) cadastrado(s)</p>${heroStats('clientes')}</div>
     <button class="btn btn-gold" data-action="newCliente">${icon('plus')} Novo cliente</button>
   </div>
   <div class="flex gap flex-wrap mb2" style="align-items:center;">
@@ -2493,7 +2515,7 @@ function renderClientes(){
         <option value="recente" ${sort==='recente'?'selected':''}>Compra mais recente</option>
       </select></label>
   </div>
-  <div class="segbar mb2" style="flex-wrap:wrap;">${chips.map(([k,l])=>`<button class="${flt===k?'on':''}" data-action="setClientFilter" data-f="${k}">${l}</button>`).join('')}</div>
+  <div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''}" data-action="setClientFilter" data-f="${k}">${l}</button>`).join('')}</div>
   ${list.length===0 ? emptyState(icon('users',26),'Nenhum cliente', flt?'Nenhum cliente nesse filtro.':'Cadastre o primeiro cliente da loja para começar a vincular vendas.') : `
   <div class="table-wrap"><table>
     <thead><tr><th>Código</th><th>Nome</th><th>Telefone</th><th style="text-align:right;">Compras</th><th style="text-align:right;">Total gasto</th><th>Última compra</th><th style="text-align:right;">Ações</th></tr></thead>
@@ -2598,9 +2620,7 @@ function renderOnline(){
   const cnt = k => k==='todos' ? ONLINE.orders.length : ONLINE.orders.filter(o=>o.status===k).length;
   const chips = [['novo','Novos'],['atendimento','Em atendimento'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
   const list = ONLINE.orders.filter(o=> flt==='todos' || o.status===flt);
-  const head = `<div class="flex-between flex-wrap mb2"><div>
-    <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Pedidos online</h2>
-    <p class="muted">Escolhas feitas pelos clientes no catálogo online</p></div>
+  const head = `<div class="cx-hero"><div><h2 class="serif">Pedidos online</h2><p>Escolhas feitas pelos clientes no catálogo online</p>${heroStats('online')}</div>
     <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="toggleOnlineSound" title="Som de aviso quando chegar pedido novo (testa o som ao ligar)">${icon(soundOn()?'bell':'bellOff')} Som: ${soundOn()?'ligado':'desligado'}</button><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button>${isAdmin()&&syncEnabled()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="clearOnlineOrders">${icon('trash')} Zerar pedidos online</button>`:''}</div></div>`;
   if(!syncEnabled()){
     return head + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
@@ -2631,7 +2651,7 @@ function renderOnline(){
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
           </div></div>`;
       }).join('')}</div>`;
-  return head + `<div class="segbar mb2" style="flex-wrap:wrap;">${chips.map(([k,l])=>`<button class="${flt===k?'on':''}" data-action="setOnlineFilter" data-f="${k}">${l} (${cnt(k)})</button>`).join('')}</div>` + body;
+  return head + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
 }
 const actions_online = {
   setOnlineFilter(t){ state.ui.onlineFilter = t.dataset.f; render(); },
@@ -2836,10 +2856,7 @@ function renderProdutos(){
   const groups = catFilter ? null : groupProductsByCategory(list);
   const subOptions = catFilter ? state.subcategories.filter(sc=>sc.category===catFilter) : [];
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Produtos</h2>
-      <p class="muted">${state.products.length} produto(s) cadastrado(s)</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Produtos</h2><p>${state.products.length} produto(s) cadastrado(s)</p>${heroStats('produtos')}</div>
     <div class="flex gap flex-wrap">
       <div class="dropdown">
         <button class="btn btn-gold" data-action="toggleAddMenu">${icon('plus')} Cadastrar produto ${icon('chart',11)}</button>
@@ -3183,11 +3200,7 @@ const actions_produtos = {
 function renderEstoque(){
   const view = state.ui.estoqueView==='inventario' ? 'inventario' : 'posicao';
   return `
-  <div class="flex-between flex-wrap mb2" style="gap:12px;">
-    <div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Estoque</h2>
-      <p class="muted">${view==='inventario' ? 'Contagem física e conferência do estoque' : 'Organizado a partir dos produtos cadastrados'}</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Estoque</h2><p>${view==='inventario' ? 'Contagem física e conferência do estoque' : 'Organizado a partir dos produtos cadastrados'}</p>${heroStats('estoque')}</div>
     <div class="segbar">
       <button class="${view==='posicao'?'on':''}" data-action="setEstoqueView" data-view="posicao">${icon('warehouse',14)} Posição atual</button>
       <button class="${view==='inventario'?'on':''}" data-action="setEstoqueView" data-view="inventario">${icon('clipboard',14)} Inventário${INV?' <span class="pill">em andamento</span>':''}</button>
@@ -3509,11 +3522,7 @@ function renderVendas(){
   const view = state.ui.vendaView==='lista' ? 'lista' : 'nova';
   const kpi = (label,val,sub)=>`<div class="card kpi" style="padding:14px 16px;"><div class="klabel">${label}</div><div class="kval">${val}</div><div class="muted" style="font-size:12px;margin-top:2px;">${sub}</div></div>`;
   return `
-  <div class="flex-between flex-wrap mb2" style="gap:12px;">
-    <div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Vendas</h2>
-      <p class="muted">Registre vendas e consulte o histórico</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Vendas</h2><p>Registre vendas e consulte o histórico</p>${heroStats('vendas')}</div>
     <div class="segbar">
       <button class="${view==='nova'?'on':''}" data-action="setVendaView" data-view="nova">${icon('plus',14)} Nova venda</button>
       <button class="${view==='lista'?'on':''}" data-action="setVendaView" data-view="lista">${icon('cart',14)} Histórico (${state.sales.length})</button>
@@ -3862,10 +3871,7 @@ function renderPedidos(){
   const invoicedThisMonth = state.orders.filter(o=>o.status==='Faturado' && (o.invoicedAt||o.createdAt||'').slice(0,7)===now);
   const invoicedValue = invoicedThisMonth.reduce((a,o)=>a+o.total,0);
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Pedidos de Venda</h2>
-      <p class="muted">${state.orders.length} pedido(s) registrado(s)</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Pedidos de Venda</h2><p>${state.orders.length} pedido(s) registrado(s)</p>${heroStats('pedidos')}</div>
     <div class="flex gap flex-wrap">
       <button class="btn ${state.ui.pedidoView==='nova'?'btn-gold':'btn-ghost'}" data-action="newPedido">${icon('plus')} Novo pedido</button>
       <button class="btn ${state.ui.pedidoView==='lista'?'btn-gold':'btn-ghost'}" data-action="setPedidoView" data-view="lista">${icon('clipboard')} Todos os pedidos</button>
@@ -4171,6 +4177,19 @@ function printOrderDoc(orderId){
 }
 
 /* ================= catalogo ================= */
+
+function heroStats(kind){
+  const st = (v,l,hot) => `<div class="cx-stat${hot?' hot':''}"><b>${v}</b><span>${l}</span></div>`;
+  let a = [];
+  if(kind==='clientes'){ a = [st(state.customers.length,'cadastrados'), st(state.customers.filter(c=>waPhone(c.phone)).length,'com WhatsApp'), st(state.customers.filter(c=>!waPhone(c.phone)).length,'sem telefone')]; }
+  else if(kind==='produtos'){ const low = state.products.filter(p=>p.stock<=(p.minStock||0)).length; a = [st(state.products.length,'produtos'), st(state.products.filter(p=>p.stock>0).length,'com estoque'), st(low,'em alerta',low>0)]; }
+  else if(kind==='estoque'){ const un = state.products.reduce((t,p)=>t+(+p.stock||0),0), low = state.products.filter(p=>p.stock<=(p.minStock||0)).length; a = [st(un,'unidades'), st(brl(state.products.reduce((t,p)=>t+p.stock*p.costPrice,0)),'valor (custo)'), st(low,'em alerta',low>0)]; }
+  else if(kind==='vendas'){ const t = todayISO(), d = state.sales.filter(x=>x.status!=='cancelada' && localDay(x.date)===t); a = [st(d.length,'vendas hoje'), st(brl(d.reduce((q,x)=>q+x.total,0)),'faturado hoje'), st(state.sales.length,'no histórico')]; }
+  else if(kind==='pedidos'){ const pend = state.orders.filter(o=>o.status==='Pendente').length; a = [st(state.orders.length,'pedidos'), st(pend,'pendentes',pend>0)]; }
+  else if(kind==='online'){ const n = (typeof onlineNewCount==='function')?onlineNewCount():0; a = [st(n,'novo(s)',n>0), st(ONLINE.orders.length,'recebidos')]; }
+  else if(kind==='usuarios'){ const ad = adminCount(); a = [st(ad,'administrador(es)'), st(state.users.length-ad,'usuário(s)')]; }
+  return a.length ? `<div class="cx-stats">${a.join('')}</div>` : '';
+}
 function renderCatalogo(){
   const subView = state.ui.catalogoSubView || 'vitrine';
   const act = state.products.filter(p=>p.active!==false);
@@ -4452,10 +4471,7 @@ function renderCaixa(){
   const maxDay = dayRows.reduce((a,r)=>Math.max(a,r.total),0) || 1;
 
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-    <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Caixa</h2>
-    <p class="muted">Entradas por forma de pagamento</p>
-  </div>
+  <div class="cx-hero"><div><h2 class="serif">Caixa</h2><p>Entradas por forma de pagamento</p></div>
   <div class="flex gap flex-wrap">
     <button class="btn btn-ghost" data-action="printCaixa">${icon('printer')} Imprimir</button>
     <button class="btn btn-ghost" data-action="exportCaixa">${icon('download')} Exportar CSV</button>
@@ -4583,8 +4599,7 @@ function renderRelatorios(){
   const stockValueSale = state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
 
   return `
-  <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Relatórios</h2>
-  <p class="muted mb2">Lucratividade, vendas e estoque</p>
+  <div class="cx-hero"><div><h2 class="serif">Relatórios</h2><p>Lucratividade, vendas por vendedor, comissões e estoque</p></div></div>
   <div class="flex gap flex-wrap mb3" style="align-items:end;">
     <label class="field" style="margin-bottom:0;min-width:210px;"><span class="lbl">Tipo de relatório</span>
       <select data-field="ui.relType">${REL_TYPES.map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
@@ -4651,10 +4666,7 @@ function renderUsuarios(){
   const admins = adminCount(), normals = state.users.length - admins;
   const roleCard = (cls,title,items)=>`<div class="card" style="padding:14px 16px;"><span class="role-badge ${cls}">${title}</span><ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;" class="muted">${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
   return `
-  <div class="flex-between flex-wrap mb2"><div>
-      <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Usuários</h2>
-      <p class="muted">${admins} administrador(es) · ${normals} usuário(s)</p>
-    </div>
+  <div class="cx-hero"><div><h2 class="serif">Usuários</h2><p>${admins} administrador(es) · ${normals} usuário(s)</p>${heroStats('usuarios')}</div>
     <button class="btn btn-gold" data-action="newUsuario">${icon('plus')} Novo usuário</button>
   </div>
   <div class="grid grid-2 mb2" style="max-width:860px;">
@@ -4697,17 +4709,14 @@ function renderServidor(){
   const last = SYNC.cfg.last ? new Date(SYNC.cfg.last).toLocaleString('pt-BR') : 'nunca';
   const tabs = [['conexao','Conexão'],['dados','Enviar e baixar'],['backup','Backup'],['guia','Guia de instalação']];
   return `
-  <div class="mb2">
-    <h2 class="serif plum" style="font-size:26px;margin-bottom:2px;">Servidor</h2>
-    <p class="muted">Sincronização com o banco de dados do seu site (Hostinger)</p>
-  </div>
+  <div class="cx-hero"><div><h2 class="serif">Servidor</h2><p>Sincronização com o banco de dados do seu site (Hostinger)</p></div></div>
   <div class="servstatus ${st.cls}">
     <span class="syncdot ${st.cls}"></span>
     <div style="flex:1;min-width:180px;"><b>${esc(st.text)}</b>
       <div style="font-size:12.5px;" class="muted">Versão no servidor: ${SYNC.cfg.version} · Última sincronização: ${last}</div></div>
     ${syncEnabled() ? `<button class="btn btn-ghost" data-action="syncTest" ${SYNC.busy?'disabled':''}>Testar conexão</button>` : ''}
   </div>
-  <div class="segbar mb2">
+  <div class="cx-tabs">
     ${tabs.map(([id,l])=>`<button class="${view===id?'on':''}" data-action="setServidorSubView" data-view="${id}">${l}</button>`).join('')}
   </div>
   ${SYNC.msg ? `<p class="${SYNC.msgType==='err'?'danger-c':'muted'}" style="font-size:13px;margin-bottom:14px;max-width:640px;">${esc(SYNC.msg)}</p>` : ''}
