@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-p';
+const APP_VERSION = '2026.10.13-q';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2072,13 +2072,18 @@ function handleFieldInput(t){
     val = t.dataset.mask==='phone' ? maskPhone(t.value) : maskCep(t.value);
     if(val !== t.value) t.value = val;
   }
+  if(path==='prefs.heroColor' || path==='prefs.bgColor'){   /* sem render: o seletor de cor do navegador não pode ser refeito enquanto se arrasta */
+    const hero = path==='prefs.heroColor', ok = hero ? heroOk(val) : bgOk(val), cur = (state.prefs && state.prefs[hero?'heroColor':'bgColor']) || '';
+    if(!ok){ notify.err(hero ? 'Cor muito clara: o texto branco do cabeçalho ficaria difícil de ler. Escolha uma cor escura.' : 'Cor muito escura: o texto ficaria difícil de ler. Escolha uma cor clara.'); const el=document.querySelector('input[data-field="'+path+'"]'); if(el) el.value = cur || (hero?'#0D1230':'#F1F1F8'); return; }
+    state.prefs = state.prefs||{}; state.prefs[hero?'heroColor':'bgColor'] = val; persist('prefs'); applyPrefs();
+    document.querySelectorAll('[data-action="'+(hero?'setHero':'setBg')+'"]').forEach(btn=>{ const sp=btn.firstElementChild, on=(btn.dataset.color||'').toUpperCase()===String(val).toUpperCase(); if(sp){ sp.style.borderColor = on?'var(--plum)':'var(--line)'; sp.style.boxShadow = on?'0 0 0 2px var(--tint)':'none'; } });
+    return;
+  }
   setPath(state, path, val);
   { const mm = /^ui\.modal\.data\.(costPrice|markup|salePrice)$/.exec(path); if(mm && state.ui.modal && state.ui.modal.type==='produto') productPriceSync(mm[1]); }
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path==='prefs.heroColor'){ persist('prefs'); if(!heroOk(val)) notify.err('Cor muito clara: o texto branco do cabeçalho ficaria difícil de ler. Escolha uma cor escura.'); applyPrefs(); return; }
-  if(path==='prefs.bgColor'){ persist('prefs'); if(!bgOk(val)) notify.err('Cor muito escura: o texto ficaria difícil de ler. Escolha uma cor clara.'); applyPrefs(); return; }   /* sem render: o seletor de cor do navegador não pode ser refeito enquanto se arrasta */
   if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
