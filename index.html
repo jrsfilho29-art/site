@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-m';
+const APP_VERSION = '2026.10.13-n';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2372,15 +2372,17 @@ function renderDashboard(){
     <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
-    <div class="bgpick" style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor de fundo do aplicativo">
-      <span class="muted2" style="font-size:12px;">Fundo</span>
-      ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
+    <div class="bgcol" style="margin-left:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-start;">
+    <div class="bgpick" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor de fundo do aplicativo">
+      <span style="font-size:12px;color:#D7DAF0;width:68px;">Fundo</span>
+      ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};"></button>`; }).join('')}
       <input type="color" data-field="prefs.bgColor" value="${(state.prefs&&state.prefs.bgColor)||'#F1F1F8'}" title="Outra cor (use cores claras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
     </div>
     <div class="bgpick" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor do cabeçalho (cores escuras)">
-      <span class="muted2" style="font-size:12px;">Cabeçalho</span>
-      ${HERO_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.heroColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setHero" data-color="${c}" title="${n}" aria-label="Cabeçalho ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#0D1230'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
+      <span style="font-size:12px;color:#D7DAF0;width:68px;">Cabeçalho</span>
+      ${HERO_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.heroColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setHero" data-color="${c}" title="${n}" aria-label="Cabeçalho ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#0D1230'};border:2px solid ${cur?'var(--plum)':'var(--line)'};"></button>`; }).join('')}
       <input type="color" data-field="prefs.heroColor" value="${(state.prefs&&state.prefs.heroColor)||'#0D1230'}" title="Outra cor (use cores escuras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
+    </div>
     </div>
     </div>
   </div>
