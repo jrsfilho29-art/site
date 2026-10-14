@@ -585,7 +585,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-za';
+const APP_VERSION = '2026.10.13-zb';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2804,7 +2804,7 @@ function renderProductCard(p, sel){
           <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
           <div class="pc-code">${p.sku? 'Cód. '+esc(p.sku) : '&nbsp;'}</div>
           ${state.prefs.showPrices!==false ? `
-          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
+          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}${p.lastUnits?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Últimas unid.</span>':''}${margin!==null?`<span class="mg${margin<0?' neg':''}" title="Margem sobre o preço de venda">margem ${margin}%</span>`:''}</div>` : ''}
           <div class="pc-stock">
             <div class="row${zero||low?' bad':''}"><span>Estoque</span><span>${p.stock} un.${zero||low?' · repor':''}</span></div>
           </div>
@@ -2982,7 +2982,7 @@ function renderProdutos(){
 
 const actions_produtos = {
   toggleAddMenu(){ state.ui.addMenuOpen = !state.ui.addMenuOpen; render(); },
-  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',promoPrice:'',isNew:false,stock:0,minStock:0,description:''}}; render(); },
+  newProduto(){ state.ui.addMenuOpen=false; state.ui.modal = {type:'produto', data:{id:null,sku:nextProductCode(),name:'',category:'',image:'',costPrice:'',salePrice:'',markup:'',promoPrice:'',isNew:false,lastUnits:false,stock:0,minStock:0,description:''}}; render(); },
   openExportProducts(){
     state.ui.addMenuOpen=false;
     const list = currentProductExportList();
@@ -3223,6 +3223,7 @@ const actions_produtos = {
       markup: Math.max(0, parseFloat(d.markup)||0),
       promoPrice: (()=>{ const v=parseFloat(d.promoPrice)||0, sp=parseFloat(d.salePrice)||0; return (v>0 && v<sp) ? +v.toFixed(2) : 0; })(),
       isNew: !!d.isNew,
+      lastUnits: !!d.lastUnits,
       stock: Math.max(0, parseInt(d.stock)||0),
       minStock: Math.max(0, parseInt(d.minStock)||0),
       maxStock: d.maxStock? Math.max(0, parseInt(d.maxStock)||0) : null,
@@ -4446,7 +4447,7 @@ function renderCatalogoCard(p){
         <div class="pc-body">
           <div class="pc-brand"><span>${p.brand? esc(p.brand) : '&nbsp;'}</span>${p.volume? `<span class="vol">${esc(p.volume)}ml</span>`:''}</div>
           <div class="pc-name" title="${esc(p.name)}">${esc(p.name)}</div>
-          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}</div>
+          <div class="pc-price">${promoOn(p)?`<s class="muted2" style="font-size:12px;margin-right:6px;">${brl(p.salePrice)}</s>`:''}<b>${brl(effPrice(p))}</b>${promoOn(p)?`<span class="mg" style="background:#FADFE6;color:#8F2A42;">-${promoPct(p)}%</span>`:''}${p.isNew?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Novidade</span>':''}${p.lastUnits?'<span class="mg" style="background:#FFF3D6;color:#9A6400;">Últimas unid.</span>':''}</div>
           <div class="pc-meta">${p.sku?'Cód. '+esc(p.sku)+' · ':''}${out?'sem estoque':p.stock+' em estoque'}${p.category?' · '+esc(p.category):''}</div>
           ${p.description?`<div class="pc-desc">${esc(p.description)}</div>`:''}
           <div style="margin-top:auto;"><button class="btn ${inactive?'btn-gold':'btn-ghost'} pc-btn" data-action="toggleProductActive" data-id="${p.id}">
@@ -5484,7 +5485,10 @@ function renderProdutoModal(d){
     </div>
     <div class="grid grid-2" style="align-items:end;">
       <label class="field"><span class="lbl">Preço promocional (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.promoPrice" value="${esc(d.promoPrice||'')}" placeholder="vazio = sem promoção"><span class="hint">${(parseFloat(d.promoPrice)||0)>0 && (parseFloat(d.promoPrice)||0)>=(parseFloat(d.salePrice)||0) ? '<b class="danger-c">Precisa ser menor que o preço de venda.</b>' : 'Aparece riscado no catálogo, com o desconto em %.'}</span></label>
-      <label class="field" style="display:flex;align-items:center;gap:8px;padding-bottom:20px;"><input type="checkbox" data-field="ui.modal.data.isNew" ${d.isNew?'checked':''}> <span><b>Novidade</b> <span class="muted2" style="font-size:12px;">(selo no catálogo)</span></span></label>
+      <div style="display:flex;flex-direction:column;gap:8px;padding-bottom:20px;">
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" data-field="ui.modal.data.isNew" ${d.isNew?'checked':''}> <span><b>Novidade</b> <span class="muted2" style="font-size:12px;">(selo no catálogo)</span></span></label>
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" data-field="ui.modal.data.lastUnits" ${d.lastUnits?'checked':''}> <span><b>Últimas unidades</b> <span class="muted2" style="font-size:12px;">(selo no catálogo)</span></span></label>
+      </div>
     </div>
     <div class="grid grid-2">
       <label class="field"><span class="lbl">Estoque inicial / atual</span><input type="number" min="0" data-field="ui.modal.data.stock" value="${esc(d.stock)}"><span class="hint">Sem limite de quantidade</span></label>

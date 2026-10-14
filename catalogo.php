@@ -196,8 +196,8 @@ if(isset($_GET['ogimg'])){
 try{
   $cats = $pdo->query('SELECT name FROM categories ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
   $subs = $pdo->query('SELECT name, category FROM subcategories ORDER BY name')->fetchAll();
-  try{ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,promo_price,is_new,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }
-  catch(Throwable $__e){ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }
+  try{ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,promo_price,is_new,last_units,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }
+  catch(Throwable $__e){ try{ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,promo_price,is_new,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); }catch(Throwable $__e2){ $prods = $pdo->query('SELECT id,name,category,subcategory,image,sale_price,stock,brand,volume,description FROM products WHERE active = 1 AND stock > 0')->fetchAll(); } }
 }catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
 
 $coll = class_exists('Collator') ? new Collator('pt_BR') : null;
@@ -238,7 +238,7 @@ unset($g);
 
 function card($p){
   $__eff = eff_price($p); $__promo = $__eff < (float)$p['sale_price']; $__new = !empty($p['is_new']);
-  $__pct = $__promo ? (int)round((1 - $__eff / (float)$p['sale_price']) * 100) : 0;
+  $__pct = $__promo ? (int)round((1 - $__eff / (float)$p['sale_price']) * 100) : 0; $__last = !empty($p['last_units']);
   $img = (string)$p['image'];
   if(strncmp($img, 'data:', 5) === 0) $src = 'catalogo.php?img='.rawurlencode($p['id']).'&v='.substr(md5($img), 0, 8);
   elseif(preg_match('#^https?://#i', $img)) $src = $img;
@@ -264,7 +264,7 @@ function card($p){
   $low = '';
   if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%</span>';
   if($__new) $low .= '<span class="tag-new">Novidade</span>';
-  if((int)$p['stock'] > 0 && (int)$p['stock'] <= 3) $low .= '<span class="tag-low">Últimas unidades</span>';
+  if($__last) $low .= '<span class="tag-low">Últimas unidades</span>';
   if($low !== '') $low = '<div class="tags">'.$low.'</div>';
   return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').brl($__eff).'</div>'.$btn.'</div></div>';
 }
@@ -661,7 +661,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-zz</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-zb</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>

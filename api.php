@@ -71,6 +71,13 @@ catch(Throwable $e){
   catch(Throwable $e2){ $prodPromo = false; }
 }
 
+$prodLast = true;
+try{ $pdo->query('SELECT last_units FROM products LIMIT 1'); }
+catch(Throwable $e){
+  try{ $pdo->exec('ALTER TABLE products ADD COLUMN last_units TINYINT(1) NOT NULL DEFAULT 0'); }
+  catch(Throwable $e2){ $prodLast = false; }
+}
+
 /* ---- colunas extras de clientes (código e endereço): criadas sozinhas em bancos antigos ---- */
 $custExtra = ['code'=>20, 'number'=>20, 'district'=>120, 'city'=>120, 'state'=>10, 'zip'=>12];
 $custHas = [];
@@ -227,7 +234,7 @@ try{
       'maxStock'=>($r['max_stock'] === null ? null : (int)$r['max_stock']),
       'active'=>((int)$r['active'] === 1), 'description'=>s($r['description']), 'sku'=>s($r['sku']),
       'brand'=>s($r['brand']), 'volume'=>s($r['volume']), 'supplier'=>s($r['supplier']),
-      'promoPrice'=>(isset($r['promo_price']) && $r['promo_price'] !== null) ? (float)$r['promo_price'] : 0, 'isNew'=>!empty($r['is_new']),
+      'promoPrice'=>(isset($r['promo_price']) && $r['promo_price'] !== null) ? (float)$r['promo_price'] : 0, 'isNew'=>!empty($r['is_new']), 'lastUnits'=>!empty($r['last_units']),
       'createdAt'=>fromDt($r['created_at'])
     ], rows($pdo, 'SELECT * FROM products ORDER BY created_at, name'));
 
@@ -323,6 +330,7 @@ try{
       $st = $ins('INSERT INTO subcategories (id,name,category) VALUES (?,?,?)');
       foreach($d['subcategories'] as $c){ $st->execute([s($c['id']??''), s($c['name']??''), s($c['category']??'')]); }
 
+      $stLast = $prodLast ? $pdo->prepare('UPDATE products SET last_units = ? WHERE id = ?') : null;
       $st = $prodPromo ? $ins('INSERT INTO products (id,name,category,subcategory,image,cost_price,sale_price,markup,stock,min_stock,max_stock,active,description,sku,brand,volume,supplier,created_at,promo_price,is_new) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                        : $ins('INSERT INTO products (id,name,category,subcategory,image,cost_price,sale_price,markup,stock,min_stock,max_stock,active,description,sku,brand,volume,supplier,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
       foreach($d['products'] as $p){
@@ -336,6 +344,7 @@ try{
           s($p['description']??''), s($p['sku']??''), s($p['brand']??''), s($p['volume']??''), s($p['supplier']??''),
           toDt($p['createdAt']??null) ?? gmdate('Y-m-d H:i:s')
         ] + ($prodPromo ? [18=>(num($p['promoPrice']??0) > 0 && num($p['promoPrice']??0) < num($p['salePrice']??0)) ? num($p['promoPrice']) : null, 19=>!empty($p['isNew']) ? 1 : 0] : []));
+        if($stLast && !empty($p['lastUnits'])) $stLast->execute([1, s($p['id']??'')]);
       }
 
       $st  = $salesSeller ? $ins('INSERT INTO sales (id,date,customer_id,customer_name,subtotal,discount,total,status,order_id,created_at,seller_id,seller_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
