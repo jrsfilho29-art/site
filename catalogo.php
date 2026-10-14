@@ -810,6 +810,12 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .cta-wa{position:fixed!important;top:auto!important;left:auto!important;right:14px;bottom:18px;transition:bottom .2s;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
   .cta-wa:hover{opacity:1;}
   body.has-cart .cta-wa{bottom:84px!important;}
+  /* carrinho como gaveta no lado direito da tela */
+  .ct{padding:0!important;align-items:stretch!important;justify-content:flex-end!important;}
+  .ct-box{max-width:none!important;width:min(100%,440px)!important;height:100vh;height:100dvh;max-height:none!important;border-radius:18px 0 0 18px!important;padding:18px 16px calc(16px + env(safe-area-inset-bottom))!important;box-shadow:-18px 0 50px rgba(0,0,0,.35)!important;}
+  .ct.on .ct-box{animation:ctin .26s ease-out;}
+  @keyframes ctin{from{transform:translateX(100%)}to{transform:none}}
+  @media (max-width:560px){.ct-box{width:100%!important;border-radius:0!important;}}
   .cb{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
   .cb button{font-family:inherit;font-weight:700;border:none;cursor:pointer;line-height:1.1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;transition:filter .12s,background .12s,color .12s;}
   .cb-buy{font-size:13px;padding:12px 8px;text-transform:uppercase;letter-spacing:.6px;}
@@ -847,7 +853,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-l</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-m</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
