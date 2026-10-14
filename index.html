@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-m';
+const APP_VERSION = '2026.10.14-n';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2697,7 +2697,7 @@ function renderOnline(){
   const chips = [['novo','Novos'],['atendimento','Em atendimento'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
   const list = ONLINE.orders.filter(o=> flt==='todos' || o.status===flt);
   const head = `<div class="cx-hero"><div><h2 class="serif">Pedidos online</h2><p>Escolhas feitas pelos clientes no catálogo online</p>${heroStats('online')}</div>
-    <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="toggleOnlineSound" title="Som de aviso quando chegar pedido novo (testa o som ao ligar)">${icon(soundOn()?'bell':'bellOff')} Som: ${soundOn()?'ligado':'desligado'}</button><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button>${isAdmin()&&syncEnabled()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="clearOnlineOrders">${icon('trash')} Zerar pedidos online</button>`:''}</div></div>`;
+    <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="toggleOnlineSound" title="Som de aviso quando chegar pedido novo (testa o som ao ligar)">${icon(soundOn()?'bell':'bellOff')} Som: ${soundOn()?'ligado':'desligado'}</button><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button></div></div>`;
   if(!syncEnabled()){
     return head + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
   }
