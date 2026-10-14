@@ -684,6 +684,17 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .pay button.on{border-color:var(--gold);background:#FFF6DF;box-shadow:inset 0 0 0 1px var(--gold);}
   .toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:130;background:var(--plum);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center;}
   .toast.on{opacity:1;transform:translateX(-50%);}
+  .okpop{position:fixed;inset:0;z-index:200;background:rgba(13,18,48,.7);display:none;align-items:center;justify-content:center;padding:18px;}
+  .okpop.on{display:flex;animation:okfade .2s ease-out;}
+  .okpop-b{background:#fff;border-radius:20px;width:100%;max-width:360px;padding:26px 22px 22px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45);animation:okpop .32s cubic-bezier(.2,1.2,.3,1);}
+  .okpop-i{color:#1a8f4a;line-height:0;margin-bottom:10px;}
+  .okpop-i path{stroke-dasharray:40;stroke-dashoffset:40;animation:okdraw .5s .15s ease-out forwards;}
+  .okpop-t{font-size:20px;font-weight:800;color:var(--plum);margin-bottom:8px;}
+  .okpop-m{font-size:14px;color:#4a4f6a;line-height:1.45;margin-bottom:6px;}
+  .okpop-c{font-size:12.5px;color:#6b6f85;margin-bottom:16px;}
+  @keyframes okfade{from{opacity:0}to{opacity:1}}
+  @keyframes okpop{from{transform:scale(.8);opacity:0}to{transform:none;opacity:1}}
+  @keyframes okdraw{to{stroke-dashoffset:0}}
   .atoast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:131;width:min(92vw,380px);background:#fff;color:var(--plum);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(13,18,48,.28);padding:10px 12px;display:none;align-items:center;gap:10px;opacity:0;transition:.25s;}
   .atoast.on{display:flex;opacity:1;transform:translateX(-50%);}
   .atoast img,.atoast .at-ph{width:46px;height:46px;border-radius:8px;object-fit:cover;background:#eef0fa;flex:none;}
@@ -853,7 +864,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-m</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-n</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -898,6 +909,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <div class="of-ok" id="ct-ok" style="display:none"><div class="of-ok-i">&#10003;</div><div class="of-ok-t">Pedido enviado!</div><div class="of-ok-m" id="ct-okm"></div><div class="pixbox" id="ct-pix" style="display:none"><h4>Pague com PIX</h4><div class="pv" id="ct-pixv"></div><div class="pq" id="ct-pixq"></div><textarea class="pc" id="ct-pixc" readonly rows="3" aria-label="Código PIX copia e cola"></textarea><button type="button" class="lb-act lb-buy" id="ct-pixb" style="margin-top:10px">Copiar código PIX</button><div class="ph">Abra o app do seu banco, escolha <b>PIX &rarr; Pagar com QR Code</b> (ou <b>Copia e Cola</b>) e confira o valor. Depois envie o comprovante no WhatsApp.</div></div><a class="lb-act lb-buy" id="ct-paid" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center;background:#25D366;color:#073B1B">Já fiz o pagamento — avisar a loja</a><a class="lb-act lb-buy" id="ct-ow" target="_blank" rel="noopener" style="display:none;text-decoration:none;text-align:center">Falar agora no WhatsApp</a><button type="button" class="of-b" id="ct-oc">Fechar</button></div>
 </div></div>
 <div class="toast" id="toast" role="status"></div>
+<div class="okpop" id="okpop" role="alertdialog" aria-modal="true" aria-labelledby="okpop-t"><div class="okpop-b"><div class="okpop-i"><svg viewBox="0 0 52 52" width="64" height="64" aria-hidden="true"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15 27l8 8 15-17" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="okpop-t" id="okpop-t">Compra realizada com sucesso!</div><div class="okpop-m" id="okpop-m"></div><div class="okpop-c" id="okpop-c"></div><button type="button" class="lb-act lb-buy" id="okpop-x">OK</button></div></div>
 <div class="atoast" id="atoast" role="status" aria-live="polite"></div>
 <script>
 document.addEventListener('contextmenu',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault();});
@@ -1023,6 +1035,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     var t=e.target;
     var cbb=t.closest&&t.closest('[data-cb]');
     if(cbb){var cc=cbb.closest('.card');if(cc){if(cbb.getAttribute('data-cb')==='buy'){add(cc);openCart();}else if(add(cc))openCart();}return;}
+    if(t.id==='okpop-x'||t.id==='okpop'){$('okpop').className='okpop';var okb=$('ct-ok');if(okb&&okb.scrollIntoView)try{okb.scrollIntoView({block:'start'});}catch(e){}return;}
     if(t.id==='at-open'){$('atoast').className='atoast';openCart();return;}
     if(t.id==='lb-add'){if(cur&&add(cur)){openCart();}return;}
     if(t.id==='lb-buy'){if(cur&&add(cur))openCart();else if(cur)openCart();return;}
@@ -1074,6 +1087,10 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       var pd=$('ct-paid'),oid=String(j.id||'').replace(/^ped_/,'').slice(0,8).toUpperCase();
       if(WA&&pay==='PIX'){pd.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Já fiz o pagamento do meu pedido'+(oid?' '+oid:'')+' ('+brl(tot)+', '+pay+') em nome de '+n+'.'+(pay==='PIX'?' Segue o comprovante:':''));pd.style.display='block';}else pd.style.display='none';
       showPix(j.pix);
+      (function(){var oc=String(j.id||'').replace(/^ped_/,'').slice(0,8).toUpperCase();
+        $('okpop-m').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido de '+brl(tot)+'.'+(j.pix?' Faça o pagamento pelo PIX para concluir.':' A loja vai falar com você pelo WhatsApp.');
+        $('okpop-c').textContent=oc?'Pedido nº '+oc:'';$('okpop-x').textContent=j.pix?'Ver pagamento PIX':'OK';
+        $('okpop').className='okpop on';})();
       cart=[];saveCart();fab();$('of-o').value='';
       $('ct-main').style.display='none';$('ct-ok').style.display='block';
     }).catch(function(){btn.disabled=false;btn.textContent='Enviar pedido para a loja';er.textContent='Sem conexão. Verifique a internet e tente novamente.';});
