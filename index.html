@@ -73,7 +73,22 @@
   .oo-rows{display:flex;flex-direction:column;gap:8px;}
   .oo-row{display:flex;gap:10px;align-items:center;}
   .oo-img.sm{width:48px;height:48px;}
-  .oo-acts{display:flex;gap:6px;flex-wrap:wrap;}
+  .oo-acts{display:flex;gap:5px;flex-wrap:wrap;}
+  .oo-grid{grid-template-columns:repeat(auto-fill,minmax(235px,1fr))!important;gap:8px!important;align-items:start;}
+  .oo-c{padding:10px 12px!important;gap:5px!important;}
+  .oo-h{display:flex;justify-content:space-between;gap:6px;align-items:center;}
+  .oo-who{min-width:0;font-size:13.5px;line-height:1.25;}
+  .oo-who .muted{font-size:12px;white-space:nowrap;}
+  .oo-sub{font-size:12px;color:var(--muted);}
+  .oo-sub strong{color:var(--ink,inherit);font-size:13px;}
+  .oo-brief{font-size:12.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .oo-note{font-size:12px;color:var(--muted);font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .oo-note.open{display:block;-webkit-line-clamp:unset;}
+  .oo-more{background:none;border:none;padding:0;font:inherit;font-size:11.5px;color:var(--gold-deep,#9a6b00);cursor:pointer;text-align:left;width:fit-content;}
+  .oo-c .oo-rows{gap:5px;}
+  .oo-c .oo-acts{margin-top:3px;}
+  .oo-c .oo-acts{gap:4px;}
+  .oo-c .oo-acts .btn{padding:4px 8px!important;font-size:11.5px!important;min-height:0!important;}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(36,26,34,.04);}
   .grid{display:grid;gap:16px;}
   .grid-2{grid-template-columns:repeat(2,1fr);}
@@ -591,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-k';
+const APP_VERSION = '2026.10.14-l';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2701,15 +2716,19 @@ function renderOnline(){
           const im = p && p.image ? `<img class="oo-img sm" src="${esc(p.image)}" alt="">` : `<div class="oo-img sm ph">${icon('package',18)}</div>`;
           return `<div class="oo-row">${im}<div style="min-width:0;flex:1;"><div style="font-weight:600;font-size:13.5px;">${esc(i.name)}</div><div class="muted" style="font-size:12px;">${p&&p.sku?'Cód. '+esc(p.sku)+' · ':''}${i.qty} × ${brl(i.unitPrice)} = <strong>${brl(i.qty*i.unitPrice)}</strong>${p?'':' · produto removido'}</div></div></div>`;
         }).join('');
-        return `<div class="card oo-card">
-          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><span class="muted2" style="font-size:11.5px;">${onlineAgo(o.createdAt)}</span><span style="display:flex;gap:6px;align-items:center;">${paid?`<span class="badge-ok" title="Pagamento confirmado">Pago</span>`:''}<span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></span></div>
-          <div class="oo-rows">${rows}</div>${o.sellerName?`<div class="muted2" style="font-size:12px;">Vendedor: <strong>${esc(o.sellerName)}</strong></div>`:''}
-          <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:8px;"><span class="muted">${o.payment?'Pagamento: <strong>'+esc(o.payment)+'</strong>':''}</span><span>Total <strong style="font-size:17px;">${brl(total)}</strong></span></div>
-          <div><strong>${esc(o.customerName)}</strong><br><span class="muted">${esc(maskPhone(onlineDigits(o.phone)))}</span>${o.note?`<div class="muted" style="margin-top:4px;font-size:12.5px;">“${esc(o.note)}”</div>`:''}</div>
+        const openD = !!(state.ui.ooOpen&&state.ui.ooOpen[o.id]);
+        const brief = its.map(i=>i.qty+'× '+i.name).join(' · ');
+        return `<div class="card oo-card oo-c">
+          <div class="oo-h"><div class="oo-who"><strong>${esc(o.customerName)}</strong> <span class="muted">${esc(maskPhone(onlineDigits(o.phone)))}</span></div><span style="display:flex;gap:4px;align-items:center;flex:none;">${paid?`<span class="badge-ok" title="Pagamento confirmado">Pago</span>`:''}<span class="${cls}">${ONLINE_ST[o.status]||esc(o.status)}</span></span></div>
+          <div class="oo-sub">${onlineAgo(o.createdAt)}${o.payment?' · '+esc(o.payment):''}${o.sellerName?' · '+esc(o.sellerName):''} · <strong>${brl(total)}</strong></div>
+          <div class="oo-brief" title="${esc(its.map(i=>i.qty+'× '+i.name+' ('+brl(i.unitPrice)+')').join('\n'))}">${esc(brief)}</div>
+          ${o.note?`<div class="oo-note ${openD?'open':''}">${esc(o.note)}</div>`:''}
+          ${(o.note||its.length>0)?`<button type="button" class="oo-more" data-action="ooToggle" data-id="${esc(o.id)}">${openD?'Ocultar detalhes ▴':'Ver detalhes ▾'}</button>`:''}
+          ${openD?`<div class="oo-rows">${rows}</div>`:''}
           <div class="oo-acts">
             <button class="btn btn-primary" data-action="onlineWhats" data-id="${esc(o.id)}">WhatsApp</button>
-            ${o.status!=='cancelado'?`<button class="btn ${paid?'btn-ghost':'btn-gold'}" data-action="onlinePaid" data-id="${esc(o.id)}" title="${paid?'Reenviar a confirmação ao cliente':'Marca como pago e responde ao cliente no WhatsApp'}">${paid?'Reenviar confirmação':'Confirmar pagamento'}</button>`:''}
-            ${paid&&o.status!=='cancelado'?`<button class="btn btn-ghost" data-action="onlineUnpaid" data-id="${esc(o.id)}">Desmarcar pago</button>`:''}
+            ${o.status!=='cancelado'?`<button class="btn ${paid?'btn-ghost':'btn-gold'}" data-action="onlinePaid" data-id="${esc(o.id)}" title="${paid?'Reenviar a confirmação ao cliente':'Marca como pago e responde ao cliente no WhatsApp'}">${paid?'Reenviar':'Confirmar pagamento'}</button>`:''}
+            ${paid&&o.status!=='cancelado'?`<button class="btn btn-ghost" data-action="onlineUnpaid" data-id="${esc(o.id)}">Desmarcar</button>`:''}
             ${open&&sellable?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
             ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
@@ -2718,6 +2737,7 @@ function renderOnline(){
   return head + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
 }
 const actions_online = {
+  ooToggle(t){ state.ui.ooOpen = state.ui.ooOpen||{}; state.ui.ooOpen[t.dataset.id] = !state.ui.ooOpen[t.dataset.id]; render(); },
   setOnlineFilter(t){ state.ui.onlineFilter = t.dataset.f; render(); },
   async refreshOnline(){ ONLINE.err=''; await fetchOnlineOrders(false); if(ONLINE.err) notify.err(ONLINE.err); else notify.ok('Pedidos atualizados.'); },
   onlineWhats(t){
