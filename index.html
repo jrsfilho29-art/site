@@ -393,7 +393,7 @@
   .cx-hero .segbar button:hover{background:rgba(255,255,255,.14);}
   .cx-hero .segbar button.on{background:var(--gold);border-color:var(--gold);color:#141A3C;}
   /* ===== Catálogo On ===== */
-  .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:radial-gradient(circle at 92% -10%,rgba(240,168,31,.38),transparent 38%),linear-gradient(135deg,#0D1230 0%,#17204A 55%,#2A3470 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+  .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:radial-gradient(circle at 92% -10%,rgba(240,168,31,.38),transparent 38%),linear-gradient(135deg,var(--hero-a,#0D1230) 0%,var(--hero-b,#17204A) 55%,var(--hero-c,#2A3470) 100%);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
   .cx-hero p{margin:0;color:#C9CDEA;font-size:13px;}
   .cx-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-l';
+const APP_VERSION = '2026.10.13-m';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1890,7 +1890,13 @@ function persist(key){
 /* ================= render engine ================= */
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
+const HERO_PRESETS = [['','Padrão'],['#0D1230','Azul noite'],['#4A1230','Vinho'],['#0F3B33','Verde'],['#3B1F5C','Roxo'],['#5A2A0E','Marrom'],['#1F2937','Grafite'],['#7A1F2B','Vermelho']];
+function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) <= 130; }   /* só cores escuras: o texto do cabeçalho é branco */
+function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
+  const hc = state.prefs && state.prefs.heroColor, rs = document.documentElement.style;
+  if(hc && heroOk(hc)){ rs.setProperty('--hero-a',heroMix(hc,0)); rs.setProperty('--hero-b',heroMix(hc,.1)); rs.setProperty('--hero-c',heroMix(hc,.22)); }
+  else { rs.removeProperty('--hero-a'); rs.removeProperty('--hero-b'); rs.removeProperty('--hero-c'); }
   const bg = state.prefs && state.prefs.bgColor;
   document.body.style.background = (bg && bgOk(bg)) ? bg : '';
   document.documentElement.style.removeProperty('--cream');   /* cor de fundo personalizada foi removida: volta ao padrão */
@@ -2070,6 +2076,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
+  if(path==='prefs.heroColor'){ persist('prefs'); if(!heroOk(val)) notify.err('Cor muito clara: o texto branco do cabeçalho ficaria difícil de ler. Escolha uma cor escura.'); applyPrefs(); return; }
   if(path==='prefs.bgColor'){ persist('prefs'); if(!bgOk(val)) notify.err('Cor muito escura: o texto ficaria difícil de ler. Escolha uma cor clara.'); applyPrefs(); return; }   /* sem render: o seletor de cor do navegador não pode ser refeito enquanto se arrasta */
   if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
@@ -2370,6 +2377,11 @@ function renderDashboard(){
       ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
       <input type="color" data-field="prefs.bgColor" value="${(state.prefs&&state.prefs.bgColor)||'#F1F1F8'}" title="Outra cor (use cores claras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
     </div>
+    <div class="bgpick" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor do cabeçalho (cores escuras)">
+      <span class="muted2" style="font-size:12px;">Cabeçalho</span>
+      ${HERO_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.heroColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setHero" data-color="${c}" title="${n}" aria-label="Cabeçalho ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#0D1230'};border:2px solid ${cur?'var(--plum)':'var(--line)'};${c===''?'background-image:linear-gradient(135deg,transparent 46%,var(--muted2) 46%,var(--muted2) 54%,transparent 54%);':''}"></button>`; }).join('')}
+      <input type="color" data-field="prefs.heroColor" value="${(state.prefs&&state.prefs.heroColor)||'#0D1230'}" title="Outra cor (use cores escuras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
+    </div>
     </div>
   </div>
   <div class="grid grid-4 kpi-grid mb3">
@@ -2664,6 +2676,7 @@ const actions_online = {
     openNewTab(u);
     if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
   },
+  setHero(t){ state.prefs = state.prefs||{}; state.prefs.heroColor = t.dataset.color||''; persist('prefs'); render(); },
   setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; persist('prefs'); render(); },
   toggleOnlineSound(){
     state.prefs = state.prefs||{}; state.prefs.soundOnline = !soundOn(); persist('prefs');
