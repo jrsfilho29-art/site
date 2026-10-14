@@ -807,8 +807,9 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   <?php if($__hc !== ''): ?>header{background:<?= e($__hc) ?> !important;}
   <?php endif; ?>
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
-  .cta-wa{position:fixed!important;top:auto!important;right:auto!important;left:14px;bottom:18px;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
+  .cta-wa{position:fixed!important;top:auto!important;left:auto!important;right:14px;bottom:18px;transition:bottom .2s;width:44px;height:44px;padding:0!important;font-size:0!important;border-radius:50%;z-index:59;background:#25D366;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)!important;opacity:.92;}
   .cta-wa:hover{opacity:1;}
+  body.has-cart .cta-wa{bottom:84px!important;}
   .cb{display:flex;flex-direction:column;gap:7px;margin-top:auto;}
   .cb button{font-family:inherit;font-weight:700;border:none;cursor:pointer;line-height:1.1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;transition:filter .12s,background .12s,color .12s;}
   .cb-buy{font-size:13px;padding:12px 8px;text-transform:uppercase;letter-spacing:.6px;}
@@ -846,7 +847,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-j</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-k</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -914,7 +915,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function count(){return cart.reduce(function(a,i){return a+i.qty;},0);}
   function total(){return cart.reduce(function(a,i){return a+i.qty*i.price;},0);}
   function toast(m){var t=$('toast');t.textContent=m;t.className='toast on';clearTimeout(toast._t);toast._t=setTimeout(function(){t.className='toast';},2200);}
-  function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());markCards();}
+  function fab(){var n=count(),f=$('cfab');f.style.display=n?'flex':'none';document.body.classList.toggle('has-cart',n>0);$('cfab-n').textContent=n;$('cfab-t').textContent=brl(total());markCards();}
   function markCards(){
     var cs=document.querySelectorAll('.card[data-id]');
     for(var k=0;k<cs.length;k++){
