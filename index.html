@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-n';
+const APP_VERSION = '2026.10.14-o';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1658,7 +1658,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), catalogBtn:String((state.prefs&&state.prefs.catBtnColor)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), catalogBtn:String((state.prefs&&state.prefs.catBtnColor)||''), catalogFont:String((state.prefs&&state.prefs.catFont)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
 async function syncCall(action, extra){
   let r;
@@ -1708,6 +1708,7 @@ function syncApplyPulled(j){
   if(d.settings && d.settings.pix && typeof d.settings.pix.key==='string' && d.settings.pix.key){ state.prefs = state.prefs||{}; const px=d.settings.pix; state.prefs.pixType=px.type||'random'; state.prefs.pixKey=px.key; state.prefs.pixName=px.name||''; state.prefs.pixCity=px.city||''; persist('prefs'); }
   if(d.settings && typeof d.settings.catalogColor==='string' && (d.settings.catalogColor==='' || heroOk(d.settings.catalogColor))){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = d.settings.catalogColor; persist('prefs'); }
   if(d.settings && d.settings.shipping && typeof d.settings.shipping==='object'){ const sh=d.settings.shipping; state.prefs = state.prefs||{}; state.prefs.shipOn=!!sh.on; state.prefs.shipPickup=sh.pickup!==false; state.prefs.shipFree=sh.free||''; state.prefs.shipDef=sh.def===null||sh.def===undefined?'':String(sh.def); state.prefs.shipDays=sh.days||''; state.prefs.shipRules=sh.rules||''; state.prefs.shipMode=sh.mode==='distance'?'distance':'rules'; state.prefs.shipOrigin=sh.origin||''; state.prefs.shipPkgKg=sh.pkgKg||''; state.prefs.shipBase=sh.base||''; state.prefs.shipPer100=sh.per100||''; state.prefs.shipPerKg=sh.perKg||''; state.prefs.shipAdd=sh.add||''; state.prefs.shipExpress=!!sh.express; state.prefs.shipExpMult=sh.expMult||''; persist('prefs'); }
+  if(d.settings && typeof d.settings.catalogFont==='string' && (d.settings.catalogFont==='' || CAT_FONTS.some(f=>f[0]===d.settings.catalogFont))){ state.prefs = state.prefs||{}; state.prefs.catFont = d.settings.catalogFont; persist('prefs'); }
   if(d.settings && typeof d.settings.catalogBtn==='string' && (d.settings.catalogBtn==='' || /^#[0-9a-f]{6}$/i.test(d.settings.catalogBtn))){ state.prefs = state.prefs||{}; state.prefs.catBtnColor = d.settings.catalogBtn; persist('prefs'); }
   if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
@@ -1935,6 +1936,7 @@ function persist(key){
 }
 
 /* ================= render engine ================= */
+const CAT_FONTS = [['','Padrão','Segoe UI, sans-serif'],['georgia','Clássica (Georgia)','Georgia, serif'],['playfair','Playfair Display','"Playfair Display", Georgia, serif'],['cormorant','Cormorant Garamond','"Cormorant Garamond", Georgia, serif'],['poppins','Poppins','Poppins, "Segoe UI", sans-serif'],['montserrat','Montserrat','Montserrat, "Segoe UI", sans-serif'],['lora','Lora','Lora, Georgia, serif'],['raleway','Raleway','Raleway, "Segoe UI", sans-serif']];
 const BTN_PRESETS = [['','Cor do cabeçalho'],['#1DA851','Verde'],['#17204A','Marinho'],['#0B6EF3','Azul'],['#7B2CBF','Roxo'],['#C2185B','Pink'],['#E53935','Vermelho'],['#F0A81F','Dourado'],['#EF6C00','Laranja'],['#00897B','Turquesa'],['#37474F','Grafite'],['#6D4C41','Marrom'],['#111111','Preto']];
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza'],['#F3EEFA','Lavanda'],['#E8E3F6','Lilás'],['#FDE8E4','Pêssego'],['#FBE4EC','Rosa bebê'],['#E3F1FB','Azul bebê'],['#DDEFE5','Verde claro'],['#EEF5DC','Pistache'],['#FCF3C9','Amarelo claro'],['#F2E8DC','Bege'],['#DADDE6','Cinza azulado']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
@@ -2147,7 +2149,7 @@ function handleFieldInput(t){
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
-  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain|catHeaderColor|catBtnColor|ship)/.test(path)) syncSchedulePush(); }
+  if(path.indexOf('prefs.')===0){ persist('prefs'); if(path==='prefs.storeWhatsapp' || /^prefs\.(pix|sellers|commissionMain|catHeaderColor|catBtnColor|catFont|ship)/.test(path)) syncSchedulePush(); }
   if(path==='ui.syncAuto'){ SYNC.cfg.auto = !!val; syncSaveCfg(); if(val) syncSchedulePush(); }
   render();
 }
@@ -2793,6 +2795,7 @@ const actions_online = {
   setHero(t){ state.prefs = state.prefs||{}; state.prefs.heroColor = t.dataset.color||''; persist('prefs'); render(); },
   setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; state.prefs.bgStyle = ''; persist('prefs'); render(); },
   setSide(t){ state.prefs = state.prefs||{}; state.prefs.sideColor = t.dataset.color||''; persist('prefs'); render(); },
+  setCatFont(t){ state.prefs = state.prefs||{}; state.prefs.catFont = t.dataset.font||''; persist('prefs'); syncSchedulePush(); render(); },
   setCatBtn(t){ state.prefs = state.prefs||{}; state.prefs.catBtnColor = t.dataset.color||''; persist('prefs'); syncSchedulePush(); render(); },
   setCatHeader(t){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = t.dataset.color||''; persist('prefs'); syncSchedulePush(); render(); },
   setBgLogin(t){ state.prefs = state.prefs||{}; state.prefs.bgStyle = (t&&t.dataset&&t.dataset.s==='solid') ? 'loginsolid' : 'login'; state.prefs.bgColor = ''; persist('prefs'); render(); },
@@ -4928,6 +4931,12 @@ function renderAparencia(){
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor
         <input type="color" data-field="prefs.catBtnColor" value="${p.catBtnColor||'#1DA851'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
       ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta cor no servidor.</p>'}
+    </div>
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Letra dos produtos</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Tipo de letra do <b>nome, marca, preço e descrição</b> dos produtos na página pública do catálogo. Fica salvo no servidor, para todos os aparelhos.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;">${CAT_FONTS.map(f=>`<button type="button" data-action="setCatFont" data-font="${f[0]}" style="text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;background:var(--bg-soft,transparent);color:inherit;border:2px solid ${(p.catFont||'')===f[0]?'var(--brand,#1DA851)':'var(--line,#ccc)'};font-family:${f[2].replace(/"/g,"'")};"><div style="font-size:15px;font-weight:600;">Perfume Essência</div><div style="font-size:13px;">R$ 189,90</div><div class="muted2" style="font-size:11px;font-family:inherit;">${f[1]}${(p.catFont||'')===f[0]?' ✓':''}</div></button>`).join('')}</div>
+      ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta opção no servidor.</p>'}
     </div>
   </div>`;
 }

@@ -466,6 +466,12 @@ $__bc = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->e
 if(!preg_match('/^#[0-9a-fA-F]{6}$/', $__bc)) $__bc = ($__hc !== '') ? $__hc : '#17204A';   /* sem cor própria: botões seguem a cor do cabeçalho */
 $__n = hexdec(substr($__bc, 1)); $__lum = 0.299*(($__n>>16)&255) + 0.587*(($__n>>8)&255) + 0.114*($__n&255);
 $__tx = $__lum > 150 ? '#1a1a1a' : '#ffffff';
+$__FONTS = ['georgia'=>['Georgia, "Times New Roman", serif',''],'playfair'=>['"Playfair Display", Georgia, serif','Playfair+Display:wght@400;600;700'],'cormorant'=>['"Cormorant Garamond", Georgia, serif','Cormorant+Garamond:wght@500;600;700'],'poppins'=>['Poppins, "Segoe UI", sans-serif','Poppins:wght@400;500;600;700'],'montserrat'=>['Montserrat, "Segoe UI", sans-serif','Montserrat:wght@400;500;600;700'],'lora'=>['Lora, Georgia, serif','Lora:wght@400;500;600;700'],'raleway'=>['Raleway, "Segoe UI", sans-serif','Raleway:wght@400;500;600;700']];
+$__fk = ''; try{ $__q = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__q->execute(['catalog_font']); $__fk = (string)($__q->fetchColumn() ?: ''); }catch(Throwable $__e){}
+if(isset($__FONTS[$__fk])){
+  if($__FONTS[$__fk][1] !== '') echo '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family='.$__FONTS[$__fk][1].'&display=swap">'."\n";
+  echo '<style>.card .name,.card .price,.card .cat,.card .save,#lb-n,#lb-p,#lb-b,#lb-d{font-family:'.$__FONTS[$__fk][0].'!important}</style>'."\n";
+}
 echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!important;color:'.$__tx.'!important;box-shadow:0 4px 12px rgba(0,0,0,.18)!important}.cb-buy:hover,.lb-buy:hover,.lb-add:hover,#of-s:hover{filter:brightness(1.12)}.cb-add{background:'.$__bc.'14!important;color:'.$__bc.'!important;box-shadow:inset 0 0 0 1.5px '.$__bc.'55!important}.cb-add:hover{background:'.$__bc.'!important;color:'.$__tx.'!important}</style>'."\n";
 ?>
 <style>
@@ -874,7 +880,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-u</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-v</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
