@@ -624,6 +624,10 @@ if($__op){
   .nav a.nv{border-color:var(--gold);color:var(--gold-deep);}
   .nav a.nv.on{background:var(--gold);border-color:var(--gold);color:var(--plum-dark);}
   @media (max-width:640px){.tags{top:6px;left:6px;gap:3px;}.tag-promo,.tag-new{font-size:9px;padding:2px 6px;}.price .old{font-size:9.5px;}}
+  /* janela de detalhes: foto menor */
+  .lb-img img{max-height:40vh;}
+  @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
+  @media (max-width:640px){.lb-img img{max-height:20vh;}}
   @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
 </style>
 </head>
@@ -657,7 +661,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-x</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-z</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
