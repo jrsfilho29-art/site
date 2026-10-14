@@ -563,7 +563,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.13-o';
+const APP_VERSION = '2026.10.13-p';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -629,6 +629,7 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&am
 
 /* refined line-icon set (inline SVG) used throughout the interface instead of emoji */
 const ICONS = {
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
   menu: '<path d="M3.5 6h17"/><path d="M3.5 12h17"/><path d="M3.5 18h17"/>',
   inbox: '<path d="M3 13l2.5-7.2A2 2 0 0 1 7.4 4.5h9.2a2 2 0 0 1 1.9 1.3L21 13"/><path d="M3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5h-5.2a3 3 0 0 1-5.6 0z"/>',
   clipboard: '<rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M8.5 10.5h7"/><path d="M8.5 14h7"/><path d="M8.5 17.5h4.5"/>',
@@ -2211,7 +2212,7 @@ const actions_login = {
 };
 
 /* ================= shell + sidebar ================= */
-const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',servidor:'Servidor',usuarios:'Usuários'};
+const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
 
 function renderTopbar(){
   const today = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
@@ -2268,6 +2269,7 @@ function renderSidebar(){
     ['online','inbox','Pedidos online'],
     ['caixa','wallet','Caixa'],
     ['relatorios','chart','Relatórios'],
+    ['aparencia','palette','Aparência'],
     ['servidor','cloud','Servidor'],
     ['usuarios','key','Usuários'],
   ];
@@ -2309,6 +2311,7 @@ function renderTab(){
     case 'caixa': return renderCaixa();
     case 'relatorios': return renderRelatorios();
     case 'servidor': return renderServidor();
+    case 'aparencia': return renderAparencia();
     case 'usuarios': return renderUsuarios();
     default: return '';
   }
@@ -2372,18 +2375,7 @@ function renderDashboard(){
     <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="clientes">${icon('users')} Cadastrar cliente</button>
-    <div class="bgcol" style="margin-left:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-start;">
-    <div class="bgpick" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor de fundo do aplicativo">
-      <span style="font-size:12px;color:#D7DAF0;width:68px;">Fundo</span>
-      ${BG_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.bgColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setBg" data-color="${c}" title="${n}" aria-label="Fundo ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#F1F1F8'};border:2px solid ${cur?'var(--plum)':'var(--line)'};"></button>`; }).join('')}
-      <input type="color" data-field="prefs.bgColor" value="${(state.prefs&&state.prefs.bgColor)||'#F1F1F8'}" title="Outra cor (use cores claras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
-    </div>
-    <div class="bgpick" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" title="Escolher a cor do cabeçalho (cores escuras)">
-      <span style="font-size:12px;color:#D7DAF0;width:68px;">Cabeçalho</span>
-      ${HERO_PRESETS.map(([c,n])=>{ const cur=(state.prefs&&state.prefs.heroColor||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="setHero" data-color="${c}" title="${n}" aria-label="Cabeçalho ${n}" style="width:24px;height:24px;border-radius:50%;cursor:pointer;padding:0;background:${c||'#0D1230'};border:2px solid ${cur?'var(--plum)':'var(--line)'};"></button>`; }).join('')}
-      <input type="color" data-field="prefs.heroColor" value="${(state.prefs&&state.prefs.heroColor)||'#0D1230'}" title="Outra cor (use cores escuras)" style="width:30px;height:26px;padding:2px;border-radius:6px;cursor:pointer;">
-    </div>
-    </div>
+
     </div>
   </div>
   <div class="grid grid-4 kpi-grid mb3">
@@ -4674,6 +4666,30 @@ function renderRelatorios(){
       </div>`).join('')}
   </div>`:''}`:''}
   `;
+}
+
+/* ================= aparencia ================= */
+function renderAparencia(){
+  const sw = (list,cur,action,label,fallback)=>list.map(([c,n])=>{ const on=(cur||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="${action}" data-color="${c}" title="${n}" aria-label="${label} ${n}" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;width:64px;font-size:11.5px;color:var(--muted);"><span style="width:38px;height:38px;border-radius:50%;background:${c||fallback};border:3px solid ${on?'var(--plum)':'var(--line)'};box-shadow:${on?'0 0 0 2px var(--tint)':'none'};"></span>${n}</button>`; }).join('');
+  const p = state.prefs||{};
+  return `
+  <div class="cx-hero"><div><h2 class="serif">Aparência</h2><p>Personalize as cores do aplicativo neste aparelho</p></div></div>
+  <div class="grid grid-2 mb2" style="max-width:860px;">
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Cor do cabeçalho</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Tons de azul para o destaque no topo de cada menu.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS,p.heroColor,'setHero','Cabeçalho','#0D1230')}</div>
+      <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
+        <input type="color" data-field="prefs.heroColor" value="${p.heroColor||'#0D1230'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+    </div>
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Cor de fundo</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor sólida atrás das telas do aplicativo.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(BG_PRESETS,p.bgColor,'setBg','Fundo','#F1F1F8')}</div>
+      <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (clara)
+        <input type="color" data-field="prefs.bgColor" value="${p.bgColor||'#F1F1F8'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+    </div>
+  </div>`;
 }
 
 /* ================= usuarios ================= */
