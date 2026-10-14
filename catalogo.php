@@ -414,11 +414,11 @@ function card($p){
   }
   $btn = '<div class="cb"><button type="button" class="cb-buy" data-cb="buy">Comprar agora</button><button type="button" class="cb-add" data-cb="add"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2L21 8H6"/></svg>Adicionar ao carrinho</button></div>';
   $low = '';
-  if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%</span>';
+  if($__promo) $low .= '<span class="tag-promo">-'.$__pct.'%<i class="of"> OFF</i></span>';
   if($__new) $low .= '<span class="tag-new">Novidade</span>';
   if($__last) $low .= '<span class="tag-low">Últimas unidades</span>';
-  if($low !== '') $low = '<div class="tags">'.$low.'</div>';
-  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').brl($__eff).'</div>'.$btn.'</div></div>';
+  $__save = $__promo ? '<div class="save">Economize '.brl((float)$p['sale_price'] - $__eff).'</div>' : '';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.($__promo ? '<s class="old">'.brl($p['sale_price']).'</s>' : '').brl($__eff).'</div>'.$__save.$btn.'</div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -811,6 +811,12 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .nav a.nv{border-color:var(--gold);color:var(--gold-deep);}
   .nav a.nv.on{background:var(--gold);border-color:var(--gold);color:var(--plum-dark);}
   @media (max-width:640px){.tags{top:6px;left:6px;gap:3px;}.tag-promo,.tag-new{font-size:9px;padding:2px 6px;}.price .old{font-size:9.5px;}}
+  /* selos organizados: promoção à esquerda, novidade à direita, últimas unidades na base */
+  .imgwrap .tag-promo{position:absolute;top:8px;left:8px;z-index:1;}
+  .imgwrap .tag-new{position:absolute;top:8px;right:8px;z-index:1;}
+  .imgwrap .tag-low{position:absolute;top:auto;bottom:8px;left:auto;right:8px;z-index:1;}
+  .tag-promo .of{font-style:normal;}.save{font-size:11px;font-weight:700;color:#1a8f4a;margin:-2px 0 6px;line-height:1.2;}
+  @media (max-width:640px){.tag-promo .of{display:none;}.imgwrap .tag-promo{top:5px;left:5px;}.imgwrap .tag-new{top:5px;right:5px;}.imgwrap .tag-low{bottom:5px;right:5px;}.save{font-size:9.5px;margin:-3px 0 5px;}}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -864,7 +870,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-q</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-r</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
