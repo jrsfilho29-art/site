@@ -827,6 +827,11 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .pinfo .last{font-size:10px;font-weight:700;color:var(--gold-deep);background:#FFF3D6;border-radius:999px;padding:2px 7px;}
   .tag-promo .of{font-style:normal;}.save{font-size:11px;font-weight:700;color:#1a8f4a;line-height:1.2;}
   @media (max-width:640px){.bdg{gap:3px;margin-bottom:5px;}.bdg .tag-promo,.bdg .tag-new{font-size:9px;padding:4px 6px;border-radius:5px;}.card .price .old{font-size:9.5px;}.pinfo .last{font-size:8.5px;padding:1px 5px;}.save{font-size:9.5px;}}
+  /* fotos: preenchem melhor o quadro, fundo branco limpo, sem corte */
+  .imgwrap{margin:6px 6px 0;padding:2px;background:#fff;border:1px solid var(--line);border-radius:12px;}
+  .imgwrap img{object-fit:contain;object-position:center;background:#fff;mix-blend-mode:multiply;border-radius:10px;}
+  .imgwrap .noimg{width:100%;text-align:center;}
+  @media (max-width:640px){.imgwrap{margin:4px 4px 0;padding:1px;border-radius:9px;}}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -880,7 +885,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-w</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-x</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
