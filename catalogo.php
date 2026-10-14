@@ -254,7 +254,8 @@ function card($p){
     $attrs .= ' data-wa="https://wa.me/'.e($WHATSAPP).'?text='.e(rawurlencode('Olá! Escolhi este perfume no catálogo da Essência: '.$p['name'].' ('.brl($p['sale_price']).'). Quero finalizar a compra! '.$plink)).'"';
   }
   $btn = '<span class="buy">Ver detalhes</span>';
-  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
+  $low = ((int)$p['stock'] > 0 && (int)$p['stock'] <= 3) ? '<span class="tag-low">Últimas unidades</span>' : '';
+  return '<div class="card"'.$attrs.'><div class="imgwrap">'.$low.$im.'</div><div class="info">'.$meta.'<div class="name">'.e($p['name']).'</div><div class="price">'.brl($p['sale_price']).'</div>'.$btn.'</div></div>';
 }
 
 header('Content-Type: text/html; charset=utf-8');
@@ -537,7 +538,62 @@ if($__op){
   .pixbox .pc{display:block;width:100%;margin:10px 0 0;font:11px/1.35 monospace;word-break:break-all;background:#f7f2ea;border:1px solid #e6dccf;border-radius:8px;padding:8px;color:#444;max-height:74px;overflow:auto;text-align:left;user-select:all;}
   .pixbox .ph{font-size:12px;color:#6b5b4d;margin-top:8px;line-height:1.45;}
   .lb-box.fm #lb-ok .lb-wa{display:block;}
-  @media (prefers-reduced-motion:reduce){.card{transition:none;}}
+
+  /* ===== repaginada: vitrine premium ===== */
+  :root{--shadow-s:0 1px 3px rgba(13,18,48,.06),0 6px 18px rgba(13,18,48,.07);--shadow-m:0 4px 10px rgba(13,18,48,.08),0 20px 40px rgba(13,18,48,.15);}
+  body{background:linear-gradient(180deg,#EEF0FA 0,#F7F5F0 340px);}
+  header{padding:46px 20px 70px;border-radius:0 0 34px 34px;background:radial-gradient(circle at 80% -20%,rgba(240,168,31,.35),transparent 42%),linear-gradient(160deg,#222C66 0%,#17204A 48%,#0D1230 100%);box-shadow:0 14px 34px rgba(13,18,48,.28);}
+  header h1{font-size:40px;letter-spacing:.2em;padding-left:.2em;}
+  header p{font-size:11.5px;letter-spacing:.3em;color:var(--gold-soft);}
+  header .logo{filter:drop-shadow(0 4px 14px rgba(240,168,31,.35));}
+  .hero-tools{max-width:600px;margin-top:26px;}
+  .search input{padding:16px 22px 16px 50px;font-size:16px;box-shadow:0 12px 30px rgba(0,0,0,.32);}
+  .search svg{left:19px;width:20px;height:20px;}
+  .cta-wa{box-shadow:0 8px 20px rgba(37,211,102,.35);padding:11px 26px;}
+  .steps{position:relative;list-style:none;margin:-34px auto 0;padding:0;max-width:760px;display:flex;gap:10px;justify-content:center;z-index:2;}
+  .steps li{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-s);font-size:13px;font-weight:600;color:var(--plum);}
+  .steps b{flex:0 0 28px;width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--plum-dark);display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .steps small{display:block;font-weight:400;color:var(--muted);font-size:11.5px;margin-top:1px;}
+  .nav{margin-top:14px;background:rgba(247,245,240,.92);}
+  .nav a{background:#fff;border:1.5px solid var(--line);font-weight:600;transition:all .12s;}
+  .nav a:hover{border-color:var(--plum);}
+  .nav a.on{box-shadow:0 4px 12px rgba(23,32,74,.3);}
+  .wrap{padding-top:22px;}
+  .catsec{margin-bottom:46px;}
+  .catsec h2{font-size:26px;font-weight:400;padding:0 0 14px;margin-bottom:18px;}
+  .catsec h2::after{width:70px;height:4px;}
+  .catsec h3{display:inline-flex;background:#FFF3D6;color:var(--gold-deep);padding:5px 13px;border-radius:999px;margin:6px 0 14px;font-size:12px;}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:22px;}
+  .card{border-radius:22px;box-shadow:var(--shadow-s);background:#fff;position:relative;transition:transform .18s ease,box-shadow .18s ease;}
+  .card:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
+  .imgwrap{margin:10px 10px 0;border-radius:16px;background:linear-gradient(160deg,#F4F5FC,#FFF);padding:14px;}
+  .imgwrap img{background:transparent;transition:transform .25s ease;}
+  .card:hover .imgwrap img{transform:scale(1.06);}
+  .tag-low{position:absolute;top:10px;left:10px;z-index:1;background:#FFF3D6;color:var(--gold-deep);font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:4px 10px;border-radius:999px;box-shadow:0 2px 6px rgba(13,18,48,.12);}
+  .info{padding:10px 16px 18px;}
+  .cat{color:var(--gold-deep);font-weight:600;}
+  .name{font-size:15px;font-weight:600;color:var(--ink);}
+  .price{font-size:23px;font-weight:700;margin:8px 0 14px;letter-spacing:-.01em;}
+  .buy{background:linear-gradient(135deg,#222C66,#0D1230);box-shadow:0 6px 14px rgba(23,32,74,.28);transition:transform .12s,box-shadow .12s;}
+  .card:hover .buy{background:linear-gradient(135deg,var(--gold),#E09410);color:var(--plum-dark);box-shadow:0 6px 14px rgba(240,168,31,.4);}
+  footer{padding:30px 20px 40px;border-top:1px solid var(--line);margin:0 20px;}
+  .cfab{box-shadow:0 12px 30px rgba(13,18,48,.38);}
+  @media (max-width:640px){
+    header{padding:30px 14px 56px;border-radius:0 0 26px 26px;}
+    header h1{font-size:31px;}
+    .steps{margin:-30px 12px 0;gap:6px;}
+    .steps li{flex-direction:column;text-align:center;gap:6px;padding:10px 6px;font-size:11.5px;border-radius:14px;}
+    .steps small{display:none;}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .steps b{flex:none;width:28px;min-width:28px;}
+    .card{border-radius:18px;}
+    .imgwrap{margin:7px 7px 0;padding:8px;border-radius:13px;}
+    .info{padding:8px 10px 14px;}
+    .price{font-size:18px;}
+    .catsec h2{font-size:21px;}
+    .tag-low{top:8px;left:8px;font-size:9.5px;padding:3px 8px;}
+  }
+  @media (prefers-reduced-motion:reduce){.card,.card img{transition:none;}}
 </style>
 </head>
 <body>
@@ -550,6 +606,7 @@ if($__op){
 <?php if($WHATSAPP !== ''): ?>      <a class="cta-wa" target="_blank" rel="noopener" href="https://wa.me/<?= e($WHATSAPP) ?>?text=<?= rawurlencode('Olá! Vi o catálogo da Essência e gostaria de ajuda.') ?>">Falar no WhatsApp</a>
 <?php endif; ?>    </div>
   </header>
+  <ol class="steps"><li><b>1</b><span>Escolha<small>seus perfumes favoritos</small></span></li><li><b>2</b><span>Monte o carrinho<small>ajuste as quantidades</small></span></li><li><b>3</b><span>Envie o pedido<small>a loja combina o resto</small></span></li></ol>
 <?php if(count($groups) > 1): ?>
   <nav class="nav" id="tabs"><a href="#" data-cat="all" class="on">Todos</a><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
 <?php endif; ?>
@@ -568,7 +625,7 @@ if($__op){
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.12-q</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.13-u</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
