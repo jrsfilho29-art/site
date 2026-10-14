@@ -332,7 +332,7 @@
   .selall{border-radius:4px;}
 
   /* menu lateral */
-  .sidebar{background:var(--plum-dark);box-shadow:none;border-right:1px solid #000;}
+  .sidebar{background:var(--side-bg,var(--plum-dark));box-shadow:none;border-right:1px solid #000;}
   .sidebar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:46%;pointer-events:none;
     background:var(--lattice);opacity:.07;
     -webkit-mask-image:linear-gradient(to top,#000,transparent);mask-image:linear-gradient(to top,#000,transparent);}
@@ -591,7 +591,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-b';
+const APP_VERSION = '2026.10.14-c';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1925,6 +1925,7 @@ function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) 
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
   const hc = state.prefs && state.prefs.heroColor, rs = document.documentElement.style;
+  const sc = state.prefs && state.prefs.sideColor; if(sc && heroOk(sc)) rs.setProperty('--side-bg',sc); else rs.removeProperty('--side-bg');
   if(hc && heroOk(hc)){ rs.setProperty('--hero-a',hc); }
   else { rs.removeProperty('--hero-a'); }
   const bg = state.prefs && state.prefs.bgColor;
@@ -2103,6 +2104,12 @@ function handleFieldInput(t){
   if(t.dataset.mask){
     val = t.dataset.mask==='phone' ? maskPhone(t.value) : maskCep(t.value);
     if(val !== t.value) t.value = val;
+  }
+  if(path==='prefs.sideColor'){
+    if(!heroOk(val)){ notify.err('Cor muito clara: o texto branco do menu ficaria difícil de ler. Escolha uma cor escura.'); const el=document.querySelector('input[data-field="prefs.sideColor"]'); if(el) el.value=(state.prefs&&state.prefs.sideColor)||'#0D1230'; return; }
+    state.prefs = state.prefs||{}; state.prefs.sideColor = val; persist('prefs'); applyPrefs();
+    document.querySelectorAll('[data-action="setSide"]').forEach(btn=>{ const sp=btn.firstElementChild, on=(btn.dataset.color||'').toUpperCase()===String(val).toUpperCase(); if(sp){ sp.style.borderColor=on?'var(--plum)':'var(--line)'; sp.style.boxShadow=on?'0 0 0 2px var(--tint)':'none'; } });
+    return;
   }
   if(path==='prefs.catHeaderColor'){
     if(!heroOk(val)){ notify.err('Cor muito clara: o texto branco do topo do catálogo ficaria difícil de ler. Escolha uma cor escura.'); const el=document.querySelector('input[data-field="prefs.catHeaderColor"]'); if(el) el.value=(state.prefs&&state.prefs.catHeaderColor)||'#17204A'; return; }
@@ -2717,6 +2724,7 @@ const actions_online = {
   },
   setHero(t){ state.prefs = state.prefs||{}; state.prefs.heroColor = t.dataset.color||''; persist('prefs'); render(); },
   setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; state.prefs.bgStyle = ''; persist('prefs'); render(); },
+  setSide(t){ state.prefs = state.prefs||{}; state.prefs.sideColor = t.dataset.color||''; persist('prefs'); render(); },
   setCatHeader(t){ state.prefs = state.prefs||{}; state.prefs.catHeaderColor = t.dataset.color||''; persist('prefs'); syncSchedulePush(); render(); },
   setBgLogin(t){ state.prefs = state.prefs||{}; state.prefs.bgStyle = (t&&t.dataset&&t.dataset.s==='solid') ? 'loginsolid' : 'login'; state.prefs.bgColor = ''; persist('prefs'); render(); },
   toggleOnlineSound(){
@@ -4784,6 +4792,13 @@ function renderAparencia(){
       <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(BG_PRESETS,p.bgStyle?'__'+p.bgStyle:p.bgColor,'setBg','Fundo','#F1F1F8')}<button type="button" data-action="setBgLogin" data-s="solid" title="Azul sólido da tela de login" aria-label="Azul sólido do login" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;width:64px;font-size:11.5px;color:var(--muted);"><span style="width:38px;height:38px;border-radius:50%;background:#17204A;border:3px solid ${p.bgStyle==='loginsolid'?'var(--plum)':'var(--line)'};box-shadow:${p.bgStyle==='loginsolid'?'0 0 0 2px var(--tint)':'none'};"></span>Azul do login</button><button type="button" data-action="setBgLogin" title="Pano de fundo da tela de login" aria-label="Fundo da tela de login" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;width:64px;font-size:11.5px;color:var(--muted);"><span style="width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 25% 15%,#222C66,#17204A 45%,#0D1230 100%);border:3px solid ${p.bgStyle==='login'?'var(--plum)':'var(--line)'};box-shadow:${p.bgStyle==='login'?'0 0 0 2px var(--tint)':'none'};"></span>Fundo do login</button></div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (clara)
         <input type="color" data-field="prefs.bgColor" value="${p.bgColor||'#F1F1F8'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+    </div>
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Barra de menus</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor da barra lateral com os menus (cores escuras, para o texto branco ficar legível).</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.map(x=>x[0]===''?['','Padrão']:x),p.sideColor,'setSide','Menus','#0D1230')}</div>
+      <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
+        <input type="color" data-field="prefs.sideColor" value="${p.sideColor||'#0D1230'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
     </div>
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Cabeçalho do catálogo</h3>
