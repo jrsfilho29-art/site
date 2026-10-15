@@ -636,7 +636,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-h';
+const APP_VERSION = '2026.10.15-i';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2379,7 +2379,7 @@ const actions_login = {
 /* ================= shell + sidebar ================= */
 const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',pagar:'Contas a pagar',receber:'Contas a receber',relatorios:'Relatórios',vendedores:'Vendedores',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
 
-const QUICK_NAV = [['clientes','users','Clientes'],['produtos','package','Produtos'],['estoque','warehouse','Estoque'],['vendas','cart','Vendas'],['pedidos','clipboard','Pedidos'],['online','inbox','Pedidos online'],['catalogo','book','Catálogo On'],['caixa','wallet','Caixa']];
+const QUICK_NAV = [['clientes','users','Clientes'],['produtos','package','Produtos'],['estoque','warehouse','Estoque'],['vendas','cart','Vendas'],['pedidos','clipboard','Pedidos'],['online','inbox','Pedidos online'],['catalogo','book','Catálogo On'],['caixa','wallet','Caixa'],['pagar','send','Contas a pagar'],['receber','download','Contas a receber']];
 function renderQuickNav(){
   return `<div class="qnav" role="navigation" aria-label="Atalhos">${QUICK_NAV.filter(([id])=>canAccessTab(id)).map(([id,ic,label])=>{
     const n = id==='online' ? onlineNewCount()+(ONLINE.resets||[]).length : 0;
@@ -2429,8 +2429,6 @@ function renderShell(){
 function renderSidebar(){
   const items = [
     ['dashboard','dashboard','Painel'],
-    ['pagar','send','Contas a pagar'],
-    ['receber','download','Contas a receber'],
     ['relatorios','chart','Relatórios'],
     ['vendedores','users','Vendedores'],
     ['aparencia','palette','Aparência'],
