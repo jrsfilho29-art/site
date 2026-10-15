@@ -985,22 +985,20 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .steps li b{width:22px!important;height:22px!important;font-size:12px!important;}
   .steps li small{font-size:10.5px!important;}
   @media (max-width:640px){header{padding:10px 12px 18px!important;}.steps{margin:-10px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{top:8px;right:8px;padding:5px 10px!important;font-size:10.5px!important;}}
-  /* menu lateral: novo visual (painel escuro, ícones, seções) */
-  :root{--navbg:<?= $__hc !== '' ? e($__hc) : '#17204A' ?>;}
-  .shell .nav{background:var(--navbg)!important;border:none!important;border-radius:20px!important;padding:14px 10px 16px!important;gap:3px!important;box-shadow:0 14px 34px rgba(13,18,48,.28)!important;color:#fff;}
-  .shell .nav .nav-h{color:var(--gold-soft)!important;font-size:11px!important;letter-spacing:.22em!important;padding:2px 10px 10px!important;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:6px;}
-  .shell .nav .nav-x{color:#fff!important;}
-  .shell .nav .nav-s{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);padding:12px 10px 4px;}
-  .shell .nav a,.shell .nav a.hot,.shell .nav a.nv{background:transparent!important;border:none!important;color:rgba(255,255,255,.88)!important;border-radius:11px!important;padding:9px 10px!important;gap:10px!important;font-weight:600;box-shadow:none!important;justify-content:flex-start!important;transition:background .15s;}
-  .shell .nav a .ni{display:flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,255,255,.1);flex:none;font-style:normal;}
-  .shell .nav a.hot .ni{color:#ff8da0;background:rgba(214,51,79,.25);}
-  .shell .nav a.nv .ni{color:var(--gold);background:rgba(240,168,31,.2);}
-  .shell .nav a b{flex:1;font-weight:600;font-size:13.5px;line-height:1.25;}
-  .shell .nav a span{margin:0!important;background:rgba(255,255,255,.14);color:#fff!important;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;}
-  .shell .nav a:hover{background:rgba(255,255,255,.09)!important;}
-  .shell .nav a.on,.shell .nav a.hot.on,.shell .nav a.nv.on{background:rgba(255,255,255,.15)!important;color:#fff!important;box-shadow:inset 3px 0 0 var(--gold)!important;}
-  .shell .nav a.on span{background:var(--gold);color:var(--plum-dark)!important;}
-  .shell .nav a.on .ni{background:var(--gold);color:var(--plum-dark);}
+  /* menu lateral simples: só os nomes, um abaixo do outro */
+  .shell .nav{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:8px 6px!important;gap:0!important;box-shadow:none!important;color:var(--plum);}
+  .shell .nav .nav-h{display:flex;color:var(--muted)!important;font-size:11px!important;letter-spacing:.16em!important;padding:6px 12px 8px!important;border-bottom:1px solid var(--line);margin-bottom:4px;}
+  .shell .nav .nav-x{color:var(--plum)!important;}
+  .shell .nav .nav-s,.shell .nav a .ni{display:none!important;}
+  .shell .nav a,.shell .nav a.hot,.shell .nav a.nv{background:transparent!important;border:none!important;border-radius:8px!important;color:var(--plum)!important;padding:9px 12px!important;gap:8px!important;font-weight:500;box-shadow:none!important;justify-content:space-between!important;}
+  .shell .nav a b{flex:1;font-weight:inherit;font-size:14px;line-height:1.25;}
+  .shell .nav a span{margin:0!important;background:transparent!important;color:var(--muted)!important;font-size:12px;font-weight:400;padding:0;}
+  .shell .nav a.hot b{color:#B8213C;}
+  .shell .nav a.nv b{color:var(--gold-deep);}
+  .shell .nav a:hover{background:var(--tint)!important;}
+  .shell .nav a.on,.shell .nav a.hot.on,.shell .nav a.nv.on{background:var(--tint)!important;color:var(--plum)!important;font-weight:700;box-shadow:inset 3px 0 0 var(--plum)!important;}
+  .shell .nav a.on b{font-weight:700;}
+  .shell .nav a.on span{background:transparent!important;color:var(--plum)!important;}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -1059,7 +1057,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ad</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ae</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
