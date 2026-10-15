@@ -182,6 +182,22 @@
   .main{padding-top:14px;}
   .kpi-6{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
   @media (max-width:640px){.kpi-6{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}}
+  .mnav{display:none;}
+  @media (max-width:860px){
+    .mnav{display:block;padding:12px 12px 2px;}
+    .dnav-only{display:none !important;}
+    .main>.qnav{display:none !important;}
+    .mn-g{margin-bottom:10px;}
+    .mn-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--gold-soft);opacity:.85;margin:0 4px 6px;font-weight:600;}
+    .mn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .mn-b{position:relative;display:flex;align-items:center;gap:8px;padding:10px 8px;border-radius:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;font:inherit;font-size:12px;font-weight:600;text-align:left;cursor:pointer;line-height:1.15;min-width:0;}
+    .mn-b .mn-i{display:inline-flex;color:var(--gold-soft);flex-shrink:0;}
+    .mn-b.on{background:linear-gradient(180deg,#D3AC68,var(--gold));color:var(--plum-dark);border-color:var(--gold-deep);}
+    .mn-b.on .mn-i{color:var(--plum-dark);}
+    .mn-n{position:absolute;top:-6px;right:-4px;background:var(--gold);color:#17204A;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;border:1px solid var(--plum-dark);}
+    .mn-b:last-child:nth-child(odd){grid-column:1 / -1;}
+    .mn-g.fin .mn-grid{grid-template-columns:1fr;}
+  }
   .qnav{margin-bottom:14px !important;}
   .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
   .hhead h2{margin:0 !important;}
@@ -665,7 +681,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-r';
+const APP_VERSION = '2026.10.15-s';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2461,6 +2477,19 @@ function renderShell(){
   `;
 }
 
+const MNAV_GROUPS = [
+  ['Principal',[['dashboard','dashboard','Painel']]],
+  ['Cadastros',[['clientes','users','Clientes'],['produtos','package','Produtos'],['estoque','warehouse','Estoque']]],
+  ['Vendas',[['vendas','cart','Vendas'],['pedidos','clipboard','Pedidos'],['online','inbox','Pedidos online'],['caixa','wallet','Caixa'],['catalogo','book','Catálogo On']]],
+  ['Financeiro',[['pagar','send','Contas a pagar'],['receber','download','Contas a receber']]],
+];
+function renderMobileNav(){
+  const nOn = onlineNewCount()+(ONLINE.resets||[]).length;
+  return `<div class="mnav">${MNAV_GROUPS.map(([g,items])=>{
+    const its = items.filter(([id])=>canAccessTab(id)); if(!its.length) return '';
+    return `<div class="mn-g${g==='Financeiro'?' fin':''}"><div class="mn-t">${g}</div><div class="mn-grid">${its.map(([id,ic,label])=>`<button type="button" class="mn-b${state.tab===id?' on':''}" data-action="goTab" data-tab="${id}"><span class="mn-i">${icon(ic,16)}</span><span class="mn-l">${label}</span>${id==='online'&&nOn>0?`<span class="mn-n">${nOn}</span>`:''}</button>`).join('')}</div></div>`;
+  }).join('')}<div class="mn-t" style="margin-top:6px;">Gestão</div></div>`;
+}
 function renderSidebar(){
   const items = [
     ['dashboard','dashboard','Painel'],
@@ -2476,10 +2505,11 @@ function renderSidebar(){
       <div class="name serif">${esc((state.prefs&&state.prefs.brandName)||'Essência')}</div>
       <div class="sub">${esc((state.prefs&&state.prefs.brandSub!=null)?state.prefs.brandSub:'gestão de perfumaria')}</div>
     </div>
+    ${renderMobileNav()}
     <nav>
       ${items.filter(([id])=>canAccessTab(id)).map(([id,ic,label])=>{
         return `
-        <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
+        <div class="navitem ${state.tab===id?'active':''}${id==='dashboard'?' dnav-only':''}" data-action="goTab" data-tab="${id}">
           <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='online'&&(onlineNewCount()+(ONLINE.resets||[]).length)>0 ? `<span class="navbadge">${onlineNewCount()+(ONLINE.resets||[]).length}</span>` : ''}${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
         </div>`;
       }).join('')}
