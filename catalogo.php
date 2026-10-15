@@ -1089,7 +1089,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-c</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-d</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1367,10 +1367,11 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     }
     wipeForm();
     function openCad(v){
-      if(!v)v=ACCT?'acct':'reg';
+      if(!v)v=ACCT?'acct':'login';
       if(v==='acct'){$('ac-t').textContent='Olá, '+ACCT.name.split(' ')[0]+'!';$('ac-m').textContent='Você está logado como '+ACCT.username+'. Pode finalizar suas compras pelo carrinho.';}
       if(v==='reg')wipeForm();
       view(v);cad.className='okpop on';document.body.style.overflow='hidden';
+      if(v==='login'){setTimeout(function(){var u=$('lg-u');if(u)u.focus();},60);}
     }
     function closeCad(){cad.className='okpop';if($('ct').className.indexOf('on')<0)document.body.style.overflow='';}
     window.openCad=openCad;
