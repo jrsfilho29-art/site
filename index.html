@@ -616,7 +616,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-za';
+const APP_VERSION = '2026.10.14-zb';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -4847,7 +4847,7 @@ function renderCaixa(){
     <tbody>${shown.map(r=>{ const n=(r.sale.items||[]).length; const first=n?esc(r.sale.items[0].name||''):'—';
       return `<tr><td class="muted" style="white-space:nowrap;">${fmtDate(r.date)}</td><td>${esc(r.customer)}</td>
       <td class="plum" style="cursor:pointer;" data-action="viewSale" data-id="${r.sale.id}" title="Ver venda">${first}${n>1?` <span class="muted">+ ${n-1}</span>`:''}</td>
-      <td>${r.method}${r.method==='Fiado'?' <span class="badge-danger" style="margin-left:4px;">a receber</span>':''}</td><td style="text-align:right;white-space:nowrap;">${brl(r.amount)}</td></tr>`; }).join('')}</tbody>
+      <td>${esc(r.method)}${r.method==='Fiado'?' <span class="badge-danger" style="margin-left:4px;">a receber</span>':''}</td><td style="text-align:right;white-space:nowrap;">${brl(r.amount)}</td></tr>`; }).join('')}</tbody>
     <tfoot><tr><td colspan="4" style="text-align:right;font-weight:600;padding:10px 12px;">Total listado (${shown.length})</td><td style="text-align:right;font-weight:600;padding:10px 12px;white-space:nowrap;">${brl(shownTotal)}</td></tr></tfoot>
   </table></div>`}
   `;
@@ -5486,7 +5486,7 @@ function printReceipt(saleId){
     ${s.shipping>0?`<div class="tot"><span>Frete</span><span>${brl(s.shipping)}</span></div>`:''}
     <div class="tot grand"><span>TOTAL</span><span>${brl(s.total)}</span></div>
     <hr>
-    ${s.payments.map(pm=>`<div class="tot"><span>${pm.method}</span><span>${brl(pm.amount)}</span></div>`).join('')}
+    ${s.payments.map(pm=>`<div class="tot"><span>${esc(pm.method)}</span><span>${brl(pm.amount)}</span></div>`).join('')}
     <div class="foot">Obrigado pela preferencia!<br>Volte sempre.</div>
   </body></html>`);
   w.document.close();

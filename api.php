@@ -103,7 +103,15 @@ if((string)($req['action'] ?? '') === 'status'){
 
 /* ---- autenticação: senha de sincronização OU usuário e senha de uma conta cadastrada ---- */
 $key = (string)($req['key'] ?? '');
-$authRole = null;
+$authRole = null; $authUid = '';
+$__ip = substr(hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? '').'|essencia-api'), 0, 32);
+$__since = gmdate('Y-m-d\TH:i:s\Z', time() - 600);
+/* limite de tentativas erradas por aparelho/rede: 15 em 10 minutos (protege contra adivinhação de senha) */
+try{
+  $pdo->exec('CREATE TABLE IF NOT EXISTS api_attempts (ip_hash VARCHAR(40) NOT NULL, created_at VARCHAR(30) NOT NULL)'.($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  $__q = $pdo->prepare('SELECT COUNT(*) FROM api_attempts WHERE ip_hash = ? AND created_at > ?'); $__q->execute([$__ip, $__since]);
+  if((int)$__q->fetchColumn() >= 15) fail(429, 'Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.', ['code'=>'rate_limited']);
+}catch(PDOException $e){}
 if($key !== '' && hash_equals((string)SYNC_KEY, $key)){
   $authRole = 'admin';
 }elseif(!empty($req['user']) && !empty($req['hash'])){
@@ -113,10 +121,15 @@ if($key !== '' && hash_equals((string)SYNC_KEY, $key)){
     $u = $st->fetch();
     if($u && hash_equals((string)$u['password_hash'], (string)$req['hash'])){
       $authRole = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
+      $authUid = (string)$u['id'];
     }
   }catch(Throwable $e){}
 }
 if($authRole === null){
+  try{
+    $pdo->prepare('INSERT INTO api_attempts (ip_hash,created_at) VALUES (?,?)')->execute([$__ip, gmdate('Y-m-d\TH:i:s\Z')]);
+    $pdo->prepare('DELETE FROM api_attempts WHERE created_at < ?')->execute([gmdate('Y-m-d\TH:i:s\Z', time() - 86400)]);
+  }catch(PDOException $e){}
   usleep(800000); // freia tentativas de adivinhar senha
   fail(401, 'Senha de sincronização, usuário ou senha incorretos.', ['code'=>'bad_key']);
 }
@@ -260,7 +273,8 @@ try{
     $d = [];
     $d['users'] = array_map(fn($r)=>[
       'id'=>$r['id'], 'name'=>$r['name'], 'username'=>$r['username'],
-      'passwordHash'=>$r['password_hash'], 'createdAt'=>fromDt($r['created_at']),
+      /* conta comum (não administradora) só recebe o próprio hash de senha: não vê o dos administradores */
+      'passwordHash'=>($authRole === 'admin' || (string)$r['id'] === $authUid) ? $r['password_hash'] : '', 'createdAt'=>fromDt($r['created_at']),
       'role'=>(($r['role'] ?? 'admin') === 'user' ? 'user' : 'admin')
     ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
 
