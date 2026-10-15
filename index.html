@@ -446,6 +446,13 @@
   /* celular: campos com 16px evitam o zoom automático do iOS/Android ao tocar (tela "desajustada") */
   html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   @media (max-width:820px){html,body{max-width:100%;overflow-x:clip;}input,select,textarea,.gsearch input{font-size:16px !important;}}
+  /* login: o quadro de usuário e senha fica no centro exato da tela; a marca fica acima dele */
+  @media (min-height:740px){
+    .login-wrap .login-brand{position:absolute;left:0;right:0;bottom:100%;margin-bottom:22px !important;}
+    .login-wrap .login-brand .login-brand-mark{width:60px;height:60px;margin-bottom:8px;}
+    .login-wrap .login-brand .login-title{font-size:28px;}
+    .login-wrap .login-brand .login-sub{margin-top:3px;}
+  }
   /* ===== Catálogo On ===== */
   .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:var(--hero-a,#0D1230);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
@@ -616,7 +623,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-zd';
+const APP_VERSION = '2026.10.14-ze';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2232,8 +2239,8 @@ function renderLogin(){
   const fade = !window._loginFaded; if(!window._loginFadeT){ window._loginFadeT = setTimeout(()=>{ window._loginFaded = true; },1500); }
   return `
   <div class="login-wrap${fade?' fadein':''}">
-    <div class="login-rise" style="width:100%;max-width:380px;">
-      <div style="text-align:center;margin-bottom:26px;">
+    <div class="login-rise" style="width:100%;max-width:380px;position:relative;">
+      <div class="login-brand" style="text-align:center;margin-bottom:26px;">
         <div class="login-brand-mark">
           <svg class="star" viewBox="0 0 84 84" aria-hidden="true"><path d="M42 3 L52.6 18.4 L70.2 13.8 L65.6 31.4 L81 42 L65.6 52.6 L70.2 70.2 L52.6 65.6 L42 81 L31.4 65.6 L13.8 70.2 L18.4 52.6 L3 42 L18.4 31.4 L13.8 13.8 L31.4 18.4 Z"/><path class="inner" d="M42 14 L67 29 V55 L42 70 L17 55 V29 Z"/></svg>
           <span style="display:flex;align-items:center;justify-content:center;height:100%;">${icon('lock',22)}</span>
