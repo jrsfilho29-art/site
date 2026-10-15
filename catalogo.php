@@ -977,8 +977,9 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   header .logo{width:44px!important;height:44px!important;margin:0 auto 5px!important;}
   header h1{font-size:30px!important;letter-spacing:.17em!important;line-height:1.1;}
   header p{font-size:10.5px!important;letter-spacing:.28em!important;margin-top:4px!important;}
-  .hero-tools{margin-top:16px!important;max-width:500px!important;}
-  .hero-tools .search input{padding-top:9px!important;padding-bottom:9px!important;}
+  .hero-tools{margin-top:14px!important;max-width:360px!important;}
+  .hero-tools .search input{padding-top:6px!important;padding-bottom:6px!important;font-size:13.5px!important;}
+  .hero-tools .search svg{width:16px!important;height:16px!important;}
   .cad-open{position:relative;display:block;margin:12px 0 0 auto!important;padding:6px 16px!important;font-size:12px!important;z-index:2;}
   .steps{margin:-16px auto 0!important;max-width:640px!important;}
   .steps li{padding:7px 12px!important;font-size:12px!important;border-radius:12px!important;gap:8px!important;}
@@ -1057,7 +1058,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ah</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ai</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
