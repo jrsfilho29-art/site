@@ -972,6 +972,35 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     .nav-bd{display:none;}
     .nav-fab{display:flex;align-items:center;gap:6px;position:fixed;left:14px;bottom:18px;z-index:120;border:none;background:var(--plum);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:11px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(13,18,48,.35);cursor:pointer;}
   }
+  /* cabeçalho compacto */
+  header{padding:12px 16px 20px!important;border-radius:0 0 22px 22px!important;}
+  header .logo{width:32px!important;height:32px!important;margin:0 auto 3px!important;}
+  header h1{font-size:23px!important;letter-spacing:.16em!important;line-height:1.1;}
+  header p{font-size:9.5px!important;letter-spacing:.26em!important;margin-top:2px!important;}
+  .hero-tools{margin-top:10px!important;max-width:480px!important;}
+  .hero-tools .search input{padding-top:9px!important;padding-bottom:9px!important;}
+  .cad-open{position:absolute;top:10px;right:12px;margin:0!important;padding:6px 13px!important;font-size:11.5px!important;z-index:2;}
+  .steps{margin:-12px auto 0!important;max-width:620px!important;}
+  .steps li{padding:7px 12px!important;font-size:12px!important;border-radius:12px!important;gap:8px!important;}
+  .steps li b{width:22px!important;height:22px!important;font-size:12px!important;}
+  .steps li small{font-size:10.5px!important;}
+  @media (max-width:640px){header{padding:10px 12px 18px!important;}.steps{margin:-10px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{top:8px;right:8px;padding:5px 10px!important;font-size:10.5px!important;}}
+  /* menu lateral: novo visual (painel escuro, ícones, seções) */
+  :root{--navbg:<?= $__hc !== '' ? e($__hc) : '#17204A' ?>;}
+  .shell .nav{background:var(--navbg)!important;border:none!important;border-radius:20px!important;padding:14px 10px 16px!important;gap:3px!important;box-shadow:0 14px 34px rgba(13,18,48,.28)!important;color:#fff;}
+  .shell .nav .nav-h{color:var(--gold-soft)!important;font-size:11px!important;letter-spacing:.22em!important;padding:2px 10px 10px!important;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:6px;}
+  .shell .nav .nav-x{color:#fff!important;}
+  .shell .nav .nav-s{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);padding:12px 10px 4px;}
+  .shell .nav a,.shell .nav a.hot,.shell .nav a.nv{background:transparent!important;border:none!important;color:rgba(255,255,255,.88)!important;border-radius:11px!important;padding:9px 10px!important;gap:10px!important;font-weight:600;box-shadow:none!important;justify-content:flex-start!important;transition:background .15s;}
+  .shell .nav a .ni{display:flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,255,255,.1);flex:none;font-style:normal;}
+  .shell .nav a.hot .ni{color:#ff8da0;background:rgba(214,51,79,.25);}
+  .shell .nav a.nv .ni{color:var(--gold);background:rgba(240,168,31,.2);}
+  .shell .nav a b{flex:1;font-weight:600;font-size:13.5px;line-height:1.25;}
+  .shell .nav a span{margin:0!important;background:rgba(255,255,255,.14);color:#fff!important;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;}
+  .shell .nav a:hover{background:rgba(255,255,255,.09)!important;}
+  .shell .nav a.on,.shell .nav a.hot.on,.shell .nav a.nv.on{background:rgba(255,255,255,.15)!important;color:#fff!important;box-shadow:inset 3px 0 0 var(--gold)!important;}
+  .shell .nav a.on span{background:var(--gold);color:var(--plum-dark)!important;}
+  .shell .nav a.on .ni{background:var(--gold);color:var(--plum-dark);}
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -1012,7 +1041,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <div class="shell<?= $__hasNav ? ' has-nav' : '' ?>">
 <?php if($__hasNav): ?>
   <div class="nav-bd" id="nav-bd"></div>
-  <nav class="nav" id="tabs"><div class="nav-h">Menu <button type="button" class="nav-x" id="nav-x" aria-label="Fechar menu">&times;</button></div><a href="#" data-cat="all" class="on">Todos</a><?php if($nPromo): ?><a href="#" data-cat="f-promo" class="hot">Promoções <span><?= $nPromo ?></span></a><?php endif; ?><?php if($nNovo): ?><a href="#" data-cat="f-novo" class="nv">Novidades <span><?= $nNovo ?></span></a><?php endif; ?><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
+  <nav class="nav" id="tabs"><div class="nav-h">Menu <button type="button" class="nav-x" id="nav-x" aria-label="Fechar menu">&times;</button></div><a href="#" data-cat="all" class="on"><i class="ni"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></i><b>Todos os perfumes</b></a><?php if($nPromo || $nNovo): ?><div class="nav-s">Destaques</div><?php endif; ?><?php if($nPromo): ?><a href="#" data-cat="f-promo" class="hot"><i class="ni"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></i><b>Promoções</b> <span><?= $nPromo ?></span></a><?php endif; ?><?php if($nNovo): ?><a href="#" data-cat="f-novo" class="nv"><i class="ni"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg></i><b>Novidades</b> <span><?= $nNovo ?></span></a><?php endif; ?><div class="nav-s">Categorias</div><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><i class="ni"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4v3h-4zM8 6h8v3l1 2v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8l1-2z"/></svg></i><b><?= e($g['name']) ?></b> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
 <?php endif; ?>
   <div class="wrap">
 <?php if(!$groups): ?>
@@ -1030,7 +1059,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ac</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ad</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
