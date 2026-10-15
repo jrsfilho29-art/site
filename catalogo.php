@@ -1012,7 +1012,11 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .shell .nav a.on,.shell .nav a.hot.on,.shell .nav a.nv.on{background:var(--tint)!important;color:var(--plum)!important;font-weight:700;box-shadow:inset 3px 0 0 var(--plum)!important;}
   .shell .nav a.on b{font-weight:700;}
   .shell .nav a.on span{background:transparent!important;color:var(--plum)!important;}
-  /* janela de detalhes: foto menor */
+  
+  /* celular: campos com 16px evitam o zoom automático do iOS/Android ao tocar (tela "desajustada") */
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  @media (max-width:820px){html,body{max-width:100%;overflow-x:clip;}input,select,textarea,.gsearch input{font-size:16px !important;}}
+/* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
   @media (max-width:640px){.lb-img img{max-height:20vh;}}
@@ -1070,7 +1074,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-aj</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ak</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
