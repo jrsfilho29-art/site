@@ -402,7 +402,7 @@ try{
   if($action === 'onlineorder_status'){
     ensureOnlineOrders($pdo);
     $st = (string)($req['status'] ?? '');
-    if(!in_array($st, ['novo','atendimento','concluido','cancelado'], true)) fail(400, 'Status inválido.');
+    if(!in_array($st, ['novo','atendimento','enviado','concluido','cancelado'], true)) fail(400, 'Status inválido.');
     $q = $pdo->prepare('UPDATE online_orders SET status = ? WHERE id = ?'); $q->execute([$st, (string)($req['id'] ?? '')]);
     out(200, ['ok'=>true]);
   }

@@ -683,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-u';
+const APP_VERSION = '2026.10.15-v';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2565,9 +2565,9 @@ function renderDashboard(){
   const stockValue = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
   const onlTot = o => { const its = onlineItems(o); return o.total>0 ? +o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0); };
   const onlNew = ONLINE.orders.filter(o=>o.status==='novo').length;
-  const onlProg = ONLINE.orders.filter(o=>o.status==='atendimento').length;
+  const onlProg = ONLINE.orders.filter(o=>o.status==='atendimento'||o.status==='enviado').length;
   const onlToday = ONLINE.orders.filter(o=>o.status!=='cancelado' && localDay(o.createdAt)===today).length;
-  const onlOpen = ONLINE.orders.filter(o=>o.status==='novo'||o.status==='atendimento');
+  const onlOpen = ONLINE.orders.filter(o=>o.status==='novo'||o.status==='atendimento'||o.status==='enviado');
   const onlOpenVal = onlOpen.reduce((t,o)=>t+onlTot(o),0);
   const onlDoneVal = ONLINE.orders.filter(o=>o.status==='concluido').reduce((t,o)=>t+onlTot(o),0);
   const cards = [
@@ -2575,7 +2575,7 @@ function renderDashboard(){
     ['Produtos cadastrados', state.products.length, state.products.filter(p=>p.stock>0).length+' com estoque disponível', icon('package')],
     ['Clientes', state.customers.length, 'cadastrados', icon('users')],
     ['Valor do estoque (custo)', brl(stockValue), lowStock.length+' produto(s) em alerta', icon('warehouse')],
-    ['Pedidos online novos', onlNew, onlProg+' em atendimento · '+onlToday+' hoje', icon('inbox')],
+    ['Pedidos online novos', onlNew, onlProg+' em andamento · '+onlToday+' hoje', icon('inbox')],
     ['Online em aberto', brl(onlOpenVal), onlOpen.length+' pedido(s) a atender · '+brl(onlDoneVal)+' concluído(s)', icon('book')],
   ];
   // --- last 7 days series ---
@@ -2846,7 +2846,7 @@ function playOrderSound(force){
   }catch(e){}
   try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
 }
-const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', concluido:'Concluído', cancelado:'Cancelado'};
+const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', enviado:'Enviado', concluido:'Concluído', cancelado:'Cancelado'};
 function onlineDigits(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>11 && d.slice(0,2)==='55') d=d.slice(2); return d; }
 function onlineItems(o){ return (o.items&&o.items.length) ? o.items.map(i=>({productId:i.productId,name:i.name,qty:+i.qty||1,unitPrice:+i.unitPrice||0})) : [{productId:o.productId,name:o.productName,qty:o.qty||1,unitPrice:o.unitPrice||0}]; }
 function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
@@ -2936,7 +2936,7 @@ function renderOnline(){
   const flt = state.ui.onlineFilter || 'novo';
   if(syncEnabled() && !ONLINE.loaded && !ONLINE.loading && !ONLINE.err){ ONLINE.loading=true; fetchOnlineOrders(false).finally(()=>{ONLINE.loading=false;}); }
   const cnt = k => k==='todos' ? ONLINE.orders.length : ONLINE.orders.filter(o=>o.status===k).length;
-  const chips = [['novo','Novos'],['atendimento','Em atendimento'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
+  const chips = [['novo','Novos'],['atendimento','Em atendimento'],['enviado','Enviados'],['concluido','Concluídos'],['cancelado','Cancelados'],['todos','Todos']];
   const list = ONLINE.orders.filter(o=> flt==='todos' || o.status===flt);
   const head = `<div class="cx-hero"><div><h2 class="serif">Pedidos online</h2><p>Escolhas feitas pelos clientes no catálogo online</p>${heroStats('online')}</div>
     <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="toggleOnlineSound" title="Som de aviso quando chegar pedido novo (testa o som ao ligar)">${icon(soundOn()?'bell':'bellOff')} Som: ${soundOn()?'ligado':'desligado'}</button><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button></div></div>`;
@@ -2951,7 +2951,7 @@ function renderOnline(){
         const total = o.total>0 ? o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0);
         const paid = !!o.paidAt;
         const cls = o.status==='novo'?'badge-warn':o.status==='concluido'?'badge-ok':o.status==='cancelado'?'badge-danger':'badge-warn';
-        const open = o.status==='novo'||o.status==='atendimento';
+        const open = o.status==='novo'||o.status==='atendimento'||o.status==='enviado';
         const sellable = its.some(i=>state.products.some(x=>x.id===i.productId));
         const rows = its.map(i=>{
           const p = state.products.find(x=>x.id===i.productId);
@@ -2974,6 +2974,7 @@ function renderOnline(){
             ${open&&sellable?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
             ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
             ${isAdmin()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="onlineDelete" data-id="${esc(o.id)}" title="Excluir este pedido (e devolver os produtos ao estoque, se já viraram venda)">Excluir</button>`:''}
+            ${open&&o.status!=='enviado'?`<button class="btn btn-gold" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="enviado" title="Marca o pedido como enviado e avisa o cliente">Pedido enviado</button>`:''}
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
           </div></div>`;
       }).join('')}</div>`;
@@ -3065,12 +3066,14 @@ const actions_online = {
     const old = o.status; o.status = t.dataset.s; render();
     try{ await syncCall('onlineorder_status',{id:o.id,status:o.status}); }
     catch(e){ o.status = old; notify.err(e.message); render(); return; }
-    if((o.status==='concluido'||o.status==='cancelado') && old!==o.status){
-      const msg = o.status==='concluido'
+    if((o.status==='enviado'||o.status==='concluido'||o.status==='cancelado') && old!==o.status){
+      const msg = o.status==='enviado'
+        ? 'Olá, '+o.customerName+'! Seu pedido foi enviado 🚚 e já está a caminho. Qualquer dúvida é só responder esta mensagem.'+catTrackTxt()
+        : o.status==='concluido'
         ? 'Olá, '+o.customerName+'! Seu pedido foi concluído. Muito obrigado pela preferência! 💛'+catTrackTxt()
         : 'Olá, '+o.customerName+'! Infelizmente seu pedido foi cancelado. Se tiver qualquer dúvida, é só responder esta mensagem.';
       const u = waLink(o.phone, msg);
-      if(u && confirm((o.status==='concluido'?'Pedido concluído.':'Pedido cancelado.')+'\n\nAvisar o cliente pelo WhatsApp agora?')) openNewTab(u);
+      if(u && confirm((o.status==='enviado'?'Pedido marcado como enviado.':o.status==='concluido'?'Pedido concluído.':'Pedido cancelado.')+'\n\nAvisar o cliente pelo WhatsApp agora?')) openNewTab(u);
     }
   },
   async onlineToSale(t){

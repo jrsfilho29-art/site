@@ -1123,7 +1123,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-f</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-g</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1505,7 +1505,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       if(!ORD.length){l.innerHTML='<div class="mp-sub" style="text-align:center;padding:18px 0">Você ainda não fez nenhum pedido.</div>';return;}
       l.innerHTML=ORD.map(function(o){
         var canc=o.status==='cancelado',paid=!!o.paidAt,st=o.status;
-        var steps=[['Pedido recebido',true],['Pagamento confirmado',paid],['Em atendimento',st==='atendimento'||st==='concluido'],['Concluído',st==='concluido']];
+        var steps=[['Pedido recebido',true],['Pagamento confirmado',paid],['Em atendimento',st==='atendimento'||st==='enviado'||st==='concluido'],['Pedido enviado',st==='enviado'||st==='concluido'],['Concluído',st==='concluido']];
         var cur=-1;for(var i=0;i<steps.length;i++){if(!steps[i][1]){cur=i;break;}}
         var sh=steps.map(function(s,i){var c=s[1]?'ok':(i===cur&&!canc?'now':'');return '<div class="mp-st '+c+'"><i>'+(s[1]?'✓':(i+1))+'</i>'+s[0]+'</div>';}).join('');
         var its=o.items.map(function(i){return esc2(i.qty+'× '+i.name);}).join('<br>');
@@ -1525,6 +1525,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
           if(prev!==undefined&&prev!==sig){
             if(o.status==='cancelado')news.push('Seu pedido '+ordCode(o)+' foi cancelado.');
             else if(o.paidAt&&prev.slice(-1)==='0')news.push('✓ Pagamento do pedido '+ordCode(o)+' confirmado!');
+            else if(o.status==='enviado')news.push('🚚 Seu pedido '+ordCode(o)+' foi enviado!');
             else if(o.status==='atendimento')news.push('Seu pedido '+ordCode(o)+' está em atendimento.');
             else if(o.status==='concluido')news.push('Seu pedido '+ordCode(o)+' foi concluído. Obrigado!');
           }
