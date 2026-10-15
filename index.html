@@ -174,7 +174,7 @@
 
   /* ---------- top bar ---------- */
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
-  .qbtn{position:relative;display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:7px;font:inherit;font-size:13.5px;font-weight:500;letter-spacing:.15px;cursor:pointer;
+  .qbtn{position:relative;display:inline-flex;align-items:center;gap:6px;padding:9px 11px;border-radius:7px;font:inherit;font-size:13px;font-weight:500;letter-spacing:.15px;cursor:pointer;
         background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
   .qbtn .qic{display:inline-flex;color:var(--gold-soft);}
   .qbtn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(13,18,48,.35);border-color:rgba(255,255,255,.34);}
@@ -186,6 +186,7 @@
   @media (max-width:640px){.qnav{gap:6px;}.qbtn{padding:8px 11px;font-size:12px;gap:6px;}}
   .topbar{display:flex;align-items:center;gap:14px;padding:14px 0 20px;border-bottom:1px solid var(--line);margin-bottom:24px;}
   .topbar .crumb{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted2);font-weight:600;}
+  .topbar .today-w{margin-left:auto;}
   .topbar .gsearch{position:relative;flex:1;max-width:380px;margin-left:auto;}
   .topbar .gsearch input{padding-left:34px;background:var(--paper);}
   .topbar .gsearch .gsicon{position:absolute;left:11px;top:9px;color:var(--muted2);pointer-events:none;}
@@ -635,7 +636,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-g';
+const APP_VERSION = '2026.10.15-h';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2392,11 +2393,6 @@ function renderTopbar(){
   <div class="topbar">
     <button class="menu-toggle" data-action="toggleMenu">${icon('menu',16)}</button>
     <span class="crumb">Essência · ${TAB_TITLES[state.tab]||''}</span>
-    <div class="gsearch">
-      <span class="gsicon">${icon('search',15)}</span>
-      <input id="gsearch-input" placeholder="Buscar produto ou cliente...  ( / )" data-field="ui.globalQuery" value="${esc(state.ui.globalQuery||'')}">
-      ${renderGlobalResults()}
-    </div>
     <div class="today-w"><span class="today">${today}</span><div class="dclock" role="timer" aria-label="Relógio"><b id="dclock-t">${clockStr().slice(0,5)}</b></div></div>
   </div>`;
 }
