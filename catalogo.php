@@ -979,12 +979,12 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   header p{font-size:10.5px!important;letter-spacing:.28em!important;margin-top:4px!important;}
   .hero-tools{margin-top:16px!important;max-width:500px!important;}
   .hero-tools .search input{padding-top:9px!important;padding-bottom:9px!important;}
-  .cad-open{position:relative;display:block;margin:12px auto 0!important;padding:6px 16px!important;font-size:12px!important;z-index:2;}
+  .cad-open{position:relative;display:block;margin:12px 0 0 auto!important;padding:6px 16px!important;font-size:12px!important;z-index:2;}
   .steps{margin:-16px auto 0!important;max-width:640px!important;}
   .steps li{padding:7px 12px!important;font-size:12px!important;border-radius:12px!important;gap:8px!important;}
   .steps li b{width:22px!important;height:22px!important;font-size:12px!important;}
   .steps li small{font-size:10.5px!important;}
-  @media (max-width:640px){header{padding:16px 12px 24px!important;}header .logo{width:38px!important;height:38px!important;}header h1{font-size:26px!important;}.hero-tools{margin-top:12px!important;}.steps{margin:-14px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{margin-top:10px!important;padding:5px 14px!important;font-size:11.5px!important;}}
+  @media (max-width:640px){header{padding:16px 12px 24px!important;}header .logo{width:38px!important;height:38px!important;}header h1{font-size:26px!important;}.hero-tools{margin-top:12px!important;}.steps{margin:-14px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{margin:10px 0 0 auto!important;padding:5px 14px!important;font-size:11.5px!important;}}
   /* menu lateral simples: só os nomes, um abaixo do outro */
   .shell .nav{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:8px 6px!important;gap:0!important;box-shadow:none!important;color:var(--plum);}
   .shell .nav .nav-h{display:flex;color:var(--muted)!important;font-size:11px!important;letter-spacing:.16em!important;padding:6px 12px 8px!important;border-bottom:1px solid var(--line);margin-bottom:4px;}
@@ -1057,7 +1057,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ag</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ah</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
