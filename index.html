@@ -174,12 +174,15 @@
 
   /* ---------- top bar ---------- */
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
-  .qbtn{position:relative;display:inline-flex;align-items:center;gap:6px;padding:8px 11px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--plum);font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(23,32,74,.06);transition:transform .12s,box-shadow .12s,border-color .12s,background .12s;}
-  .qbtn .qic{display:inline-flex;color:var(--gold-deep);}
-  .qbtn:hover{transform:translateY(-1px);border-color:var(--gold-deep);box-shadow:0 4px 10px rgba(23,32,74,.12);}
-  .qbtn.on{background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border-color:var(--plum-dark);box-shadow:0 4px 12px rgba(13,18,48,.28);}
-  .qbtn.on .qic{color:var(--gold);}
+  .qbtn{position:relative;display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:7px;font:inherit;font-size:13.5px;font-weight:500;letter-spacing:.15px;cursor:pointer;
+        background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
+  .qbtn .qic{display:inline-flex;color:var(--gold-soft);}
+  .qbtn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(13,18,48,.35);border-color:rgba(255,255,255,.34);}
+  .qbtn.on{background:linear-gradient(180deg,#D3AC68,var(--gold));color:var(--plum-dark);border-color:var(--gold-deep);font-weight:600;box-shadow:0 1px 2px rgba(173,131,66,.35);}
+  .qbtn.on:hover{box-shadow:0 4px 10px rgba(173,131,66,.4);}
+  .qbtn.on .qic{color:var(--plum-dark);}
   .qbadge{background:var(--gold);color:#17204A;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:2px;}
+  .qbtn.on .qbadge{background:var(--plum-dark);color:var(--gold-soft);}
   @media (max-width:640px){.qnav{gap:6px;}.qbtn{padding:8px 11px;font-size:12px;gap:6px;}}
   .topbar{display:flex;align-items:center;gap:14px;padding:14px 0 20px;border-bottom:1px solid var(--line);margin-bottom:24px;}
   .topbar .crumb{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted2);font-weight:600;}
@@ -632,7 +635,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-f';
+const APP_VERSION = '2026.10.15-g';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
