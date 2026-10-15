@@ -178,6 +178,14 @@
   .apar-ic{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--gold-soft);flex-shrink:0;}
   .apar-ch{font-size:22px;font-weight:300;color:var(--gold-deep);width:24px;text-align:center;}
   .apar-b{border-top:1px solid var(--line);padding-top:14px !important;}
+  .main > .topbar{display:none;}
+  .main{padding-top:14px;}
+  .qnav{margin-bottom:14px !important;}
+  .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
+  .hhead h2{margin:0 !important;}
+  .hclock{display:inline-flex;align-items:center;gap:10px;}
+  .hclock .dclock b{font-size:17px;padding:5px 12px;}
+  .hdate{font-size:13px;color:#C9CDEA;white-space:nowrap;}
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
   .qbtn{position:relative;display:inline-flex;align-items:center;flex-direction:column;justify-content:center;text-align:center;gap:6px;width:calc((100% - 54px)/10);min-width:78px;min-height:72px;padding:11px 4px;border-radius:14px;font:inherit;font-size:12px;line-height:1.15;font-weight:600;letter-spacing:0;cursor:pointer;
         background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
@@ -596,7 +604,7 @@
     .main{padding:16px 14px;margin-left:0;}
     .menu-toggle{display:inline-flex;}
     .scrim{position:fixed;inset:0;background:rgba(32,16,27,.5);z-index:99;}
-    .topbar{padding:10px 0 14px;margin-bottom:16px;gap:10px;flex-wrap:wrap;}
+    .main > .topbar{display:flex;padding:0 0 10px;margin-bottom:10px;gap:10px;flex-wrap:wrap;}
     .topbar .gsearch{max-width:none;order:3;flex-basis:100%;}
     .topbar .today{display:none;}
     .grid-4{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
@@ -644,7 +652,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-l';
+const APP_VERSION = '2026.10.15-m';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2395,13 +2403,15 @@ function renderQuickNav(){
   }).join('')}</div>`;
 }
 
+function heroClock(){ return `<span class="hclock" role="timer" aria-label="Relógio"><span class="dclock"><b id="dclock-t">${clockStr().slice(0,5)}</b></span><span class="hdate">${esc(clockDate())}</span></span>`; }
+function withHeroClock(html){
+  return html.replace(/(class="cx-hero"[^>]*>\s*<div[^>]*>\s*)(<h2[^>]*>[^<]*<\/h2>)/, (m,pre,h2)=>pre+'<div class="hhead">'+h2+heroClock()+'</div>');
+}
 function renderTopbar(){
-  const today = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
   return `
   <div class="topbar">
     <button class="menu-toggle" data-action="toggleMenu">${icon('menu',16)}</button>
     <span class="crumb">Essência · ${TAB_TITLES[state.tab]||''}</span>
-    <div class="today-w"><span class="today">${today}</span><div class="dclock" role="timer" aria-label="Relógio"><b id="dclock-t">${clockStr().slice(0,5)}</b></div></div>
   </div>`;
 }
 
@@ -2427,7 +2437,7 @@ function renderShell(){
     <div class="main">
       ${renderQuickNav()}
       ${renderTopbar()}
-      ${renderTab()}
+      ${withHeroClock(renderTab())}
     </div>
   </div>
   ${state.ui.modal ? renderModal() : ''}
