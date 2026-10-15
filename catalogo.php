@@ -343,7 +343,7 @@ function acct_profile($row, $tok){
   $d = json_decode((string)($row['data'] ?? ''), true); if(!is_array($d)) $d = [];
   return ['token'=>$tok, 'name'=>(string)$row['name'], 'phone'=>(string)$row['phone'], 'username'=>(string)($row['username'] ?? ''), 'cpf'=>(string)($d['cpf'] ?? ''), 'email'=>(string)($d['email'] ?? '')];
 }
-if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair', 'esqueci'], true) && $_SERVER['REQUEST_METHOD'] === 'POST'){
+if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair', 'esqueci', 'pedidos'], true) && $_SERVER['REQUEST_METHOD'] === 'POST'){
   header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
   $jerr = function($code, $msg){ http_response_code($code); echo json_encode(['ok'=>false, 'error'=>$msg]); exit; };
   $ho = strtolower((string)parse_url((string)($_SERVER['HTTP_ORIGIN'] ?? ''), PHP_URL_HOST));
@@ -361,6 +361,20 @@ if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair', 'esqueci'], true) 
       $t = (string)($in['token'] ?? '');
       if(preg_match('/^[a-f0-9]{48}$/', $t)) $pdo->prepare('DELETE FROM online_tokens WHERE token_hash = ?')->execute([hash('sha256', $t)]);
       echo json_encode(['ok'=>true]); exit;
+    }
+    if($act === 'pedidos'){   /* acompanhamento: pedidos da conta logada (casa pelo WhatsApp cadastrado) */
+      $ac = acct_by_token($pdo, $in['token'] ?? '');
+      if(!$ac) $jerr(401, 'Sessão expirada. Entre novamente.');
+      $ph = preg_replace('/\D/', '', (string)$ac['phone']); $list = [];
+      try{
+        $q = $pdo->prepare('SELECT * FROM online_orders WHERE phone = ? ORDER BY created_at DESC LIMIT 20'); $q->execute([$ph]);
+        foreach($q->fetchAll() as $o){
+          $its = json_decode((string)($o['items'] ?? ''), true); if(!is_array($its) || !$its) $its = [['name'=>(string)$o['product_name'], 'qty'=>(int)$o['qty'], 'unitPrice'=>(float)$o['unit_price']]];
+          $list[] = ['id'=>(string)$o['id'], 'createdAt'=>(string)$o['created_at'], 'status'=>(string)$o['status'], 'payment'=>(string)($o['payment'] ?? ''), 'paidAt'=>(string)($o['paid_at'] ?? ''), 'total'=>(float)($o['total'] ?? 0),
+            'items'=>array_map(function($i){ return ['name'=>mb_substr((string)($i['name'] ?? ''), 0, 120), 'qty'=>(int)($i['qty'] ?? 1), 'unitPrice'=>(float)($i['unitPrice'] ?? 0)]; }, $its)];
+        }
+      }catch(Throwable $e){ $list = []; }
+      echo json_encode(['ok'=>true, 'orders'=>$list]); exit;
     }
     if($act === 'esqueci'){
       $q = $pdo->prepare('SELECT COUNT(*) FROM online_attempts WHERE ip_hash = ? AND created_at > ?'); $q->execute([$ip, $since]);
@@ -831,6 +845,26 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .pay button.on{border-color:var(--gold);background:#FFF6DF;box-shadow:inset 0 0 0 1px var(--gold);}
   .toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);z-index:130;background:var(--plum);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center;}
   .toast.on{opacity:1;transform:translateX(-50%);}
+  .ord-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e23b4e;margin-left:6px;vertical-align:middle;}
+  .mp-b{max-width:460px;max-height:88vh;overflow-y:auto;text-align:left;position:relative;}
+  .mp-sub{font-size:13px;color:#6b6f85;margin:4px 0 14px;}
+  .mp-c{border:1px solid #e1e3f0;border-radius:14px;padding:14px;margin-bottom:12px;background:#fff;}
+  .mp-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;}
+  .mp-h b{font-size:14px;color:var(--plum);}.mp-h span{font-size:12px;color:#6b6f85;}
+  .mp-it,.mp-tot{text-align:left;}
+  .mp-it{font-size:13px;color:#3a3f5c;margin:8px 0 2px;line-height:1.4;}
+  .mp-tot{font-weight:800;color:var(--plum);font-size:15px;margin:6px 0 10px;}
+  .mp-steps{display:flex;margin-top:6px;}
+  .mp-st{flex:1;text-align:center;position:relative;font-size:10.5px;color:#9a9eb5;line-height:1.25;padding:0 2px;}
+  .mp-st i{display:block;width:22px;height:22px;border-radius:50%;margin:0 auto 5px;background:#e6e8f3;color:#fff;font-style:normal;font-size:13px;line-height:22px;position:relative;z-index:1;}
+  .mp-st:not(:last-child)::after{content:'';position:absolute;top:10px;left:calc(50% + 12px);right:calc(-50% + 12px);height:2px;background:#e6e8f3;}
+  .mp-st.ok{color:#1a8f4a;font-weight:700;}.mp-st.ok i{background:#1a8f4a;}.mp-st.ok:not(:last-child)::after{background:#1a8f4a;}
+  .mp-st.now{color:var(--plum);font-weight:700;}.mp-st.now i{background:#F0A81F;}
+  .mp-bad{background:#fdecef;color:#b83a57;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:700;margin-top:8px;}
+  .mp-pay{font-size:12.5px;margin-top:10px;padding:8px 10px;border-radius:10px;background:#f3f4fa;color:#3a3f5c;}
+  .mp-pay.ok{background:#e6f6ec;color:#17703c;font-weight:700;}
+  .ord-toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:400;width:max-content;max-width:min(92vw,420px);background:#17204A;color:#fff;border-radius:14px;padding:12px 16px;font-size:14px;font-weight:600;box-shadow:0 12px 34px rgba(0,0,0,.35);border-left:5px solid #1a8f4a;cursor:pointer;transition:transform .35s cubic-bezier(.2,1.1,.3,1);}
+  .ord-toast.on{transform:translate(-50%,0);}
   .okpop{position:fixed;inset:0;z-index:200;background:rgba(13,18,48,.7);display:none;align-items:center;justify-content:center;padding:18px;}
   .okpop.on{display:flex;animation:okfade .2s ease-out;}
   .okpop-b{background:#fff;border-radius:20px;width:100%;max-width:360px;padding:26px 22px 22px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.45);animation:okpop .32s cubic-bezier(.2,1.2,.3,1);}
@@ -1089,7 +1123,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-e</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-f</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1097,6 +1131,13 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 </div></div></div>
 <?php if($__hasNav): ?><button type="button" class="nav-fab" id="nav-open" aria-label="Abrir menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button><?php endif; ?>
 <button type="button" class="cfab" id="cfab" style="display:none" aria-label="Abrir carrinho"><span class="cfab-i">&#128722;</span><span id="cfab-n">0</span><span class="cfab-t" id="cfab-t"></span></button>
+<div class="okpop" id="mp" role="dialog" aria-modal="true" aria-label="Meus pedidos"><div class="okpop-b mp-b">
+<button class="lb-x" type="button" id="mp-x" aria-label="Fechar">&times;</button>
+<div class="of-t" style="text-align:left">Meus pedidos</div>
+<div class="mp-sub" id="mp-s">Acompanhe aqui o pagamento e o andamento dos seus pedidos.</div>
+<div id="mp-l"></div>
+</div></div>
+<div id="ord-toast" class="ord-toast" role="status" aria-live="polite"></div>
 <div class="okpop" id="cad" role="dialog" aria-modal="true" aria-labelledby="cad-t"><div class="okpop-b cad-b">
 <button class="lb-x" type="button" id="cad-x" aria-label="Fechar">&times;</button>
 <form id="cad-f" novalidate autocomplete="off">
@@ -1134,7 +1175,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   <div id="fg-ok" style="display:none;text-align:center;margin-top:10px"><div class="of-t">Pedido enviado!</div><p style="margin:6px 0 10px;font-size:13.5px">A loja vai te chamar no WhatsApp. Se preferir, fale agora:</p><button type="button" class="lb-act lb-buy" id="fg-wa" style="width:100%">Falar com a loja no WhatsApp</button></div>
   <button type="button" class="of-b" id="fg-back">Voltar para entrar</button>
 </form>
-<div id="ac-v" style="display:none;text-align:center"><div class="okpop-i"><svg viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-7"/></svg></div><div class="of-t" id="ac-t">Olá!</div><p id="ac-m" style="margin:6px 0 14px;font-size:14px"></p><button type="button" class="lb-act lb-buy" id="ac-close" style="width:100%">Continuar</button><button type="button" class="of-b" id="ac-out">Sair da conta</button></div>
+<div id="ac-v" style="display:none;text-align:center"><div class="okpop-i"><svg viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-7"/></svg></div><div class="of-t" id="ac-t">Olá!</div><p id="ac-m" style="margin:6px 0 14px;font-size:14px"></p><button type="button" class="lb-act lb-buy" id="ac-orders" style="width:100%;margin-bottom:8px">Meus pedidos <span id="ac-dot" class="ord-dot" style="display:none"></span></button><button type="button" class="of-b" id="ac-close" style="margin-bottom:8px">Continuar comprando</button><button type="button" class="of-b" id="ac-out">Sair da conta</button></div>
 </div></div>
 <div class="ct" id="ct" aria-hidden="true"><div class="ct-box" role="dialog" aria-modal="true">
 <button class="lb-x" type="button" id="ct-x" aria-label="Fechar">&times;</button>
@@ -1409,6 +1450,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     function post(a,d,n){n=n||0;return fetch('catalogo.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json().catch(function(){return null;});}).catch(function(){return null;}).then(function(j){if(j)return j;if(n<2)return new Promise(function(ok){setTimeout(ok,700);}).then(function(){return post(a,d,n+1);});return {ok:false,error:'Erro de comunicação. Tente novamente.'};});}
     function done(pf){
       saveAcct(pf);wipeForm();
+      if(window.ordStart)window.ordStart();
       openCad('acct');
       if($('ct').className.indexOf('on')>=0){drawCart();}
     }
@@ -1446,7 +1488,67 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     $('gt-reg').addEventListener('click',function(){openCad('reg');});
     window.acctToken=function(){return ACCT?ACCT.token:'';};
     window.acctClear=function(){saveAcct(null);var n=$('of-n'),p=$('of-p');if(n)n.readOnly=false;if(p)p.readOnly=false;};
-    uiAcct();
+
+    /* ---- acompanhamento de pedidos (cliente logado) ---- */
+    var ORD=[],ordTimer=null,mp=$('mp');
+    function ordSeen(){try{return JSON.parse(localStorage.getItem('ess_ord_seen')||'{}')||{};}catch(e){return {};}}
+    function ordSave(m){try{localStorage.setItem('ess_ord_seen',JSON.stringify(m));}catch(e){}}
+    function ordSig(o){return o.status+'|'+(o.paidAt?'1':'0');}
+    function money(v){return 'R$ '+Number(v||0).toFixed(2).replace('.',',');}
+    function dt(iso){var d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+    function esc2(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    function ordCode(o){return '#'+String(o.id).replace(/^ped_/,'').slice(0,6).toUpperCase();}
+    function toast(msg){var t=$('ord-toast');if(!t)return;t.textContent=msg;t.className='ord-toast on';clearTimeout(toast.t);toast.t=setTimeout(function(){t.className='ord-toast';},9000);t.onclick=function(){t.className='ord-toast';openOrders();};}
+    function dotOn(on){var d=$('ac-dot');if(d)d.style.display=on?'inline-block':'none';var b=$('cad-open');if(b){var x=b.querySelector('.ord-dot');if(on&&!x){x=document.createElement('span');x.className='ord-dot';b.appendChild(x);}else if(!on&&x)x.remove();}}
+    function renderOrders(){
+      var l=$('mp-l');if(!l)return;
+      if(!ORD.length){l.innerHTML='<div class="mp-sub" style="text-align:center;padding:18px 0">Você ainda não fez nenhum pedido.</div>';return;}
+      l.innerHTML=ORD.map(function(o){
+        var canc=o.status==='cancelado',paid=!!o.paidAt,st=o.status;
+        var steps=[['Pedido recebido',true],['Pagamento confirmado',paid],['Em atendimento',st==='atendimento'||st==='concluido'],['Concluído',st==='concluido']];
+        var cur=-1;for(var i=0;i<steps.length;i++){if(!steps[i][1]){cur=i;break;}}
+        var sh=steps.map(function(s,i){var c=s[1]?'ok':(i===cur&&!canc?'now':'');return '<div class="mp-st '+c+'"><i>'+(s[1]?'✓':(i+1))+'</i>'+s[0]+'</div>';}).join('');
+        var its=o.items.map(function(i){return esc2(i.qty+'× '+i.name);}).join('<br>');
+        var pay=paid?'<div class="mp-pay ok">✓ Pagamento confirmado'+(o.paidAt?' em '+dt(o.paidAt):'')+' · '+esc2(o.payment)+'</div>':(canc?'':'<div class="mp-pay">Pagamento: '+esc2(o.payment)+' · aguardando confirmação da loja</div>');
+        return '<div class="mp-c"><div class="mp-h"><b>Pedido '+ordCode(o)+'</b><span>'+dt(o.createdAt)+'</span></div><div class="mp-it">'+its+'</div><div class="mp-tot">'+money(o.total)+'</div>'+(canc?'<div class="mp-bad">Pedido cancelado</div>':'<div class="mp-steps">'+sh+'</div>')+pay+'</div>';
+      }).join('');
+    }
+    function ordDot(on){try{localStorage.setItem('ess_ord_dot',on?'1':'');}catch(e){}dotOn(on);}
+    function ordLoad(){
+      if(!ACCT)return Promise.resolve();
+      return post('pedidos',{token:ACCT.token},2).then(function(j){
+        if(!j||!j.ok){if(j&&j.error&&/Sess|Entre/.test(j.error)){saveAcct(null);}return;}
+        ORD=j.orders||[];
+        var seen=ordSeen(),news=[],open=mp&&mp.className.indexOf('on')>=0;
+        ORD.forEach(function(o){
+          var sig=ordSig(o),prev=seen[o.id];
+          if(prev!==undefined&&prev!==sig){
+            if(o.status==='cancelado')news.push('Seu pedido '+ordCode(o)+' foi cancelado.');
+            else if(o.paidAt&&prev.slice(-1)==='0')news.push('✓ Pagamento do pedido '+ordCode(o)+' confirmado!');
+            else if(o.status==='atendimento')news.push('Seu pedido '+ordCode(o)+' está em atendimento.');
+            else if(o.status==='concluido')news.push('Seu pedido '+ordCode(o)+' foi concluído. Obrigado!');
+          }
+          seen[o.id]=sig;
+        });
+        ordSave(seen);
+        if(open){ordDot(false);renderOrders();}
+        else if(news.length){toast(news[0]+(news.length>1?' (+'+(news.length-1)+')':''));ordDot(true);}
+      });
+    }
+    function openOrders(){
+      if(!ACCT)return;
+      mp.className='okpop on';document.body.style.overflow='hidden';
+      $('mp-l').innerHTML='<div class="mp-sub" style="text-align:center;padding:18px 0">Carregando…</div>';
+      ordLoad().then(function(){ordDot(false);renderOrders();});
+    }
+    function closeOrders(){mp.className='okpop';if($('ct').className.indexOf('on')<0&&$('cad').className.indexOf('on')<0)document.body.style.overflow='';}
+    window.ordOpen=openOrders;window.ordRefresh=function(){return ordLoad();};
+    if(mp){$('mp-x').addEventListener('click',closeOrders);mp.addEventListener('click',function(e){if(e.target===mp)closeOrders();});}
+    $('ac-orders').addEventListener('click',function(){closeCad();openOrders();});
+    function ordStart(){clearInterval(ordTimer);if(!ACCT){dotOn(false);return;}try{dotOn(!!localStorage.getItem('ess_ord_dot'));}catch(e){}ordLoad();ordTimer=setInterval(function(){if(!document.hidden)ordLoad();},30000);}
+    document.addEventListener('visibilitychange',function(){if(!document.hidden&&ACCT)ordLoad();});
+    window.ordStart=ordStart;
+    uiAcct();ordStart();
   })();
   document.addEventListener('submit',function(e){
     if(e.target.id!=='ct-f')return;e.preventDefault();
