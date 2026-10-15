@@ -616,7 +616,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-zb';
+const APP_VERSION = '2026.10.14-zc';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -4820,7 +4820,7 @@ function renderCaixa(){
   <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(118px,1fr));">
     ${methods.map(m=>{ const pct = grandTotal>0 ? Math.round(byMethod[m]/grandTotal*100) : 0; const on = mFilter===m;
       return `<div class="card" role="button" tabindex="0" data-action="filterCaixaMethod" data-method="${esc(m)}" style="padding:12px;cursor:pointer;${on?'border-color:var(--plum);box-shadow:3px 3px 0 var(--plum);':''}${byMethod[m]===0&&!on?'opacity:.6;':''}">
-        <div class="muted" style="font-size:11px;margin-bottom:4px;">${m}</div>
+        <div class="muted" style="font-size:11px;margin-bottom:4px;">${esc(m)}</div>
         <div class="serif" style="font-size:17px;color:var(--plum);">${brl(byMethod[m])}</div>
         <div style="height:4px;background:var(--tint);border-radius:3px;margin-top:8px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:var(--gold);"></div></div>
         <div class="muted2" style="font-size:11px;margin-top:3px;">${pct}% do total</div>
