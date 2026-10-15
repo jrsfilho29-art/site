@@ -180,6 +180,8 @@
   .apar-b{border-top:1px solid var(--line);padding-top:14px !important;}
   .main > .topbar{display:none;}
   .main{padding-top:14px;}
+  .kpi-6{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+  @media (max-width:640px){.kpi-6{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}}
   .qnav{margin-bottom:14px !important;}
   .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
   .hhead h2{margin:0 !important;}
@@ -661,7 +663,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-p';
+const APP_VERSION = '2026.10.15-q';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2524,11 +2526,20 @@ function renderDashboard(){
   const revenueToday = salesToday.reduce((a,s)=>a+s.total,0);
   const lowStock = state.products.filter(p=>p.stock<=(p.minStock||0));
   const stockValue = state.products.reduce((a,p)=>a+p.stock*p.costPrice,0);
+  const onlTot = o => { const its = onlineItems(o); return o.total>0 ? +o.total : its.reduce((t,i)=>t+i.qty*i.unitPrice,0); };
+  const onlNew = ONLINE.orders.filter(o=>o.status==='novo').length;
+  const onlProg = ONLINE.orders.filter(o=>o.status==='atendimento').length;
+  const onlToday = ONLINE.orders.filter(o=>o.status!=='cancelado' && localDay(o.createdAt)===today).length;
+  const onlOpen = ONLINE.orders.filter(o=>o.status==='novo'||o.status==='atendimento');
+  const onlOpenVal = onlOpen.reduce((t,o)=>t+onlTot(o),0);
+  const onlDoneVal = ONLINE.orders.filter(o=>o.status==='concluido').reduce((t,o)=>t+onlTot(o),0);
   const cards = [
     ['Vendas hoje', salesToday.length, brl(revenueToday), icon('cart')],
     ['Produtos cadastrados', state.products.length, state.products.filter(p=>p.stock>0).length+' com estoque disponível', icon('package')],
     ['Clientes', state.customers.length, 'cadastrados', icon('users')],
     ['Valor do estoque (custo)', brl(stockValue), lowStock.length+' produto(s) em alerta', icon('warehouse')],
+    ['Pedidos online novos', onlNew, onlProg+' em atendimento · '+onlToday+' hoje', icon('inbox')],
+    ['Online em aberto', brl(onlOpenVal), onlOpen.length+' pedido(s) a atender · '+brl(onlDoneVal)+' concluído(s)', icon('book')],
   ];
   // --- last 7 days series ---
   const days = [];
@@ -2568,6 +2579,7 @@ function renderDashboard(){
         <div class="cx-stat"><b>${salesToday.length}</b><span>vendas hoje</span></div>
         <div class="cx-stat"><b>${brl(revenueToday)}</b><span>faturado hoje</span></div>
         <div class="cx-stat${lowStock.length>0?' hot':''}"><b>${lowStock.length}</b><span>produto(s) em alerta</span></div>
+        <div class="cx-stat${onlNew>0?' hot':''}"><b>${onlNew}</b><span>pedido(s) online novo(s)</span></div>
       </div>
     </div>
         <div class="flex gap flex-wrap" style="align-items:center;">
@@ -2578,7 +2590,7 @@ function renderDashboard(){
     </div>
   </div>
   ${acctAlertStrip()}
-  <div class="grid grid-4 kpi-grid mb3">
+  <div class="grid grid-4 kpi-grid kpi-6 mb3">
     ${cards.map(([label,val,sub,ic])=>`
       <div class="card kpi">
         <div class="flex-between mb1" style="align-items:flex-start;">
