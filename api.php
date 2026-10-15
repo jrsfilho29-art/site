@@ -193,6 +193,15 @@ try{
       'customer'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['customer'] ?? '')
     ], $r)]);
   }
+  if($action === 'onlinecustomers'){
+    try{
+      $r = rows($pdo, 'SELECT * FROM online_customers ORDER BY created_at DESC LIMIT 500');
+    }catch(Throwable $e){ $r = []; }   // tabela só existe depois do primeiro cadastro
+    out(200, ['ok'=>true, 'customers'=>array_map(fn($o)=>[
+      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'name'=>s($o['name']), 'phone'=>s($o['phone']),
+      'data'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['data'] ?? '')
+    ], $r)]);
+  }
   if($action === 'onlineorder_paid'){
     ensureOnlineOrders($pdo);
     $q = $pdo->prepare('UPDATE online_orders SET paid_at = ? WHERE id = ?'); $q->execute([!empty($req['paid']) ? gmdate('Y-m-d\TH:i:s\Z') : '', (string)($req['id'] ?? '')]);

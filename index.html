@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-q';
+const APP_VERSION = '2026.10.14-r';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2675,12 +2675,13 @@ function onlineDigits(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>11 
 function onlineItems(o){ return (o.items&&o.items.length) ? o.items.map(i=>({productId:i.productId,name:i.name,qty:+i.qty||1,unitPrice:+i.unitPrice||0})) : [{productId:o.productId,name:o.productName,qty:o.qty||1,unitPrice:o.unitPrice||0}]; }
 function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
 /* clientes que se cadastraram ao comprar no catálogo viram clientes do programa (sem duplicar: confere CPF e telefone) */
-function importOnlineCustomers(){
+function importOnlineCustomers(extra){
   if(!state.currentUser || !Array.isArray(state.customers)) return;
   let done; try{ done = new Set(JSON.parse(localStorage.getItem('ess_cust_imp')||'[]')); }catch(e){ done = new Set(); }
   const dg = v => String(v||'').replace(/\D/g,'');
   let added = 0, touched = false, marked = false;
-  ONLINE.orders.slice().reverse().forEach(o=>{
+  const srcs = ONLINE.orders.map(o=>({id:o.id, customerName:o.customerName, phone:o.phone, createdAt:o.createdAt, customer:o.customer})).concat((extra||[]).map(x=>({id:x.id, customerName:x.name, phone:x.phone, createdAt:x.createdAt, customer:x.data})));
+  srcs.slice().reverse().forEach(o=>{
     const c = o.customer; if(!c || typeof c!=='object' || !Object.keys(c).length || done.has(o.id)) return;   /* pedidos antigos (sem cadastro) não viram clientes */
     done.add(o.id); marked = true;
     const cpf = dg(c.cpf), ph = onlineDigits(o.phone);
@@ -2705,7 +2706,7 @@ async function fetchOnlineOrders(silent){
     const fresh = (j.orders||[]).filter(o=>o.status==='novo' && !old.has(o.id));
     const first = !ONLINE.loaded;
     ONLINE.orders = j.orders||[]; ONLINE.loaded = true; ONLINE.err = '';
-    try{ importOnlineCustomers(); }catch(e){ console.error('Cadastro de clientes do catálogo falhou:', e); }
+    try{ let ex=[]; try{ ex=(await syncCall('onlinecustomers')).customers||[]; }catch(e){} importOnlineCustomers(ex); }catch(e){ console.error('Cadastro de clientes do catálogo falhou:', e); }
     if(fresh.length && !first){ playOrderSound(); notify.ok(fresh.length===1 ? 'Novo pedido online!' : fresh.length+' novos pedidos online!'); }
     const n = onlineNewCount();
     document.title = (n>0 ? '('+n+') ' : '') + document.title.replace(/^\(\d+\)\s*/,'');
