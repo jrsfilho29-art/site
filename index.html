@@ -616,7 +616,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-zc';
+const APP_VERSION = '2026.10.14-zd';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -630,7 +630,7 @@ function sessionSave(u, tab){
   // Sessão só vale enquanto a aba/janela estiver aberta: ao fechar (X), pede login e senha de novo.
   try{ localStorage.removeItem('ess_session'); }catch(e){}
   if(!u){ try{ sessionStorage.removeItem('ess_session'); }catch(e){} return; }
-  try{ sessionStorage.setItem('ess_session', JSON.stringify({ uid:u.id, pw:String(u.passwordHash||'').slice(0,12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 })); }catch(e){}
+  try{ sessionStorage.setItem('ess_session', JSON.stringify({ uid:u.id, pw:String(u.passwordHash||'').slice(-12), tab:tab||'dashboard', exp:Date.now()+SESSION_DAYS*86400000 })); }catch(e){}
 }
 function sessionClear(){ try{ localStorage.removeItem('ess_session'); sessionStorage.removeItem('ess_session'); }catch(e){} }
 function sessionRestore(){
@@ -638,14 +638,14 @@ function sessionRestore(){
   let ses = null; try{ ses = JSON.parse(sessionStorage.getItem('ess_session')||'null'); }catch(e){}
   if(!ses || !ses.uid || !(ses.exp>Date.now())) return false;
   const u = state.users.find(x=>x.id===ses.uid);
-  if(!u || String(u.passwordHash||'').slice(0,12)!==ses.pw){ sessionClear(); return false; }   // usuário removido ou senha trocada
+  if(!u || String(u.passwordHash||'').slice(-12)!==ses.pw){ sessionClear(); return false; }   // usuário removido ou senha trocada
   state.currentUser = u;
   if(ses.tab && typeof TAB_TITLES!=='undefined' && TAB_TITLES[ses.tab] && canAccessTab(ses.tab)) state.tab = ses.tab;
   sessionSave(u, state.tab);   // renova o prazo
   return true;
 }
 const SYNC = {
-  cfg: Object.assign({key:'', user:'', hash:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
+  cfg: Object.assign({key:'', user:'', token:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
   busy:false, applying:false, timer:null, msg:'', msgType:'', conflict:false, serverDetected:false, serverHasUsers:false
 };
 const KEYS = { customers:'ess_customers', products:'ess_products', sales:'ess_sales', users:'ess_users', categories:'ess_categories', subcategories:'ess_subcategories', orders:'ess_orders', prefs:'ess_prefs' };
@@ -753,6 +753,28 @@ function simpleHash(str){
   h1=Math.imul(h3^(h1>>>18),597399067); h2=Math.imul(h4^(h2>>>22),2869860233);
   h3=Math.imul(h1^(h3>>>17),951274213); h4=Math.imul(h2^(h4>>>19),2716044179);
   return [h1,h2,h3,h4].map(n=>(n>>>0).toString(16).padStart(8,'0')).join('');
+}
+/* Senha forte: PBKDF2-SHA256 com sal aleatório por usuário (formato "pbkdf2$iterações$sal$hash").
+   O servidor confere a senha digitada com o mesmo verificador; o verificador sozinho não serve para entrar. */
+const PBKDF_ITERS = 120000;
+const CAN_PBKDF2 = !!(window.crypto && crypto.subtle && window.TextEncoder);
+function _b64(u8){ let s=''; u8.forEach(b=>{s+=String.fromCharCode(b);}); return btoa(s); }
+function _unb64(t){ const s=atob(t), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+async function _pbkdf2(pw, salt, iters){
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pw)), 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2', hash:'SHA-256', salt, iterations:iters}, k, 256));
+}
+async function makeVerifier(pw){
+  if(!CAN_PBKDF2) return simpleHash(pw);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return 'pbkdf2$'+PBKDF_ITERS+'$'+_b64(salt)+'$'+_b64(await _pbkdf2(pw, salt, PBKDF_ITERS));
+}
+async function checkVerifier(pw, stored){
+  stored = String(stored||'');
+  const m = stored.match(/^pbkdf2\$(\d+)\$([^$]+)\$([^$]+)$/);
+  if(!m) return simpleHash(pw)===stored;   // conta antiga (hash fraco): aceita uma vez e é atualizada no login
+  if(!CAN_PBKDF2) return false;
+  try{ return _b64(await _pbkdf2(pw, _unb64(m[2]), parseInt(m[1],10)))===m[3]; }catch(e){ return false; }
 }
 
 /* All product images are standardized to a fixed square thumbnail (center-cropped)
@@ -1682,8 +1704,8 @@ let state = {
 let storageWarningShown = false;
 /* ================= sincronização com o servidor (api.php / MySQL) ================= */
 function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
-function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.hash)); }
-function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, hash:SYNC.cfg.hash}; }
+function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.token)); }
+function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, token:SYNC.cfg.token}; }
 function syncSnapshot(){
   return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), catalogBtn:String((state.prefs&&state.prefs.catBtnColor)||''), catalogFont:String((state.prefs&&state.prefs.catFont)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
 }
@@ -1698,7 +1720,7 @@ async function syncCall(action, extra){
   try{ j = await r.json(); }catch(e){}
   if(!j) throw Object.assign(new Error('O servidor não respondeu como esperado (api.php ausente ou com erro de PHP). Código HTTP '+r.status+'.'), {code:'bad_response'});
   if(j && j.code==='bad_key' && !SYNC.cfg.key && SYNC.cfg.user){   // conta não confere no servidor (apagada ou senha trocada): para de tentar até o próximo login
-    SYNC.cfg.user = ''; SYNC.cfg.hash = ''; syncSaveCfg();
+    SYNC.cfg.user = ''; SYNC.cfg.token = ''; syncSaveCfg();
   }
   if(!r.ok || !j.ok) throw Object.assign(new Error(j.error || ('Erro HTTP '+r.status)), {code:j.code||'http', version:j.version});
   return j;
@@ -1808,18 +1830,27 @@ async function syncDetectServer(){
   }catch(e){}
 }
 /* login: confere usuário e senha direto no servidor (aparelho novo ou senha alterada em outro aparelho) */
-async function serverLogin(username, hash){
+async function serverLogin(username, password){
   try{
-    const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'pull', key:'', user:username, hash})});
-    let j = null; try{ j = await r.json(); }catch(e){}
+    const post = async body => { const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); let j=null; try{ j = await r.json(); }catch(e){} return j; };
+    const lg = await post({action:'login', user:username, pass:password, hash:simpleHash(password), verifier:await makeVerifier(password)});
+    if(!lg || !lg.ok) return {ok:false, code:(lg&&lg.code)||'http'};
+    SYNC.cfg.user = username; SYNC.cfg.token = lg.token; delete SYNC.cfg.hash; syncSaveCfg();
+    const j = await post({action:'pull', key:'', user:username, token:lg.token});
     if(j && j.ok) return {ok:true, j};
     return {ok:false, code:(j&&j.code)||'http'};
   }catch(e){ return {ok:false, code:'network'}; }
 }
 /* depois de entrar (administrador ou usuário): liga a sincronização desta conta e atualiza com o servidor */
-async function afterLoginSync(u){
+async function afterLoginSync(u, password){
   if(!/^https?:$/.test(location.protocol)) return;
-  if(!SYNC.cfg.key){ SYNC.cfg.user = u.username; SYNC.cfg.hash = u.passwordHash; syncSaveCfg(); }
+  if(!SYNC.cfg.key && password){
+    try{
+      const r = await fetch('api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'login', user:u.username, pass:password, hash:simpleHash(password), verifier:await makeVerifier(password)})});
+      const j = await r.json();
+      if(j && j.ok){ SYNC.cfg.user = u.username; SYNC.cfg.token = j.token; delete SYNC.cfg.hash; syncSaveCfg(); }
+    }catch(e){}
+  }
   if(!syncEnabled()) return;
   try{ await syncStartup(true); }catch(e){}
   try{ await fetchOnlineOrders(true); }catch(e){}
@@ -2267,16 +2298,19 @@ const actions_login = {
       const wait = Math.ceil((LOGIN_GUARD.until - Date.now())/1000);
       if(wait>0){ L.error='Muitas tentativas erradas. Aguarde '+wait+'s para tentar de novo.'; render(); return; }
       if(!L.username.trim() || !L.password){ L.error='Informe usuário e senha.'; render(); return; }
-      const hash = simpleHash(L.password);
+      const pw = L.password;
       const uname = L.username.trim();
-      const findLocal = ()=> state.users.find(x=> x.username.toLowerCase()===uname.toLowerCase() && x.passwordHash===hash);
-      let u = findLocal();
+      const findLocal = async ()=>{ for(const x of state.users){ if(x.username.toLowerCase()===uname.toLowerCase() && await checkVerifier(pw, x.passwordHash)) return x; } return null; };
+      L.busy = true; render();
+      let u = await findLocal();
+      L.busy = false;
       if(!u && /^https?:$/.test(location.protocol)){
         // aparelho novo ou senha alterada em outro aparelho: confere no servidor e baixa os dados
         L.busy = true; render();
-        const r = await serverLogin(uname, hash);
+        const r = await serverLogin(uname, pw);
         L.busy = false;
-        if(r.ok){ syncApplyPulled(r.j); u = findLocal(); }
+        if(r.code==='rate_limited'){ L.error='Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.'; L.password=''; render(); return; }
+        if(r.ok){ syncApplyPulled(r.j); u = await findLocal(); }
         else if(r.code==='network' && !state.users.length){ L.error='Sem conexão com o servidor. Verifique a internet e tente de novo.'; render(); return; }
       }
       if(!u && !state.users.length){ L.error='Usuário ou senha inválidos.'; L.password=''; render(); return; }
@@ -2287,11 +2321,14 @@ const actions_login = {
         L.password=''; render(); return;
       }
       LOGIN_GUARD.fails=0; LOGIN_GUARD.until=0;
+      if(CAN_PBKDF2 && !/^pbkdf2\$/.test(String(u.passwordHash||''))){   // conta antiga: troca o hash fraco pelo forte
+        try{ const nv = await makeVerifier(pw); state.users = state.users.map(x=> x.id===u.id ? {...x, passwordHash:nv} : x); persist('users'); u = state.users.find(x=>x.id===u.id); }catch(e){}
+      }
       state.currentUser = u;
       state.tab='dashboard'; sessionSave(u,'dashboard');
       state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
       render();
-      afterLoginSync(u);   // atualiza com o servidor (administrador ou usuário)
+      afterLoginSync(u, pw);   // atualiza com o servidor (administrador ou usuário)
       return;
     }
     if(!L.name.trim() || !L.username.trim() || !L.password){ L.error='Preencha todos os campos.'; render(); return; }
@@ -2300,13 +2337,14 @@ const actions_login = {
     if(L.password!==L.confirm){ L.error='As senhas não conferem.'; L.confirm=''; render(); return; }
     if(state.users.length){ L.error='Novas contas são criadas por um administrador.'; render(); return; }
     if(state.users.some(u=>u.username.toLowerCase()===L.username.trim().toLowerCase())){ L.error='Esse usuário já existe.'; render(); return; }
-    const newUser = { id:uid('user'), name:L.name.trim(), username:L.username.trim(), passwordHash: simpleHash(L.password), createdAt:new Date().toISOString(), role:'admin' };
+    const L_pw = L.password;
+    const newUser = { id:uid('user'), name:L.name.trim(), username:L.username.trim(), passwordHash: await makeVerifier(L_pw), createdAt:new Date().toISOString(), role:'admin' };
     state.users.push(newUser); persist('users');
     state.currentUser = newUser;
     state.tab='dashboard'; sessionSave(newUser,'dashboard');
     state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false};
     render();
-    afterLoginSync(newUser);
+    afterLoginSync(newUser, L_pw);
   }
 };
 
@@ -5274,12 +5312,12 @@ const actions_usuarios = {
   },
   syncDisconnect(){
     if(!confirm('Desconectar do servidor? Os dados continuam salvos neste navegador e no servidor.')) return;
-    SYNC.cfg = {key:'', user:'', hash:'', auto:true, version:0, dirty:false, last:''}; SYNC.conflict=false; SYNC.msg='';
+    SYNC.cfg = {key:'', user:'', token:'', auto:true, version:0, dirty:false, last:''}; SYNC.conflict=false; SYNC.msg='';
     state.ui.syncKey = undefined; state.ui.syncAuto = undefined;
     syncSaveCfg(); render();
   },
   newUsuario(){ state.ui.modal = {type:'newUser', name:'', username:'', role:'user', password:'', confirm:'', error:''}; render(); },
-  submitNewUser(){
+  async submitNewUser(){
     const m = state.ui.modal;
     m.error='';
     if(!m.name.trim() || !m.username.trim() || !m.password){ m.error='Preencha todos os campos.'; render(); return; }
@@ -5287,7 +5325,7 @@ const actions_usuarios = {
     if(m.password.length<4){ m.error='A senha deve ter ao menos 4 caracteres.'; render(); return; }
     if(m.password!==m.confirm){ m.error='As senhas não conferem.'; m.confirm=''; render(); return; }
     if(state.users.some(u=>u.username.toLowerCase()===m.username.trim().toLowerCase())){ m.error='Esse usuário já existe.'; render(); return; }
-    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: simpleHash(m.password), createdAt:new Date().toISOString(), role: m.role==='admin'?'admin':'user' };
+    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: await makeVerifier(m.password), createdAt:new Date().toISOString(), role: m.role==='admin'?'admin':'user' };
     state.users.push(newUser); persist('users');
     state.ui.modal = null; render();
   },
@@ -5310,16 +5348,18 @@ const actions_usuarios = {
     if(state.currentUser && state.currentUser.id===d.id) state.currentUser = state.users.find(u=>u.id===d.id);
     state.ui.modal=null; render();
   },
-  submitResetPw(){
+  async submitResetPw(){
     const m = state.ui.modal;
     if(m.userId!==state.currentUser.id && !isAdmin()){ notify.err('Somente administradores podem redefinir a senha de outros usuários.'); return; }
     if(m.self){
       const me = state.users.find(u=>u.id===state.currentUser.id);
-      if(!me || simpleHash(m.cur||'')!==me.passwordHash){ notify.err('A senha atual não confere.'); return; }
+      if(!me || !(await checkVerifier(m.cur||'', me.passwordHash))){ notify.err('A senha atual não confere.'); return; }
     }
     if(!m.pw || m.pw.length<4){ notify.err('A senha deve ter ao menos 4 caracteres.'); return; }
     if(m.pw!==m.pw2){ notify.err('As senhas não conferem.'); return; }
-    state.users = state.users.map(u=> u.id===m.userId? {...u, passwordHash: simpleHash(m.pw)} : u); persist('users');
+    const _nv = await makeVerifier(m.pw);
+    state.users = state.users.map(u=> u.id===m.userId? {...u, passwordHash: _nv} : u); persist('users');
+    if(syncEnabled() && CAN_PBKDF2){ syncCall('setpw', {uid:m.userId, verifier:_nv, pass:m.pw}).then(j=>{ if(j && j.version && !SYNC.cfg.dirty){ SYNC.cfg.version = j.version; syncSaveCfg(); } }).catch(()=>{}); }
     if(state.currentUser && state.currentUser.id===m.userId) state.currentUser = state.users.find(u=>u.id===m.userId);
     if(state.currentUser) sessionSave(state.currentUser, state.tab);
     state.ui.modal=null; render(); notify.ok('Senha alterada.');
@@ -5905,7 +5945,7 @@ const actions = {
     if(/iphone|ipad|ipod/i.test(navigator.userAgent)) notify.ok('No iPhone/iPad: toque no botão Compartilhar do Safari e escolha "Adicionar à Tela de Início".');
     else notify.ok('No menu do navegador (⋮ ou ⋯), escolha "Instalar aplicativo" ou "Adicionar à tela inicial".');
   },
-  logout(){ const _pend = (syncEnabled() && SYNC.cfg.dirty) ? syncPush(false,true) : Promise.resolve(); _pend.then(()=>{ if(!SYNC.cfg.key){ SYNC.cfg.user=''; SYNC.cfg.hash=''; syncSaveCfg(); } }); sessionClear(); window._loginFaded = false; clearTimeout(window._loginFadeT); window._loginFadeT = null; state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
+  logout(){ const _pend = (syncEnabled() && SYNC.cfg.dirty) ? syncPush(false,true) : Promise.resolve(); _pend.then(()=>{ if(!SYNC.cfg.key){ if(SYNC.cfg.user && SYNC.cfg.token){ try{ syncCall('logout').catch(()=>{}); }catch(e){} } SYNC.cfg.user=''; SYNC.cfg.token=''; delete SYNC.cfg.hash; syncSaveCfg(); } }); sessionClear(); window._loginFaded = false; clearTimeout(window._loginFadeT); window._loginFadeT = null; state.currentUser = null; state.tab='dashboard'; state.ui.login = {mode:null,name:'',username:'',password:'',confirm:'',showPw:false,error:'',busy:false}; render(); },
   closeModal(){ state.ui.modal = null; render(); },
   filterProductCategory(t){ state.tab='produtos'; state.ui.productCategory = t.dataset.cat||''; state.ui.productSubcategory=''; render(); },
   filterProductSubcategory(t){ state.ui.productSubcategory = t.dataset.sub||''; render(); },

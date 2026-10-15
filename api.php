@@ -101,27 +101,58 @@ if((string)($req['action'] ?? '') === 'status'){
   out(200, ['ok'=>true, 'hasUsers'=>($n > 0)]);
 }
 
-/* ---- autenticação: senha de sincronização OU usuário e senha de uma conta cadastrada ---- */
+/* ---- senhas: verificador PBKDF2 ("pbkdf2$iterações$sal$hash"), o mesmo calculado no navegador ---- */
+function pbkdf2_parse($v){
+  if(!preg_match('/^pbkdf2\$(\d{4,7})\$([A-Za-z0-9+\/=]{8,64})\$([A-Za-z0-9+\/=]{40,48})$/', (string)$v, $m)) return null;
+  $it = (int)$m[1]; if($it < 20000 || $it > 1000000) return null;
+  return [$it, $m[2], $m[3]];
+}
+function pbkdf2_verify($pass, $stored){
+  $p = pbkdf2_parse($stored); if(!$p || $pass === '' || strlen($pass) > 200) return false;
+  $salt = base64_decode($p[1], true); if($salt === false) return false;
+  return hash_equals($p[2], base64_encode(hash_pbkdf2('sha256', (string)$pass, $salt, $p[0], 32, true)));
+}
+
+/* ---- autenticação: (1) senha de sincronização; (2) login com usuário e senha (só na ação "login"); (3) usuário + token de acesso emitido no login ---- */
 $key = (string)($req['key'] ?? '');
-$authRole = null; $authUid = '';
+$authRole = null; $authUid = ''; $authTok = '';
 $__ip = substr(hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? '').'|essencia-api'), 0, 32);
 $__since = gmdate('Y-m-d\TH:i:s\Z', time() - 600);
+$__mysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
 /* limite de tentativas erradas por aparelho/rede: 15 em 10 minutos (protege contra adivinhação de senha) */
 try{
-  $pdo->exec('CREATE TABLE IF NOT EXISTS api_attempts (ip_hash VARCHAR(40) NOT NULL, created_at VARCHAR(30) NOT NULL)'.($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  $pdo->exec('CREATE TABLE IF NOT EXISTS api_attempts (ip_hash VARCHAR(40) NOT NULL, created_at VARCHAR(30) NOT NULL)'.($__mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  $pdo->exec('CREATE TABLE IF NOT EXISTS api_tokens (token_hash VARCHAR(64) NOT NULL PRIMARY KEY, user_id VARCHAR(60) NOT NULL, created_at VARCHAR(30) NOT NULL)'.($__mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
   $__q = $pdo->prepare('SELECT COUNT(*) FROM api_attempts WHERE ip_hash = ? AND created_at > ?'); $__q->execute([$__ip, $__since]);
   if((int)$__q->fetchColumn() >= 15) fail(429, 'Muitas tentativas erradas. Aguarde alguns minutos e tente de novo.', ['code'=>'rate_limited']);
 }catch(PDOException $e){}
+$__act0 = (string)($req['action'] ?? '');
+$__uname = (string)($req['user'] ?? '');
 if($key !== '' && hash_equals((string)SYNC_KEY, $key)){
   $authRole = 'admin';
-}elseif(!empty($req['user']) && !empty($req['hash'])){
+}elseif($__uname !== ''){
   try{
     $st = $pdo->prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)');
-    $st->execute([(string)$req['user']]);
+    $st->execute([$__uname]);
     $u = $st->fetch();
-    if($u && hash_equals((string)$u['password_hash'], (string)$req['hash'])){
-      $authRole = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
-      $authUid = (string)$u['id'];
+    if($u){
+      $ok = false;
+      if($__act0 === 'login' && isset($req['pass']) && is_string($req['pass']) && $req['pass'] !== ''){
+        $pw = (string)$req['pass'];
+        if(pbkdf2_parse($u['password_hash'])){ $ok = pbkdf2_verify($pw, $u['password_hash']); }
+        elseif(!empty($req['hash']) && hash_equals((string)$u['password_hash'], (string)$req['hash'])){
+          $ok = true;   /* conta antiga (hash fraco): confere uma última vez e já troca pelo verificador forte */
+          if(!empty($req['verifier']) && pbkdf2_verify($pw, (string)$req['verifier'])){
+            $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([(string)$req['verifier'], $u['id']]);
+          }
+        }
+      }elseif(!empty($req['token']) && is_string($req['token']) && preg_match('/^[a-f0-9]{48}$/', $req['token'])){
+        $th = hash('sha256', $req['token']);
+        $q = $pdo->prepare('SELECT created_at FROM api_tokens WHERE token_hash = ? AND user_id = ?'); $q->execute([$th, $u['id']]);
+        $t = $q->fetch();
+        if($t && strtotime((string)$t['created_at']) > time() - 30*86400){ $ok = true; $authTok = $th; }
+      }
+      if($ok){ $authRole = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin'; $authUid = (string)$u['id']; $authName = (string)$u['name']; }
     }
   }catch(Throwable $e){}
 }
@@ -129,9 +160,16 @@ if($authRole === null){
   try{
     $pdo->prepare('INSERT INTO api_attempts (ip_hash,created_at) VALUES (?,?)')->execute([$__ip, gmdate('Y-m-d\TH:i:s\Z')]);
     $pdo->prepare('DELETE FROM api_attempts WHERE created_at < ?')->execute([gmdate('Y-m-d\TH:i:s\Z', time() - 86400)]);
+    $pdo->prepare('DELETE FROM api_tokens WHERE created_at < ?')->execute([gmdate('Y-m-d\TH:i:s\Z', time() - 30*86400)]);
   }catch(PDOException $e){}
   usleep(800000); // freia tentativas de adivinhar senha
   fail(401, 'Senha de sincronização, usuário ou senha incorretos.', ['code'=>'bad_key']);
+}
+if($__act0 === 'login'){
+  if($authUid === '') fail(400, 'Use usuário e senha para entrar.');
+  $tok = bin2hex(random_bytes(24));
+  $pdo->prepare('INSERT INTO api_tokens (token_hash,user_id,created_at) VALUES (?,?,?)')->execute([hash('sha256', $tok), $authUid, gmdate('Y-m-d\TH:i:s\Z')]);
+  out(200, ['ok'=>true, 'token'=>$tok, 'role'=>$authRole, 'uid'=>$authUid, 'name'=>$authName]);
 }
 
 /* ---- utilidades ---- */
@@ -172,6 +210,80 @@ function setMeta($pdo, $k, $v){
   }
 }
 function rows($pdo, $sql){ return $pdo->query($sql)->fetchAll(); }
+
+function pull_data($pdo, $authRole, $authUid){
+    $d = [];
+    $d['users'] = array_map(fn($r)=>[
+      'id'=>$r['id'], 'name'=>$r['name'], 'username'=>$r['username'],
+      /* conta comum (não administradora) só recebe o próprio hash de senha: não vê o dos administradores */
+      'passwordHash'=>($authRole === 'admin' || (string)$r['id'] === $authUid) ? $r['password_hash'] : '', 'createdAt'=>fromDt($r['created_at']),
+      'role'=>(($r['role'] ?? 'admin') === 'user' ? 'user' : 'admin')
+    ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
+
+    $d['customers'] = array_map(fn($r)=>[
+      'id'=>$r['id'], 'code'=>s($r['code'] ?? ''), 'number'=>s($r['number'] ?? ''), 'district'=>s($r['district'] ?? ''), 'city'=>s($r['city'] ?? ''), 'state'=>s($r['state'] ?? ''), 'zip'=>s($r['zip'] ?? ''), 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
+      'cpf'=>s($r['cpf']), 'address'=>s($r['address']), 'notes'=>s($r['notes']), 'createdAt'=>fromDt($r['created_at'])
+    ], rows($pdo, 'SELECT * FROM customers ORDER BY name'));
+
+    $d['categories'] = array_map(fn($r)=>['id'=>$r['id'], 'name'=>$r['name']],
+      rows($pdo, 'SELECT * FROM categories ORDER BY name'));
+    $d['subcategories'] = array_map(fn($r)=>['id'=>$r['id'], 'name'=>$r['name'], 'category'=>s($r['category'])],
+      rows($pdo, 'SELECT * FROM subcategories ORDER BY name'));
+
+    $d['products'] = array_map(fn($r)=>[
+      'id'=>$r['id'], 'name'=>$r['name'], 'category'=>s($r['category']), 'subcategory'=>s($r['subcategory']),
+      'image'=>s($r['image']), 'costPrice'=>(float)$r['cost_price'], 'salePrice'=>(float)$r['sale_price'],
+      'markup'=>(float)$r['markup'], 'stock'=>(int)$r['stock'], 'minStock'=>(int)$r['min_stock'],
+      'maxStock'=>($r['max_stock'] === null ? null : (int)$r['max_stock']),
+      'active'=>((int)$r['active'] === 1), 'description'=>s($r['description']), 'sku'=>s($r['sku']),
+      'brand'=>s($r['brand']), 'volume'=>s($r['volume']), 'supplier'=>s($r['supplier']),
+      'promoPrice'=>(isset($r['promo_price']) && $r['promo_price'] !== null) ? (float)$r['promo_price'] : 0, 'isNew'=>!empty($r['is_new']), 'lastUnits'=>!empty($r['last_units']),
+      'createdAt'=>fromDt($r['created_at'])
+    ], rows($pdo, 'SELECT * FROM products ORDER BY created_at, name'));
+
+    /* vendas */
+    $items = []; foreach(rows($pdo, 'SELECT * FROM sale_items ORDER BY id') as $r){
+      $items[$r['sale_id']][] = ['productId'=>$r['product_id'], 'name'=>$r['name'], 'qty'=>(int)$r['qty'],
+        'unitPrice'=>(float)$r['unit_price'], 'subtotal'=>(float)$r['subtotal']];
+    }
+    $pays = []; foreach(rows($pdo, 'SELECT * FROM sale_payments ORDER BY id') as $r){
+      $pays[$r['sale_id']][] = ['method'=>$r['method'], 'amount'=>(float)$r['amount']];
+    }
+    $d['sales'] = array_map(function($r) use ($items, $pays){
+      $o = [
+        'id'=>$r['id'], 'date'=>fromDt($r['date']), 'customerId'=>$r['customer_id'],
+        'customerName'=>s($r['customer_name']), 'items'=>$items[$r['id']] ?? [],
+        'subtotal'=>(float)$r['subtotal'], 'discount'=>(float)$r['discount'], 'total'=>(float)$r['total'],
+        'shipping'=>(float)($r['shipping'] ?? 0),
+        'payments'=>$pays[$r['id']] ?? [], 'status'=>$r['status']
+      ];
+      if($r['order_id']) $o['orderId'] = $r['order_id'];
+      if(!empty($r['seller_id'])) $o['sellerId'] = $r['seller_id'];
+      if(!empty($r['seller_name'])) $o['sellerName'] = $r['seller_name'];
+      return $o;
+    }, rows($pdo, 'SELECT * FROM sales ORDER BY date DESC, id DESC'));
+
+    /* pedidos */
+    $oitems = []; foreach(rows($pdo, 'SELECT * FROM order_items ORDER BY id') as $r){
+      $oitems[$r['order_id']][] = ['productId'=>$r['product_id'], 'name'=>$r['name'], 'qty'=>(int)$r['qty'],
+        'unitPrice'=>(float)$r['unit_price'], 'subtotal'=>(float)$r['subtotal']];
+    }
+    $d['orders'] = array_map(function($r) use ($oitems){
+      return [
+        'id'=>$r['id'], 'orderNumber'=>$r['order_number'], 'customerId'=>$r['customer_id'] ?? '',
+        'customerName'=>s($r['customer_name']), 'items'=>$oitems[$r['id']] ?? [],
+        'subtotal'=>(float)$r['subtotal'], 'discount'=>(float)$r['discount'], 'shipping'=>(float)$r['shipping'],
+        'total'=>(float)$r['total'], 'status'=>$r['status'], 'notes'=>s($r['notes']),
+        'expectedDate'=>s($r['expected_date']), 'createdBy'=>s($r['created_by']),
+        'saleId'=>$r['sale_id'], 'invoicedAt'=>fromDt($r['invoiced_at']), 'createdAt'=>fromDt($r['created_at'])
+      ];
+    }, rows($pdo, 'SELECT * FROM orders ORDER BY created_at DESC, id DESC'));
+
+    $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
+    $__px = json_decode((string)getMeta($pdo, 'pix'), true);
+    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'catalogBtn'=>(string)getMeta($pdo, 'catalog_btn'), 'catalogFont'=>(string)getMeta($pdo, 'catalog_font'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
+    return $d;
+}
 
 $action = (string)($req['action'] ?? '');
 
@@ -260,6 +372,23 @@ try{
     out(200, ['ok'=>true, 'deleted'=>$n]);
   }
 
+  if($action === 'logout'){
+    if($authTok !== '') $pdo->prepare('DELETE FROM api_tokens WHERE token_hash = ?')->execute([$authTok]);
+    out(200, ['ok'=>true]);
+  }
+
+  /* ===================== TROCA DE SENHA (a própria conta ou, se administrador, qualquer conta) ===================== */
+  if($action === 'setpw'){
+    $uid = (string)($req['uid'] ?? ''); $ver = (string)($req['verifier'] ?? ''); $pw = (string)($req['pass'] ?? '');
+    if($authRole !== 'admin' && $uid !== $authUid) fail(403, 'Você só pode trocar a sua própria senha.');
+    if(strlen($pw) < 4 || !pbkdf2_verify($pw, $ver)) fail(422, 'Senha inválida.');
+    $q = $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?'); $q->execute([$ver, $uid]);
+    if($q->rowCount() === 0 && !$pdo->query("SELECT 1 FROM users WHERE id = ".$pdo->quote($uid))->fetch()) fail(404, 'Usuário não encontrado no servidor.');
+    $pdo->prepare('DELETE FROM api_tokens WHERE user_id = ? AND token_hash <> ?')->execute([$uid, $authTok]);   // derruba os outros aparelhos
+    $nv = getVersion($pdo) + 1; setVersion($pdo, $nv);
+    out(200, ['ok'=>true, 'version'=>$nv]);
+  }
+
   /* ===================== PING ===================== */
   if($action === 'ping'){
     $v = getVersion($pdo);
@@ -270,77 +399,7 @@ try{
 
   /* ===================== PULL ===================== */
   if($action === 'pull'){
-    $d = [];
-    $d['users'] = array_map(fn($r)=>[
-      'id'=>$r['id'], 'name'=>$r['name'], 'username'=>$r['username'],
-      /* conta comum (não administradora) só recebe o próprio hash de senha: não vê o dos administradores */
-      'passwordHash'=>($authRole === 'admin' || (string)$r['id'] === $authUid) ? $r['password_hash'] : '', 'createdAt'=>fromDt($r['created_at']),
-      'role'=>(($r['role'] ?? 'admin') === 'user' ? 'user' : 'admin')
-    ], rows($pdo, 'SELECT * FROM users ORDER BY created_at, id'));
-
-    $d['customers'] = array_map(fn($r)=>[
-      'id'=>$r['id'], 'code'=>s($r['code'] ?? ''), 'number'=>s($r['number'] ?? ''), 'district'=>s($r['district'] ?? ''), 'city'=>s($r['city'] ?? ''), 'state'=>s($r['state'] ?? ''), 'zip'=>s($r['zip'] ?? ''), 'name'=>$r['name'], 'phone'=>s($r['phone']), 'email'=>s($r['email']),
-      'cpf'=>s($r['cpf']), 'address'=>s($r['address']), 'notes'=>s($r['notes']), 'createdAt'=>fromDt($r['created_at'])
-    ], rows($pdo, 'SELECT * FROM customers ORDER BY name'));
-
-    $d['categories'] = array_map(fn($r)=>['id'=>$r['id'], 'name'=>$r['name']],
-      rows($pdo, 'SELECT * FROM categories ORDER BY name'));
-    $d['subcategories'] = array_map(fn($r)=>['id'=>$r['id'], 'name'=>$r['name'], 'category'=>s($r['category'])],
-      rows($pdo, 'SELECT * FROM subcategories ORDER BY name'));
-
-    $d['products'] = array_map(fn($r)=>[
-      'id'=>$r['id'], 'name'=>$r['name'], 'category'=>s($r['category']), 'subcategory'=>s($r['subcategory']),
-      'image'=>s($r['image']), 'costPrice'=>(float)$r['cost_price'], 'salePrice'=>(float)$r['sale_price'],
-      'markup'=>(float)$r['markup'], 'stock'=>(int)$r['stock'], 'minStock'=>(int)$r['min_stock'],
-      'maxStock'=>($r['max_stock'] === null ? null : (int)$r['max_stock']),
-      'active'=>((int)$r['active'] === 1), 'description'=>s($r['description']), 'sku'=>s($r['sku']),
-      'brand'=>s($r['brand']), 'volume'=>s($r['volume']), 'supplier'=>s($r['supplier']),
-      'promoPrice'=>(isset($r['promo_price']) && $r['promo_price'] !== null) ? (float)$r['promo_price'] : 0, 'isNew'=>!empty($r['is_new']), 'lastUnits'=>!empty($r['last_units']),
-      'createdAt'=>fromDt($r['created_at'])
-    ], rows($pdo, 'SELECT * FROM products ORDER BY created_at, name'));
-
-    /* vendas */
-    $items = []; foreach(rows($pdo, 'SELECT * FROM sale_items ORDER BY id') as $r){
-      $items[$r['sale_id']][] = ['productId'=>$r['product_id'], 'name'=>$r['name'], 'qty'=>(int)$r['qty'],
-        'unitPrice'=>(float)$r['unit_price'], 'subtotal'=>(float)$r['subtotal']];
-    }
-    $pays = []; foreach(rows($pdo, 'SELECT * FROM sale_payments ORDER BY id') as $r){
-      $pays[$r['sale_id']][] = ['method'=>$r['method'], 'amount'=>(float)$r['amount']];
-    }
-    $d['sales'] = array_map(function($r) use ($items, $pays){
-      $o = [
-        'id'=>$r['id'], 'date'=>fromDt($r['date']), 'customerId'=>$r['customer_id'],
-        'customerName'=>s($r['customer_name']), 'items'=>$items[$r['id']] ?? [],
-        'subtotal'=>(float)$r['subtotal'], 'discount'=>(float)$r['discount'], 'total'=>(float)$r['total'],
-        'shipping'=>(float)($r['shipping'] ?? 0),
-        'payments'=>$pays[$r['id']] ?? [], 'status'=>$r['status']
-      ];
-      if($r['order_id']) $o['orderId'] = $r['order_id'];
-      if(!empty($r['seller_id'])) $o['sellerId'] = $r['seller_id'];
-      if(!empty($r['seller_name'])) $o['sellerName'] = $r['seller_name'];
-      return $o;
-    }, rows($pdo, 'SELECT * FROM sales ORDER BY date DESC, id DESC'));
-
-    /* pedidos */
-    $oitems = []; foreach(rows($pdo, 'SELECT * FROM order_items ORDER BY id') as $r){
-      $oitems[$r['order_id']][] = ['productId'=>$r['product_id'], 'name'=>$r['name'], 'qty'=>(int)$r['qty'],
-        'unitPrice'=>(float)$r['unit_price'], 'subtotal'=>(float)$r['subtotal']];
-    }
-    $d['orders'] = array_map(function($r) use ($oitems){
-      return [
-        'id'=>$r['id'], 'orderNumber'=>$r['order_number'], 'customerId'=>$r['customer_id'] ?? '',
-        'customerName'=>s($r['customer_name']), 'items'=>$oitems[$r['id']] ?? [],
-        'subtotal'=>(float)$r['subtotal'], 'discount'=>(float)$r['discount'], 'shipping'=>(float)$r['shipping'],
-        'total'=>(float)$r['total'], 'status'=>$r['status'], 'notes'=>s($r['notes']),
-        'expectedDate'=>s($r['expected_date']), 'createdBy'=>s($r['created_by']),
-        'saleId'=>$r['sale_id'], 'invoicedAt'=>fromDt($r['invoiced_at']), 'createdAt'=>fromDt($r['created_at'])
-      ];
-    }, rows($pdo, 'SELECT * FROM orders ORDER BY created_at DESC, id DESC'));
-
-    $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
-    $__px = json_decode((string)getMeta($pdo, 'pix'), true);
-    $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'catalogBtn'=>(string)getMeta($pdo, 'catalog_btn'), 'catalogFont'=>(string)getMeta($pdo, 'catalog_font'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
-    out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>$d]);
+    out(200, ['ok'=>true, 'version'=>getVersion($pdo), 'data'=>pull_data($pdo, $authRole, $authUid)]);
   }
 
   /* ===================== PUSH ===================== */
@@ -353,6 +412,24 @@ try{
     $base  = (int)($req['baseVersion'] ?? 0);
     $force = !empty($req['force']);
 
+    /* Conta comum (não administradora): o servidor mescla em vez de substituir. Nada some e nada é cancelado por ela,
+       mesmo que alguém altere o programa no navegador (as travas da tela não bastam). */
+    if($authRole !== 'admin'){
+      $srv = pull_data($pdo, 'admin', '');
+      $keep = function($tbl, $cancelWord) use ($srv, &$d){
+        $m = []; foreach(($srv[$tbl] ?? []) as $row){ $m[(string)($row['id'] ?? '')] = $row; }
+        foreach(($d[$tbl] ?? []) as $row){
+          if(!is_array($row)) continue;
+          $id = (string)($row['id'] ?? ''); if($id === '') continue;
+          if($cancelWord !== null && isset($m[$id]) && (string)($m[$id]['status'] ?? '') !== $cancelWord && (string)($row['status'] ?? '') === $cancelWord) continue;   // não cancela
+          $m[$id] = $row;
+        }
+        $d[$tbl] = array_values($m);
+      };
+      $keep('customers', null); $keep('categories', null); $keep('subcategories', null); $keep('products', null);
+      $keep('sales', 'cancelada'); $keep('orders', 'Cancelado');
+    }
+
     $pdo->beginTransaction();
     try{
       $cur = getVersion($pdo);
@@ -361,6 +438,7 @@ try{
         fail(409, 'O servidor tem uma versão diferente dos dados. Baixe do servidor ou escolha sobrescrever.', ['code'=>'conflict', 'version'=>$cur]);
       }
 
+      $__oldPw = []; if($authRole === 'admin'){ foreach(rows($pdo, 'SELECT id, password_hash FROM users') as $__r){ $__oldPw[(string)$__r['id']] = (string)$__r['password_hash']; } }
       foreach(['sale_items','sale_payments','sales','order_items','orders','products','subcategories','categories','customers','users'] as $t){
         if($t === 'users' && $authRole !== 'admin') continue;   // conta 'user' não altera contas nem perfis
         $pdo->exec("DELETE FROM $t");
@@ -375,6 +453,11 @@ try{
         $row = [s($u['id']??''), s($u['name']??''), s($u['username']??''), s($u['passwordHash']??''), toDt($u['createdAt']??null) ?? gmdate('Y-m-d H:i:s')];
         if($hasRole) $row[] = (($u['role'] ?? 'admin') === 'user') ? 'user' : 'admin';
         $st->execute($row);
+      }
+
+      if($authRole === 'admin'){   // senha trocada ou conta removida: derruba os acessos (tokens) dessa conta
+        $__new = []; foreach($d['users'] as $u){ $__new[s($u['id']??'')] = s($u['passwordHash']??''); }
+        foreach($__oldPw as $__id=>$__h){ if(!isset($__new[$__id]) || $__new[$__id] !== $__h) $pdo->prepare('DELETE FROM api_tokens WHERE user_id = ?')->execute([$__id]); }
       }
 
       $cCols = ['id','name','phone','email','cpf','address','notes','created_at'];
