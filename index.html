@@ -624,7 +624,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-b';
+const APP_VERSION = '2026.10.15-c';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1882,8 +1882,13 @@ async function checkNewVersion(){
     d.innerHTML = '<span>Nova versão disponível ('+m[1].replace(/[<>&]/g,'')+').</span><button style="border:none;background:#17204A;color:#fff;border-radius:999px;padding:8px 16px;font:inherit;cursor:pointer;">Atualizar agora</button>';
     d.querySelector('button').onclick = async ()=>{ try{ const ks = await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){} location.reload(); };
     document.body.appendChild(d);
+    /* se ninguém mexer por 20 segundos (e não houver janela aberta), atualiza sozinho: assim ninguém fica com versão antiga */
+    const go = async ()=>{ try{ if(typeof SYNC!=='undefined' && SYNC.cfg.dirty && syncEnabled()) await Promise.race([syncPush(false,true), new Promise(r=>setTimeout(r,3000))]); }catch(e){} try{ const ks = await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){} location.reload(); };
+    setInterval(()=>{ if(!state.ui.modal && Date.now()-_lastAct > 20000 && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && document.activeElement.value)) go(); }, 5000);
   }catch(e){}
 }
+let _lastAct = Date.now();
+['keydown','click','touchstart','mousemove'].forEach(ev=>document.addEventListener(ev, ()=>{ _lastAct = Date.now(); }, {passive:true}));
 function syncStartTimers(){
   setTimeout(checkNewVersion, 4000); setInterval(checkNewVersion, 60000);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkNewVersion(); });
