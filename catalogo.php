@@ -973,18 +973,18 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     .nav-fab{display:flex;align-items:center;gap:6px;position:fixed;left:14px;bottom:18px;z-index:120;border:none;background:var(--plum);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:11px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(13,18,48,.35);cursor:pointer;}
   }
   /* cabeçalho compacto */
-  header{padding:12px 16px 20px!important;border-radius:0 0 22px 22px!important;}
-  header .logo{width:32px!important;height:32px!important;margin:0 auto 3px!important;}
-  header h1{font-size:23px!important;letter-spacing:.16em!important;line-height:1.1;}
-  header p{font-size:9.5px!important;letter-spacing:.26em!important;margin-top:2px!important;}
-  .hero-tools{margin-top:10px!important;max-width:480px!important;}
+  header{padding:20px 16px 28px!important;border-radius:0 0 26px 26px!important;}
+  header .logo{width:44px!important;height:44px!important;margin:0 auto 5px!important;}
+  header h1{font-size:30px!important;letter-spacing:.17em!important;line-height:1.1;}
+  header p{font-size:10.5px!important;letter-spacing:.28em!important;margin-top:4px!important;}
+  .hero-tools{margin-top:16px!important;max-width:500px!important;}
   .hero-tools .search input{padding-top:9px!important;padding-bottom:9px!important;}
   .cad-open{position:absolute;top:10px;right:12px;margin:0!important;padding:6px 13px!important;font-size:11.5px!important;z-index:2;}
-  .steps{margin:-12px auto 0!important;max-width:620px!important;}
+  .steps{margin:-16px auto 0!important;max-width:640px!important;}
   .steps li{padding:7px 12px!important;font-size:12px!important;border-radius:12px!important;gap:8px!important;}
   .steps li b{width:22px!important;height:22px!important;font-size:12px!important;}
   .steps li small{font-size:10.5px!important;}
-  @media (max-width:640px){header{padding:10px 12px 18px!important;}.steps{margin:-10px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{top:8px;right:8px;padding:5px 10px!important;font-size:10.5px!important;}}
+  @media (max-width:640px){header{padding:16px 12px 24px!important;}header .logo{width:38px!important;height:38px!important;}header h1{font-size:26px!important;}.hero-tools{margin-top:12px!important;}.steps{margin:-14px 10px 0!important;}.steps li{padding:6px 4px!important;font-size:10.5px!important;}.steps li small{display:none!important;}.cad-open{top:8px;right:8px;padding:5px 10px!important;font-size:10.5px!important;}}
   /* menu lateral simples: só os nomes, um abaixo do outro */
   .shell .nav{background:#fff!important;border:1px solid var(--line)!important;border-radius:12px!important;padding:8px 6px!important;gap:0!important;box-shadow:none!important;color:var(--plum);}
   .shell .nav .nav-h{display:flex;color:var(--muted)!important;font-size:11px!important;letter-spacing:.16em!important;padding:6px 12px 8px!important;border-bottom:1px solid var(--line);margin-bottom:4px;}
@@ -1057,7 +1057,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ae</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-af</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
