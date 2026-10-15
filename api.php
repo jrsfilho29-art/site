@@ -198,7 +198,7 @@ try{
       $r = rows($pdo, 'SELECT * FROM online_customers ORDER BY created_at DESC LIMIT 500');
     }catch(Throwable $e){ $r = []; }   // tabela só existe depois do primeiro cadastro
     out(200, ['ok'=>true, 'customers'=>array_map(fn($o)=>[
-      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'name'=>s($o['name']), 'phone'=>s($o['phone']),
+      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'name'=>s($o['name']), 'phone'=>s($o['phone']), 'username'=>s($o['username'] ?? ''),
       'data'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['data'] ?? '')
     ], $r)]);
   }

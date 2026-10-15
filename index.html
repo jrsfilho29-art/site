@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-r';
+const APP_VERSION = '2026.10.14-s';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2680,7 +2680,7 @@ function importOnlineCustomers(extra){
   let done; try{ done = new Set(JSON.parse(localStorage.getItem('ess_cust_imp')||'[]')); }catch(e){ done = new Set(); }
   const dg = v => String(v||'').replace(/\D/g,'');
   let added = 0, touched = false, marked = false;
-  const srcs = ONLINE.orders.map(o=>({id:o.id, customerName:o.customerName, phone:o.phone, createdAt:o.createdAt, customer:o.customer})).concat((extra||[]).map(x=>({id:x.id, customerName:x.name, phone:x.phone, createdAt:x.createdAt, customer:x.data})));
+  const srcs = ONLINE.orders.map(o=>({id:o.id, customerName:o.customerName, phone:o.phone, createdAt:o.createdAt, customer:o.customer})).concat((extra||[]).map(x=>({id:x.id, customerName:x.name, phone:x.phone, createdAt:x.createdAt, customer:x.data, username:x.username})));
   srcs.slice().reverse().forEach(o=>{
     const c = o.customer; if(!c || typeof c!=='object' || !Object.keys(c).length || done.has(o.id)) return;   /* pedidos antigos (sem cadastro) não viram clientes */
     done.add(o.id); marked = true;
@@ -2691,7 +2691,7 @@ function importOnlineCustomers(extra){
       const fill = (k,v)=>{ if(v && !String(ex[k]||'').trim()){ ex[k]=v; touched = true; } };
       fill('cpf',c.cpf); fill('email',c.email); fill('zip',mc); fill('address',c.address); fill('number',c.number); fill('district',c.district); fill('city',c.city); fill('state',c.state);
     }else{
-      state.customers.push({id:uid('cli'), code:'', name:o.customerName||'Cliente do catálogo', phone:maskPhone(ph), cpf:c.cpf||'', email:c.email||'', zip:mc, address:c.address||'', number:c.number||'', district:c.district||'', city:c.city||'', state:c.state||'', notes:'Cadastrado pelo catálogo online', createdAt:o.createdAt||new Date().toISOString()});
+      state.customers.push({id:uid('cli'), code:'', name:o.customerName||'Cliente do catálogo', phone:maskPhone(ph), cpf:c.cpf||'', email:c.email||'', zip:mc, address:c.address||'', number:c.number||'', district:c.district||'', city:c.city||'', state:c.state||'', notes:'Cadastrado pelo catálogo online'+(o.username?' (login: '+o.username+')':''), createdAt:o.createdAt||new Date().toISOString()});
       added++; touched = true;
     }
   });
