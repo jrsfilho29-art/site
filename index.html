@@ -261,7 +261,7 @@
   .segbar button{border:none;background:none;padding:7px 15px;border-radius:7px;font-size:13px;cursor:pointer;color:var(--muted);font-weight:500;transition:all .12s ease;}
   .segbar button.on{background:var(--paper);color:var(--plum);box-shadow:0 1px 3px rgba(36,26,34,.12);font-weight:600;}
 
-  body.role-user [data-action="cancelSale"],body.role-user [data-action="cancelOrder"],body.role-user [data-action="deleteCliente"],body.role-user [data-action="deleteProduto"],body.role-user [data-action="deleteSelectedProducts"],body.role-user [data-action="deleteCategory"],body.role-user [data-action="deleteSubcategory"],body.role-user [data-action="openCategoriesManager"],body.role-user .admin-only{display:none !important;}
+  body.role-user [data-action="deleteAcct"],body.role-user [data-action="cancelSale"],body.role-user [data-action="cancelOrder"],body.role-user [data-action="deleteCliente"],body.role-user [data-action="deleteProduto"],body.role-user [data-action="deleteSelectedProducts"],body.role-user [data-action="deleteCategory"],body.role-user [data-action="deleteSubcategory"],body.role-user [data-action="openCategoriesManager"],body.role-user .admin-only{display:none !important;}
   .role-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
   .role-badge.admin{background:var(--tint-warm,#FDF0D2);color:var(--gold-deep);}
   .role-badge.user{background:var(--tint);color:var(--plum);}
@@ -453,6 +453,7 @@
     .login-wrap .login-brand .login-title{font-size:28px;}
     .login-wrap .login-brand .login-sub{margin-top:3px;}
   }
+  @media (max-width:640px){.cx-stats{display:grid !important;grid-template-columns:1fr 1fr !important;gap:8px;}.cx-stat{min-width:0 !important;padding:8px 10px;}.cx-stat b{font-size:17px;overflow-wrap:anywhere;}}
   /* ===== Catálogo On ===== */
   .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:var(--hero-a,#0D1230);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
@@ -623,12 +624,12 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-ze';
+const APP_VERSION = '2026.10.15-a';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
-const ADMIN_TABS = ['relatorios','servidor','usuarios'];
-const ADMIN_ACTIONS = new Set(['custResetPw','onlineDelete','cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
+const ADMIN_TABS = ['relatorios','servidor','usuarios','pagar'];
+const ADMIN_ACTIONS = new Set(['deleteAcct','custResetPw','onlineDelete','cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
 function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
 function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
@@ -655,7 +656,7 @@ const SYNC = {
   cfg: Object.assign({key:'', user:'', token:'', auto:true, version:0, dirty:false, last:''}, LS.get('ess_sync', {})),
   busy:false, applying:false, timer:null, msg:'', msgType:'', conflict:false, serverDetected:false, serverHasUsers:false
 };
-const KEYS = { customers:'ess_customers', products:'ess_products', sales:'ess_sales', users:'ess_users', categories:'ess_categories', subcategories:'ess_subcategories', orders:'ess_orders', prefs:'ess_prefs' };
+const KEYS = { customers:'ess_customers', products:'ess_products', sales:'ess_sales', users:'ess_users', categories:'ess_categories', subcategories:'ess_subcategories', orders:'ess_orders', payables:'ess_payables', receivables:'ess_receivables', prefs:'ess_prefs' };
 
 /* ================= utilities ================= */
 const PAYMENT_METHODS = ['Dinheiro','Cartão de Débito','Cartão de Crédito','PIX','Boleto','Fiado'];
@@ -1687,6 +1688,8 @@ let state = {
   subcategories: loadInitialSubcategories(),
   sales: LS.get(KEYS.sales, []),
   orders: LS.get(KEYS.orders, []),
+  payables: LS.get(KEYS.payables, []),
+  receivables: LS.get(KEYS.receivables, []),
   users: LS.get(KEYS.users, []),
   prefs: LS.get(KEYS.prefs, {showPrices:true}),
   currentUser: null,
@@ -1714,7 +1717,7 @@ function syncSaveCfg(){ LS.set('ess_sync', SYNC.cfg); }
 function syncEnabled(){ return !!(SYNC.cfg.key || (SYNC.cfg.user && SYNC.cfg.token)); }
 function syncAuth(){ return SYNC.cfg.key ? {key:SYNC.cfg.key} : {key:'', user:SYNC.cfg.user, token:SYNC.cfg.token}; }
 function syncSnapshot(){
-  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), catalogBtn:String((state.prefs&&state.prefs.catBtnColor)||''), catalogFont:String((state.prefs&&state.prefs.catFont)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders };
+  return { settings:{whatsapp:String((state.prefs&&state.prefs.storeWhatsapp)||'').replace(/\D/g,''), sellers:sellersList(), commissionMain:parseFloat(state.prefs&&state.prefs.commissionMain)||0, catalogColor:String((state.prefs&&state.prefs.catHeaderColor)||''), catalogBtn:String((state.prefs&&state.prefs.catBtnColor)||''), catalogFont:String((state.prefs&&state.prefs.catFont)||''), shipping:shipCfg(), pix:{type:(state.prefs&&state.prefs.pixType)||'random', key:String((state.prefs&&state.prefs.pixKey)||'').trim(), name:String((state.prefs&&state.prefs.pixName)||'').trim(), city:String((state.prefs&&state.prefs.pixCity)||'').trim()}}, users:state.users, customers:state.customers, categories:state.categories, subcategories:state.subcategories, products:state.products, sales:state.sales, orders:state.orders, payables:state.payables, receivables:state.receivables };
 }
 async function syncCall(action, extra){
   let r;
@@ -1769,7 +1772,8 @@ function syncApplyPulled(j){
   if(d.settings && d.settings.commissionMain!==undefined){ state.prefs = state.prefs||{}; state.prefs.commissionMain = parseFloat(d.settings.commissionMain)||0; persist('prefs'); }
   if(d.settings && typeof d.settings.whatsapp==='string' && d.settings.whatsapp){ state.prefs = state.prefs||{}; state.prefs.storeWhatsapp = d.settings.whatsapp; persist('prefs'); }
   SYNC.applying = true;
-  ['users','customers','categories','subcategories','products','sales','orders'].forEach(k=>{
+  ['users','customers','categories','subcategories','products','sales','orders','payables','receivables'].forEach(k=>{
+    if((k==='payables'||k==='receivables') && !Array.isArray(d[k])) return;   // servidor antigo: mantém o que há aqui
     state[k] = Array.isArray(d[k]) ? d[k] : [];
     if(k==='products' && ensureProductCodes()) codesAdded = true;
     if(k==='customers' && ensureCustomerCodes()) codesAdded = true;
@@ -1991,7 +1995,7 @@ function ensureProductCodes(){
 function persist(key){
   if(key==='products') ensureProductCodes();
   if(key==='customers') ensureCustomerCodes();
-  const map = {customers:KEYS.customers, products:KEYS.products, sales:KEYS.sales, users:KEYS.users, categories:KEYS.categories, subcategories:KEYS.subcategories, orders:KEYS.orders, prefs:KEYS.prefs};
+  const map = {customers:KEYS.customers, products:KEYS.products, sales:KEYS.sales, users:KEYS.users, categories:KEYS.categories, subcategories:KEYS.subcategories, orders:KEYS.orders, payables:KEYS.payables, receivables:KEYS.receivables, prefs:KEYS.prefs};
   const ok = LS.set(map[key], state[key]);
   if(key!=='prefs' && !SYNC.applying) syncSchedulePush();
   if(!ok && !storageWarningShown){
@@ -2356,7 +2360,7 @@ const actions_login = {
 };
 
 /* ================= shell + sidebar ================= */
-const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',relatorios:'Relatórios',vendedores:'Vendedores',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
+const TAB_TITLES = {dashboard:'Painel',clientes:'Clientes',produtos:'Produtos',estoque:'Estoque',vendas:'Vendas',pedidos:'Pedidos',catalogo:'Catálogo On',online:'Pedidos online',caixa:'Caixa',pagar:'Contas a pagar',receber:'Contas a receber',relatorios:'Relatórios',vendedores:'Vendedores',aparencia:'Aparência',servidor:'Servidor',usuarios:'Usuários'};
 
 function renderTopbar(){
   const today = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
@@ -2412,6 +2416,8 @@ function renderSidebar(){
     ['catalogo','book','Catálogo On'],
     ['online','inbox','Pedidos online'],
     ['caixa','wallet','Caixa'],
+    ['pagar','send','Contas a pagar'],
+    ['receber','download','Contas a receber'],
     ['relatorios','chart','Relatórios'],
     ['vendedores','users','Vendedores'],
     ['aparencia','palette','Aparência'],
@@ -2454,6 +2460,8 @@ function renderTab(){
     case 'catalogo': return renderCatalogo();
     case 'online': return renderOnline();
     case 'caixa': return renderCaixa();
+    case 'pagar': return renderContas('pagar');
+    case 'receber': return renderContas('receber');
     case 'relatorios': return renderRelatorios();
     case 'servidor': return renderServidor();
     case 'vendedores': return renderVendedores();
@@ -2528,6 +2536,7 @@ function renderDashboard(){
 
     </div>
   </div>
+  ${acctAlertStrip()}
   <div class="grid grid-4 kpi-grid mb3">
     ${cards.map(([label,val,sub,ic])=>`
       <div class="card kpi">
@@ -5372,7 +5381,7 @@ const actions_usuarios = {
     state.ui.modal=null; render(); notify.ok('Senha alterada.');
   },
   async exportBackup(){
-    const backup = { customers: state.customers, products: state.products, sales: state.sales, orders: state.orders, users: state.users, categories: state.categories, subcategories: state.subcategories, exportedAt: new Date().toISOString() };
+    const backup = { customers: state.customers, products: state.products, sales: state.sales, orders: state.orders, payables: state.payables, receivables: state.receivables, users: state.users, categories: state.categories, subcategories: state.subcategories, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
     await saveFile('essencia-backup-'+todayISO()+'.json', blob);
   },
@@ -5419,11 +5428,211 @@ window.importBackupFile = function(input){
       state.categories = (data.categories && data.categories.length) ? data.categories : loadInitialCategories(); persist('categories');
       state.subcategories = data.subcategories||[]; persist('subcategories');
       state.orders = data.orders||[]; persist('orders');
+      state.payables = data.payables||[]; persist('payables');
+      state.receivables = data.receivables||[]; persist('receivables');
       notify.ok('Backup importado com sucesso.');
       render();
     }catch(err){ notify.err('Arquivo de backup inválido.'); }
   };
   reader.readAsText(file);
+};
+
+/* ================= contas a pagar / contas a receber ================= */
+const ACCT = {
+  pagar:   { arr:'payables',    title:'Contas a pagar',   party:'Fornecedor / credor', pOne:'Fornecedor', done:'Pago',     doneF:'paga',     doIt:'Pagar',   doing:'Registrar pagamento', paidLbl:'Pago em',     icon:'send', cats:['Fornecedor','Aluguel','Energia','Água','Internet / telefone','Salários','Impostos','Marketing','Frete','Outros'] },
+  receber: { arr:'receivables', title:'Contas a receber', party:'Cliente / devedor',   pOne:'Cliente',    done:'Recebido', doneF:'recebida', doIt:'Receber', doing:'Registrar recebimento', paidLbl:'Recebido em', icon:'download',  cats:['Venda a prazo','Serviço','Encomenda','Outros'] }
+};
+function acctList(kind){ const l = state[ACCT[kind].arr]; return Array.isArray(l) ? l : (state[ACCT[kind].arr] = []); }
+function addMonthsISO(iso, n){
+  const [y,m,d] = iso.split('-').map(Number); const t = new Date(y, m-1+n, 1); const last = new Date(t.getFullYear(), t.getMonth()+1, 0).getDate();
+  return localDay(new Date(t.getFullYear(), t.getMonth(), Math.min(d,last)));
+}
+function acctNum(v){ const n = parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(n) ? n : 0; }
+/* contas a receber também mostram o fiado das vendas (só leitura): receber é feito pelo mesmo botão de sempre */
+function acctRows(kind){
+  const rows = acctList(kind).map(e=>({...e, kind, virtual:false}));
+  if(kind==='receber'){
+    fiadoSales().forEach(s=>{ const v = fiadoAmount(s); if(v>0) rows.push({id:'fiado:'+s.id, saleId:s.id, desc:'Venda no fiado', party:s.customerName||'Consumidor Final', customerId:s.customerId||'', category:'Fiado', amount:v, due:localDay(s.date), paidAt:null, kind, virtual:true}); });
+  }
+  return rows;
+}
+function acctStatus(e){
+  if(e.paidAt) return 'paga';
+  const t = todayISO();
+  return e.due < t ? 'vencida' : (e.due === t ? 'hoje' : 'aberta');
+}
+function acctDays(e){ const a = new Date(e.due+'T12:00:00'), b = new Date(todayISO()+'T12:00:00'); return Math.round((a-b)/86400000); }
+function acctTotals(kind){
+  const rows = acctRows(kind); const t = todayISO(), in7 = localDay(new Date(Date.now()+7*86400000)), ym = t.slice(0,7);
+  const open = rows.filter(r=>!r.paidAt);
+  const sum = a => a.reduce((s,r)=>s+(+r.amount||0),0);
+  const late = open.filter(r=>r.due<t), today = open.filter(r=>r.due===t), week = open.filter(r=>r.due>t && r.due<=in7);
+  const done = rows.filter(r=>r.paidAt && localDay(r.paidAt).slice(0,7)===ym);
+  return { open:sum(open), nOpen:open.length, late:sum(late), nLate:late.length, today:sum(today), nToday:today.length, week:sum(week), nWeek:week.length, done:sum(done.map(r=>({amount:r.paidAmount!=null?r.paidAmount:r.amount}))), nDone:done.length };
+}
+function acctAlertStrip(){
+  const parts = [];
+  if(isAdmin()){ const p = acctTotals('pagar'); if(p.nLate+p.nToday>0) parts.push(`<a data-action="goTab" data-tab="pagar" style="cursor:pointer;"><b>${p.nLate+p.nToday}</b> conta(s) a pagar ${p.nLate?`<span class="badge-danger">${p.nLate} vencida(s)</span>`:''} ${p.nToday?`<span class="badge-warn">${p.nToday} vence(m) hoje</span>`:''} · ${brl(p.late+p.today)}</a>`); }
+  const r = acctTotals('receber'); if(r.nLate+r.nToday>0) parts.push(`<a data-action="goTab" data-tab="receber" style="cursor:pointer;"><b>${r.nLate+r.nToday}</b> conta(s) a receber ${r.nLate?`<span class="badge-danger">${r.nLate} vencida(s)</span>`:''} ${r.nToday?`<span class="badge-warn">${r.nToday} vence(m) hoje</span>`:''} · ${brl(r.late+r.today)}</a>`);
+  return parts.length ? `<div class="card mb3" style="padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;border-left:4px solid var(--gold);"><span class="klabel">${icon('alert',14)} Atenção às contas</span>${parts.join('')}</div>` : '';
+}
+function renderContas(kind){
+  const K = ACCT[kind]; const t = todayISO();
+  const fk = 'af_'+kind, qk = 'aq_'+kind, mk = 'am_'+kind;
+  const flt = state.ui[fk] || 'abertas', q = String(state.ui[qk]||'').toLowerCase().trim(), mon = state.ui[mk] || '';
+  const T = acctTotals(kind); const all = acctRows(kind);
+  const in7 = localDay(new Date(Date.now()+7*86400000));
+  let list = all.filter(r=>{
+    if(flt==='abertas' && r.paidAt) return false;
+    if(flt==='vencidas' && !(!r.paidAt && r.due<t)) return false;
+    if(flt==='hoje' && !(!r.paidAt && r.due===t)) return false;
+    if(flt==='7dias' && !(!r.paidAt && r.due>=t && r.due<=in7)) return false;
+    if(flt==='pagas' && !r.paidAt) return false;
+    if(mon && r.due.slice(0,7)!==mon) return false;
+    if(q && !((r.desc||'')+' '+(r.party||'')+' '+(r.category||'')+' '+(r.notes||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  list.sort((a,b)=> flt==='pagas' ? String(b.paidAt).localeCompare(String(a.paidAt)) : (a.due.localeCompare(b.due) || String(a.desc).localeCompare(String(b.desc),'pt-BR')));
+  const sumList = list.reduce((s,r)=>s+(r.paidAt && r.paidAmount!=null ? +r.paidAmount : +r.amount||0),0);
+  const cnt = f => all.filter(r=> f==='abertas' ? !r.paidAt : f==='vencidas' ? (!r.paidAt&&r.due<t) : f==='hoje' ? (!r.paidAt&&r.due===t) : f==='7dias' ? (!r.paidAt&&r.due>=t&&r.due<=in7) : f==='pagas' ? !!r.paidAt : true).length;
+  const chips = [['abertas','Em aberto'],['vencidas','Vencidas'],['hoje','Vencem hoje'],['7dias','Próx. 7 dias'],['pagas',K.done+'s'.replace('s','')+(kind==='pagar'?'as':'as')],['todas','Todas']];
+  chips[4][1] = kind==='pagar' ? 'Pagas' : 'Recebidas';
+  const st = (v,l,hot) => `<div class="cx-stat${hot?' hot':''}"><b>${v}</b><span>${l}</span></div>`;
+  const badge = r => { const s = acctStatus(r); const d = acctDays(r);
+    if(s==='paga') return `<span class="badge-ok">${K.done}${r.paidAt?' '+new Date(r.paidAt).toLocaleDateString('pt-BR'):''}</span>`;
+    if(s==='vencida') return `<span class="badge-danger">Vencida há ${-d} dia${d===-1?'':'s'}</span>`;
+    if(s==='hoje') return `<span class="badge-warn">Vence hoje</span>`;
+    return `<span class="badge-neutral">${d===1?'Vence amanhã':'Em '+d+' dias'}</span>`; };
+  const wa = r => { if(kind!=='receber') return ''; const c = r.customerId ? state.customers.find(x=>x.id===r.customerId) : state.customers.find(x=>x.name===r.party); return (c && waLink(c.phone,'')) ? c : null; };
+  return `
+  <div class="cx-hero"><div><h2 class="serif">${K.title}</h2><p>${kind==='pagar' ? 'Despesas e compromissos da loja' : 'Valores que os clientes ainda vão pagar (inclui o fiado das vendas)'}</p>
+    <div class="cx-stats">${st(brl(T.open),'em aberto ('+T.nOpen+')')}${st(brl(T.late),'vencidas ('+T.nLate+')',T.nLate>0)}${st(brl(T.today+T.week),'vencem em 7 dias ('+(T.nToday+T.nWeek)+')')}${st(brl(T.done),(kind==='pagar'?'pago':'recebido')+' no mês')}</div></div>
+    <button class="btn btn-gold" data-action="newAcct" data-kind="${kind}">${icon('plus')} Nova conta</button>
+  </div>
+  <div class="flex gap flex-wrap mb2" style="align-items:end;">
+    <div class="relative" style="max-width:320px;flex:1;min-width:200px;"><input placeholder="Buscar descrição, ${K.pOne.toLowerCase()} ou categoria..." data-field="ui.${qk}" value="${esc(state.ui[qk]||'')}"></div>
+    <label class="field" style="margin-bottom:0;"><span class="lbl">Mês do vencimento</span><input type="month" data-field="ui.${mk}" value="${esc(mon)}"></label>
+    ${mon?`<button class="btn btn-ghost" data-action="clearAcctMonth" data-kind="${kind}">Limpar mês</button>`:''}
+    <button class="btn btn-ghost" data-action="exportAcct" data-kind="${kind}">${icon('download')} Exportar CSV</button>
+  </div>
+  <div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''}" data-action="setAcctFilter" data-kind="${kind}" data-f="${k}">${l} (${cnt(k)})</button>`).join('')}</div>
+  ${list.length===0 ? emptyState(icon(K.icon,26),'Nenhuma conta', all.length ? 'Nenhuma conta nesse filtro.' : 'Cadastre a primeira conta com o botão “Nova conta”. Você pode parcelar e definir o vencimento.') : `
+  <div class="table-wrap"><table>
+    <thead><tr><th>Vencimento</th><th>Descrição</th><th>${K.pOne}</th><th style="text-align:right;">Valor</th><th>Situação</th><th style="text-align:right;">Ações</th></tr></thead>
+    <tbody>${list.map(r=>{ const c = wa(r); return `
+      <tr>
+        <td style="white-space:nowrap;">${r.due.split('-').reverse().join('/')}</td>
+        <td>${esc(r.desc)}${r.instOf>1?` <span class="badge-neutral">${r.inst}/${r.instOf}</span>`:''}${r.virtual?' <span class="badge-warn">Fiado</span>':''}${r.category&&!r.virtual?`<div class="muted2" style="font-size:11.5px;">${esc(r.category)}</div>`:''}${r.notes?`<div class="muted2" style="font-size:11.5px;">${esc(r.notes)}</div>`:''}</td>
+        <td>${esc(r.party)||'—'}</td>
+        <td style="text-align:right;white-space:nowrap;"><b>${brl(r.paidAt && r.paidAmount!=null ? r.paidAmount : r.amount)}</b>${r.paidAt && r.method?`<div class="muted2" style="font-size:11px;">${esc(r.method)}</div>`:''}</td>
+        <td>${badge(r)}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          ${r.virtual ? `<button class="btn btn-gold" style="padding:4px 10px;font-size:12px;" data-action="openReceberFiado" data-id="${r.saleId}">${K.doIt}</button>`
+          : `${!r.paidAt?`<button class="btn btn-gold" style="padding:4px 10px;font-size:12px;" data-action="openPayAcct" data-kind="${kind}" data-id="${r.id}">${icon('check',13)} ${K.doIt}</button>`:`<button class="btn btn-ghost" style="padding:4px 10px;font-size:12px;" data-action="reopenAcct" data-kind="${kind}" data-id="${r.id}">Desfazer</button>`}
+            ${c?`<button class="icon-btn plum" data-action="whatsAcct" data-id="${r.id}" title="Cobrar pelo WhatsApp">${icon('send')}</button>`:''}
+            <button class="icon-btn plum" data-action="editAcct" data-kind="${kind}" data-id="${r.id}" title="Editar">${icon('edit')}</button>
+            <button class="icon-btn danger-c" data-action="deleteAcct" data-kind="${kind}" data-id="${r.id}" title="Excluir">${icon('trash')}</button>`}
+        </td>
+      </tr>`; }).join('')}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right;font-weight:600;padding:10px 12px;">Total listado (${list.length})</td><td style="text-align:right;font-weight:600;padding:10px 12px;white-space:nowrap;">${brl(sumList)}</td><td colspan="2"></td></tr></tfoot>
+  </table></div>`}
+  `;
+}
+function renderAcctModal(m){
+  const K = ACCT[m.kind]; const edit = !!m.id;
+  const parties = m.kind==='receber' ? state.customers.map(c=>c.name) : [...new Set(state.products.map(p=>p.supplier).concat(acctList('pagar').map(e=>e.party)).filter(Boolean))];
+  const cats = [...new Set(K.cats.concat(acctList(m.kind).map(e=>e.category).filter(Boolean)))];
+  const body = `
+    ${m.error?`<div class="banner-danger mb2" style="padding:8px 12px;border-radius:8px;background:#F6E7E7;color:var(--danger);font-size:13px;">${esc(m.error)}</div>`:''}
+    <label class="field"><span class="lbl">Descrição *</span><input data-field="ui.modal.desc" value="${esc(m.desc)}" placeholder="${m.kind==='pagar'?'Ex.: Aluguel da loja, Compra de perfumes':'Ex.: Pedido da Maria, Venda parcelada'}" autofocus></label>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+      <label class="field"><span class="lbl">${K.party}</span><input data-field="ui.modal.party" value="${esc(m.party)}" list="acct-parties" autocomplete="off"><datalist id="acct-parties">${parties.map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>
+      <label class="field"><span class="lbl">Categoria</span><input data-field="ui.modal.category" value="${esc(m.category)}" list="acct-cats" autocomplete="off"><datalist id="acct-cats">${cats.map(p=>`<option value="${esc(p)}">`).join('')}</datalist></label>
+      <label class="field"><span class="lbl">${edit?'Valor (R$) *':'Valor total (R$) *'}</span><input type="number" step="0.01" min="0" inputmode="decimal" data-field="ui.modal.amount" value="${esc(m.amount)}"></label>
+      <label class="field"><span class="lbl">${edit?'Vencimento *':'Vencimento da 1ª parcela *'}</span><input type="date" data-field="ui.modal.due" value="${esc(m.due)}"></label>
+      ${edit?'':`<label class="field"><span class="lbl">Parcelas (mensais)</span><input type="number" min="1" max="60" step="1" inputmode="numeric" data-field="ui.modal.parts" value="${esc(m.parts)}"></label>`}
+    </div>
+    ${edit?'':`<p class="muted2" style="font-size:12px;margin:-4px 0 8px;">${acctNum(m.parts)>1 && acctNum(m.amount)>0 ? acctNum(m.parts)+' parcelas de cerca de '+brl(acctNum(m.amount)/acctNum(m.parts))+', uma por mês.' : 'Com mais de 1 parcela, o valor total é dividido e cada parcela vence um mês depois da anterior.'}</p>`}
+    <label class="field"><span class="lbl">Observações</span><textarea data-field="ui.modal.notes" rows="2">${esc(m.notes)}</textarea></label>
+    <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:12px;">
+      <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
+      <button class="btn btn-gold" data-action="saveAcct">${icon('save')} ${edit?'Salvar alterações':'Cadastrar'}</button>
+    </div>`;
+  return modalWrap((edit?'Editar conta':'Nova conta')+' — '+(m.kind==='pagar'?'a pagar':'a receber'), body);
+}
+function renderPayAcctModal(m){
+  const K = ACCT[m.kind]; const e = acctList(m.kind).find(x=>x.id===m.id); if(!e) return '';
+  const body = `
+    <p style="font-size:14px;margin-bottom:12px;"><b>${esc(e.desc)}</b>${e.party?' · '+esc(e.party):''}<br><span class="muted">Vencimento:</span> ${e.due.split('-').reverse().join('/')} · <span class="muted">Valor:</span> <b>${brl(e.amount)}</b></p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;">
+      <label class="field"><span class="lbl">${K.paidLbl}</span><input type="date" data-field="ui.modal.date" value="${esc(m.date)}"></label>
+      <label class="field"><span class="lbl">Valor ${m.kind==='pagar'?'pago':'recebido'} (R$)</span><input type="number" step="0.01" min="0" inputmode="decimal" data-field="ui.modal.value" value="${esc(m.value)}"></label>
+      <label class="field"><span class="lbl">Forma de pagamento</span><select data-field="ui.modal.method">${PAYMENT_METHODS.filter(x=>x!=='Fiado').map(x=>`<option ${m.method===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    </div>
+    <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
+      <button class="btn btn-gold" data-action="confirmPayAcct">${icon('check')} Confirmar</button>
+    </div>`;
+  return modalWrap(K.doing, body);
+}
+const actions_contas = {
+  setAcctFilter(t){ state.ui['af_'+t.dataset.kind] = t.dataset.f; render(); },
+  clearAcctMonth(t){ state.ui['am_'+t.dataset.kind] = ''; render(); },
+  newAcct(t){ const kind = t.dataset.kind; state.ui.modal = {type:'acct', kind, id:null, desc:'', party:'', category:'', amount:'', due:todayISO(), parts:'1', notes:'', error:''}; render(); },
+  editAcct(t){ const kind = t.dataset.kind; const e = acctList(kind).find(x=>x.id===t.dataset.id); if(!e) return; state.ui.modal = {type:'acct', kind, id:e.id, desc:e.desc||'', party:e.party||'', category:e.category||'', amount:String(e.amount), due:e.due, parts:'1', notes:e.notes||'', error:''}; render(); },
+  saveAcct(){
+    const m = state.ui.modal; m.error = '';
+    const desc = String(m.desc||'').trim(), amount = Math.round(acctNum(m.amount)*100)/100;
+    if(!desc){ m.error = 'Informe a descrição.'; render(); return; }
+    if(!(amount>0)){ m.error = 'Informe um valor maior que zero.'; render(); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(m.due||'')){ m.error = 'Informe a data de vencimento.'; render(); return; }
+    const arr = ACCT[m.kind].arr; const list = acctList(m.kind);
+    const c = m.kind==='receber' ? state.customers.find(x=>x.name===String(m.party||'').trim()) : null;
+    const base = { desc, party:String(m.party||'').trim(), category:String(m.category||'').trim(), notes:String(m.notes||'').trim(), customerId: c ? c.id : '' };
+    if(m.id){
+      state[arr] = list.map(e=> e.id===m.id ? {...e, ...base, amount, due:m.due} : e);
+    }else{
+      const n = Math.max(1, Math.min(60, parseInt(m.parts,10)||1)); const group = n>1 ? uid('grp') : '';
+      const cents = Math.round(amount*100), each = Math.floor(cents/n); const now = new Date().toISOString();
+      for(let i=0;i<n;i++){
+        const v = (i===n-1 ? cents-each*(n-1) : each)/100;
+        list.push({ id:uid('ct'), ...base, amount:v, due:addMonthsISO(m.due,i), paidAt:null, paidAmount:null, method:'', createdAt:now, group, inst:i+1, instOf:n });
+      }
+      state[arr] = list;
+    }
+    persist(arr); state.ui.modal = null; render(); notify.ok(m.id?'Conta atualizada.':'Conta cadastrada.');
+  },
+  openPayAcct(t){ const kind = t.dataset.kind; const e = acctList(kind).find(x=>x.id===t.dataset.id); if(!e) return; state.ui.modal = {type:'acctPay', kind, id:e.id, date:todayISO(), value:String(e.amount), method:'PIX'}; render(); },
+  confirmPayAcct(){
+    const m = state.ui.modal; const arr = ACCT[m.kind].arr; const v = Math.round(acctNum(m.value)*100)/100;
+    if(!(v>0)){ notify.err('Informe o valor.'); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(m.date||'')){ notify.err('Informe a data.'); return; }
+    const when = new Date(m.date+'T12:00:00').toISOString();
+    state[arr] = acctList(m.kind).map(e=> e.id===m.id ? {...e, paidAt:when, paidAmount:v, method:m.method} : e);
+    persist(arr); state.ui.modal = null; render(); notify.ok(m.kind==='pagar'?'Pagamento registrado.':'Recebimento registrado.');
+  },
+  reopenAcct(t){
+    const kind = t.dataset.kind; if(!confirm('Desfazer o '+(kind==='pagar'?'pagamento':'recebimento')+' e voltar a conta para “em aberto”?')) return;
+    const arr = ACCT[kind].arr; state[arr] = acctList(kind).map(e=> e.id===t.dataset.id ? {...e, paidAt:null, paidAmount:null, method:''} : e); persist(arr); render();
+  },
+  deleteAcct(t){
+    const kind = t.dataset.kind; const e = acctList(kind).find(x=>x.id===t.dataset.id); if(!e) return;
+    if(!confirm('Excluir a conta “'+e.desc+'” ('+brl(e.amount)+')?')) return;
+    const arr = ACCT[kind].arr; state[arr] = acctList(kind).filter(x=>x.id!==e.id); persist(arr); render();
+  },
+  whatsAcct(t){
+    const e = acctList('receber').find(x=>x.id===t.dataset.id); if(!e) return;
+    const c = e.customerId ? state.customers.find(x=>x.id===e.customerId) : state.customers.find(x=>x.name===e.party); if(!c) return;
+    const late = acctStatus(e)==='vencida';
+    const txt = 'Olá, '+c.name.split(' ')[0]+'! '+(late?'Passando para lembrar que ':'Só um lembrete: ')+'a conta "'+e.desc+'" no valor de '+brl(e.amount)+' '+(late?'venceu em ':'vence em ')+e.due.split('-').reverse().join('/')+'. Qualquer dúvida é só falar. Obrigado!';
+    window.open(waLink(c.phone, txt), '_blank', 'noopener');
+  },
+  async exportAcct(t){
+    const kind = t.dataset.kind, K = ACCT[kind]; const q = v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const lines = [['Vencimento','Descrição',K.pOne,'Categoria','Parcela','Valor','Situação',K.paidLbl,'Forma','Observações'].map(q).join(';')];
+    acctRows(kind).sort((a,b)=>a.due.localeCompare(b.due)).forEach(r=>lines.push([r.due.split('-').reverse().join('/'), r.desc, r.party, r.category, r.instOf>1?r.inst+'/'+r.instOf:'', String(r.paidAt&&r.paidAmount!=null?r.paidAmount:r.amount).replace('.',','), acctStatus(r), r.paidAt?new Date(r.paidAt).toLocaleDateString('pt-BR'):'', r.method||'', r.notes||''].map(q).join(';')));
+    await saveFile((kind==='pagar'?'contas-a-pagar-':'contas-a-receber-')+todayISO()+'.csv', new Blob(['﻿'+lines.join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+  }
 };
 
 function renderBulkImagesModal(m){
@@ -5700,6 +5909,8 @@ function renderModal(){
   if(m.type==='exportProducts') return renderExportProductsModal(m);
   if(m.type==='fixBg') return renderFixBgModal(m);
   if(m.type==='receberFiado') return renderReceberFiadoModal(m);
+  if(m.type==='acct') return renderAcctModal(m);
+  if(m.type==='acctPay') return renderPayAcctModal(m);
   return '';
 }
 
@@ -6073,7 +6284,8 @@ const actions = {
   ...actions_relatorios,
   ...actions_extras,
   ...actions_online,
-  ...actions_usuarios
+  ...actions_usuarios,
+  ...actions_contas
 };
 
 document.addEventListener('click', function(e){

@@ -211,6 +211,40 @@ function setMeta($pdo, $k, $v){
 }
 function rows($pdo, $sql){ return $pdo->query($sql)->fetchAll(); }
 
+function ensureAccts($pdo){
+  $mysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
+  foreach(['payables', 'receivables'] as $t){
+    $pdo->exec('CREATE TABLE IF NOT EXISTS '.$t.' (
+      id VARCHAR(40) NOT NULL PRIMARY KEY, description VARCHAR(255) NOT NULL DEFAULT \'\', party VARCHAR(190), category VARCHAR(120),
+      amount DECIMAL(12,2) NOT NULL DEFAULT 0, due VARCHAR(10) NOT NULL, paid_at VARCHAR(30), paid_amount DECIMAL(12,2) DEFAULT NULL,
+      method VARCHAR(30), notes TEXT, created_at VARCHAR(30), grp VARCHAR(40), inst INT NOT NULL DEFAULT 1, inst_of INT NOT NULL DEFAULT 1, customer_id VARCHAR(40)
+    )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
+  }
+}
+function accts_out($pdo, $t){
+  try{ ensureAccts($pdo); $r = rows($pdo, 'SELECT * FROM '.$t.' ORDER BY due, id'); }catch(Throwable $e){ return []; }
+  return array_map(fn($o)=>[
+    'id'=>$o['id'], 'desc'=>s($o['description']), 'party'=>s($o['party']), 'category'=>s($o['category']), 'amount'=>(float)$o['amount'], 'due'=>s($o['due']),
+    'paidAt'=>($o['paid_at'] === null || $o['paid_at'] === '') ? null : $o['paid_at'], 'paidAmount'=>($o['paid_amount'] === null) ? null : (float)$o['paid_amount'],
+    'method'=>s($o['method']), 'notes'=>s($o['notes']), 'createdAt'=>s($o['created_at']), 'group'=>s($o['grp']), 'inst'=>(int)$o['inst'], 'instOf'=>(int)$o['inst_of'], 'customerId'=>s($o['customer_id'])
+  ], $r);
+}
+function accts_save($pdo, $t, $list){
+  $pdo->exec('DELETE FROM '.$t);
+  $st = $pdo->prepare('INSERT INTO '.$t.' (id,description,party,category,amount,due,paid_at,paid_amount,method,notes,created_at,grp,inst,inst_of,customer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  $seen = [];
+  foreach($list as $e){
+    if(!is_array($e)) continue;
+    $id = mb_substr(s($e['id']??''), 0, 40); $due = s($e['due']??'');
+    if($id === '' || isset($seen[$id]) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) continue;
+    $seen[$id] = 1;
+    $pa = sn($e['paidAt']??null);
+    $st->execute([$id, mb_substr(s($e['desc']??''), 0, 255), mb_substr(s($e['party']??''), 0, 190), mb_substr(s($e['category']??''), 0, 120),
+      num($e['amount']??0), $due, $pa === null ? null : mb_substr($pa, 0, 30), (isset($e['paidAmount']) && $e['paidAmount'] !== null && $e['paidAmount'] !== '') ? num($e['paidAmount']) : null,
+      mb_substr(s($e['method']??''), 0, 30), mb_substr(s($e['notes']??''), 0, 2000), mb_substr(s($e['createdAt']??''), 0, 30), mb_substr(s($e['group']??''), 0, 40),
+      max(1, (int)num($e['inst']??1)), max(1, (int)num($e['instOf']??1)), mb_substr(s($e['customerId']??''), 0, 40)]);
+  }
+}
 function pull_data($pdo, $authRole, $authUid){
     $d = [];
     $d['users'] = array_map(fn($r)=>[
@@ -282,6 +316,8 @@ function pull_data($pdo, $authRole, $authUid){
     $__sl = json_decode((string)getMeta($pdo, 'sellers'), true);
     $__px = json_decode((string)getMeta($pdo, 'pix'), true);
     $d['settings'] = ['whatsapp'=>getMeta($pdo, 'whatsapp'), 'sellers'=>is_array($__sl) ? $__sl : [], 'pix'=>is_array($__px) ? $__px : new stdClass(), 'commissionMain'=>(float)getMeta($pdo, 'commission_main'), 'catalogColor'=>(string)getMeta($pdo, 'catalog_color'), 'catalogBtn'=>(string)getMeta($pdo, 'catalog_btn'), 'catalogFont'=>(string)getMeta($pdo, 'catalog_font'), 'shipping'=>(is_array($__sh = json_decode((string)getMeta($pdo, 'shipping'), true)) ? $__sh : new stdClass())];
+    $d['payables'] = ($authRole === 'admin') ? accts_out($pdo, 'payables') : [];   // contas a pagar: só administrador
+    $d['receivables'] = accts_out($pdo, 'receivables');
     return $d;
 }
 
@@ -428,8 +464,11 @@ try{
       };
       $keep('customers', null); $keep('categories', null); $keep('subcategories', null); $keep('products', null);
       $keep('sales', 'cancelada'); $keep('orders', 'Cancelado');
+      if(isset($d['receivables']) && is_array($d['receivables'])) $keep('receivables', null);
+      unset($d['payables']);   // conta comum não mexe em contas a pagar
     }
 
+    try{ ensureAccts($pdo); }catch(Throwable $e){}   // cria as tabelas ANTES da transação (no MySQL, criar tabela encerra a transação)
     $pdo->beginTransaction();
     try{
       $cur = getVersion($pdo);
@@ -524,6 +563,9 @@ try{
           $sti->execute([s($o['id']), sn($i['productId']??null), s($i['name']??''), (int)num($i['qty']??1), num($i['unitPrice']??0), num($i['subtotal']??0)]);
         }
       }
+
+      if(isset($d['payables']) && is_array($d['payables']) && $authRole === 'admin') accts_save($pdo, 'payables', $d['payables']);
+      if(isset($d['receivables']) && is_array($d['receivables'])) accts_save($pdo, 'receivables', $d['receivables']);
 
       $new = $cur + 1;
       setVersion($pdo, $new);
