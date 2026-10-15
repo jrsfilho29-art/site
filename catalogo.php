@@ -953,6 +953,25 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .card .name,.card .name{min-height:0!important;}
   .card .price{margin-top:4px!important;}
   .card .cb{margin-top:6px!important;}
+  /* menu do catálogo na lateral esquerda */
+  .shell{display:block;}
+  .shell.has-nav{display:flex;align-items:flex-start;gap:20px;max-width:1440px;margin:0 auto;padding:0 18px;}
+  .shell.has-nav .wrap{flex:1 1 auto;min-width:0;max-width:none;margin:0;padding-left:0;padding-right:0;}
+  .shell .nav{position:sticky;top:14px;flex:0 0 230px;width:230px;box-sizing:border-box;flex-direction:column;align-items:stretch;gap:6px;overflow-x:hidden;overflow-y:auto;max-height:calc(100vh - 28px);margin:22px 0 0;padding:14px 12px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 6px 20px rgba(13,18,48,.07);backdrop-filter:none;z-index:6;}
+  .shell .nav .nav-h{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#6b6f85);padding:2px 8px 8px;display:flex;justify-content:space-between;align-items:center;}
+  .shell .nav .nav-x{display:none;border:none;background:transparent;font-size:24px;line-height:1;color:var(--plum);cursor:pointer;padding:0 4px;}
+  .shell .nav a{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;box-sizing:border-box;border-radius:10px;padding:10px 12px;font-size:13.5px;white-space:normal;text-align:left;}
+  .shell .nav a span{margin-left:0;flex:none;}
+  .nav-fab,.nav-bd{display:none;}
+  @media (max-width:820px){
+    .shell.has-nav{display:block;padding:0;}
+    .shell.has-nav .wrap{padding-left:12px;padding-right:12px;}
+    .shell .nav{position:fixed;left:0;top:0;bottom:0;width:80vw;max-width:300px;flex:none;max-height:none;margin:0;border-radius:0 18px 18px 0;transform:translateX(-105%);transition:transform .22s ease;z-index:150;padding:16px 12px 24px;box-shadow:none;}
+    .shell .nav.open{transform:none;box-shadow:0 0 0 100vmax rgba(13,18,48,.45),8px 0 30px rgba(0,0,0,.3);}
+    .shell .nav .nav-x{display:block;}
+    .nav-bd{display:none;}
+    .nav-fab{display:flex;align-items:center;gap:6px;position:fixed;left:14px;bottom:18px;z-index:120;border:none;background:var(--plum);color:#fff;font:inherit;font-size:13px;font-weight:700;padding:11px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(13,18,48,.35);cursor:pointer;}
+  }
   /* janela de detalhes: foto menor */
   .lb-img img{max-height:40vh;}
   @media (min-width:641px){.lb-box{max-width:660px;}.lb-img{padding:10px;}.lb-img img{max-height:38vh;max-width:270px;margin:0 auto;}}
@@ -989,8 +1008,11 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   </header>
   <ol class="steps"><li><b>1</b><span>Escolha<small>seus perfumes favoritos</small></span></li><li><b>2</b><span>Monte o carrinho<small>ajuste as quantidades</small></span></li><li><b>3</b><span>Envie o pedido<small>a loja combina o resto</small></span></li></ol>
 <?php $nPromo = 0; $nNovo = 0; foreach($prods as $__q){ if(eff_price($__q) < (float)$__q['sale_price']) $nPromo++; if(!empty($__q['is_new'])) $nNovo++; } ?>
-<?php if(count($groups) > 1 || $nPromo || $nNovo): ?>
-  <nav class="nav" id="tabs"><a href="#" data-cat="all" class="on">Todos</a><?php if($nPromo): ?><a href="#" data-cat="f-promo" class="hot">Promoções <span><?= $nPromo ?></span></a><?php endif; ?><?php if($nNovo): ?><a href="#" data-cat="f-novo" class="nv">Novidades <span><?= $nNovo ?></span></a><?php endif; ?><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
+<?php $__hasNav = (count($groups) > 1 || $nPromo || $nNovo); ?>
+<div class="shell<?= $__hasNav ? ' has-nav' : '' ?>">
+<?php if($__hasNav): ?>
+  <div class="nav-bd" id="nav-bd"></div>
+  <nav class="nav" id="tabs"><div class="nav-h">Menu <button type="button" class="nav-x" id="nav-x" aria-label="Fechar menu">&times;</button></div><a href="#" data-cat="all" class="on">Todos</a><?php if($nPromo): ?><a href="#" data-cat="f-promo" class="hot">Promoções <span><?= $nPromo ?></span></a><?php endif; ?><?php if($nNovo): ?><a href="#" data-cat="f-novo" class="nv">Novidades <span><?= $nNovo ?></span></a><?php endif; ?><?php foreach($groups as $i=>$g): ?><a href="#cat-<?= $i ?>" data-cat="cat-<?= $i ?>"><?= e($g['name']) ?> <span><?= (int)$g['count'] ?></span></a><?php endforeach; ?></nav>
 <?php endif; ?>
   <div class="wrap">
 <?php if(!$groups): ?>
@@ -1007,12 +1029,14 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ab</span></footer>
+</div>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ac</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
 <button type="button" class="lb-act lb-buy" id="lb-buy">Comprar agora</button></div>
 </div></div></div>
+<?php if($__hasNav): ?><button type="button" class="nav-fab" id="nav-open" aria-label="Abrir menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button><?php endif; ?>
 <button type="button" class="cfab" id="cfab" style="display:none" aria-label="Abrir carrinho"><span class="cfab-i">&#128722;</span><span id="cfab-n">0</span><span class="cfab-t" id="cfab-t"></span></button>
 <div class="okpop" id="cad" role="dialog" aria-modal="true" aria-labelledby="cad-t"><div class="okpop-b cad-b">
 <button class="lb-x" type="button" id="cad-x" aria-label="Fechar">&times;</button>
@@ -1417,8 +1441,15 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   if(tabs)tabs.addEventListener('click',function(e){
     var a=e.target.closest('a[data-cat]');if(!a)return;e.preventDefault();
     active=a.getAttribute('data-cat');[].slice.call(tabs.querySelectorAll('a')).forEach(function(x){x.classList.toggle('on',x===a);});
-    apply();var w=document.querySelector('.wrap');if(w&&window.scrollY>w.offsetTop)window.scrollTo(0,Math.max(0,w.offsetTop-60));
+    tabs.classList.remove('open');document.body.style.overflow='';apply();var w=document.querySelector('.shell');if(w&&window.scrollY>w.offsetTop)window.scrollTo(0,Math.max(0,w.offsetTop-12));
   });
+  if(tabs){
+    var nOpen=document.getElementById('nav-open'),nX=document.getElementById('nav-x');
+    function navSet(on){tabs.classList.toggle('open',on);document.body.style.overflow=on?'hidden':'';}
+    if(nOpen)nOpen.addEventListener('click',function(){navSet(true);});
+    if(nX)nX.addEventListener('click',function(){navSet(false);});
+    document.addEventListener('click',function(e){if(tabs.classList.contains('open')&&!e.target.closest('#tabs')&&e.target.id!=='nav-open')navSet(false);});
+  }
   if(tabs){var mf=/[?&]f=(promo|novo)\b/.exec(location.search);if(mf){var ta=tabs.querySelector('a[data-cat="f-'+mf[1]+'"]');if(ta)ta.click();}}
 })();
 </script>
