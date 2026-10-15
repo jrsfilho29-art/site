@@ -683,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-w';
+const APP_VERSION = '2026.10.15-x';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2973,6 +2973,7 @@ function renderOnline(){
             <button class="btn btn-primary" data-action="onlineWhats" data-id="${esc(o.id)}">WhatsApp</button>
             ${o.status!=='cancelado'?`<button class="btn ${paid?'btn-ghost':'btn-gold'}" data-action="onlinePaid" data-id="${esc(o.id)}" title="${paid?'Reenviar a confirmação ao cliente':'Marca como pago e responde ao cliente no WhatsApp'}">${paid?'Reenviar':'Confirmar pagamento'}</button>`:''}
             ${paid&&o.status!=='cancelado'?`<button class="btn btn-ghost" data-action="onlineUnpaid" data-id="${esc(o.id)}">Desmarcar</button>`:''}
+            ${!open&&o.status==='concluido'&&!o.saleId&&sellable?`<button class="btn btn-gold" data-action="onlineBaixa" data-id="${esc(o.id)}" title="Este pedido não virou venda: cria a venda e baixa o estoque">Baixar estoque</button>`:''}
             ${open&&sellable?`<button class="btn btn-ghost" data-action="onlineToSale" data-id="${esc(o.id)}">Criar venda</button>`:''}
             ${o.status==='novo'?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="atendimento">Atender</button>`:''}
             ${isAdmin()?`<button class="btn btn-ghost" style="color:var(--danger);" data-action="onlineDelete" data-id="${esc(o.id)}" title="Excluir este pedido (e devolver os produtos ao estoque, se já viraram venda)">Excluir</button>`:''}
@@ -2981,6 +2982,34 @@ function renderOnline(){
           </div></div>`;
       }).join('')}</div>`;
   return head + resetRequestsCard() + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
+}
+/* pedido online sem venda: cria a venda (baixa o estoque) a partir do pedido */
+function onlineSaleFromOrder(o){
+  const its = onlineItems(o).filter(i=>state.products.some(p=>p.id===i.productId));
+  if(!its.length){ notify.err('Nenhum item deste pedido existe mais no cadastro de produtos.'); return null; }
+  const d = onlineDigits(o.phone);
+  let c = d && state.customers.find(x=>onlineDigits(x.phone)===d);
+  if(!c){
+    c = {id:uid('cli'), code:nextCustomerCode(), name:o.customerName, phone:maskPhone(d), email:'', cpf:'', address:'', number:'', district:'', city:'', state:'', zip:'', notes:'Veio do catálogo online', createdAt:new Date().toISOString()};
+    state.customers.push(c); persist('customers');
+  }
+  const sum = its.reduce((a,i)=>a+i.qty*i.unitPrice,0);
+  const all = onlineItems(o).reduce((a,i)=>a+i.qty*i.unitPrice,0);
+  const ship = (o.total>0 && o.total>all+0.009) ? +(o.total-all).toFixed(2) : 0;
+  const total = +(sum+ship).toFixed(2);
+  const pm = PAYMENT_METHODS.find(m=>m.toLowerCase()===String(o.payment||'').toLowerCase()) || 'PIX';
+  const sale = {
+    id:uid('venda'), date:new Date().toISOString(), customerId:c.id, customerName:c.name,
+    items: its.map(i=>({productId:i.productId,name:i.name,qty:i.qty,unitPrice:i.unitPrice,subtotal:+(i.qty*i.unitPrice).toFixed(2)})),
+    subtotal:+sum.toFixed(2), discount:0, shipping:ship, total,
+    payments:[{method:pm, amount:total}], status:'concluida'
+  };
+  if(o.sellerId && sellersList().some(x=>x.id===o.sellerId)){ sale.sellerId = o.sellerId; sale.sellerName = sellerNameOf(o.sellerId); }
+  state.sales.unshift(sale); persist('sales');
+  state.products = state.products.map(p=>{ const it = sale.items.find(x=>x.productId===p.id); return it ? {...p, stock: Math.max(0, p.stock-it.qty)} : p; });
+  persist('products');
+  o.saleId = sale.id; try{ syncCall('onlineorder_sale',{id:o.id,saleId:sale.id}).catch(()=>{}); }catch(e){}
+  return sale;
 }
 const actions_online = {
   async onlineDelete(t){
@@ -3077,10 +3106,19 @@ const actions_online = {
       u = waLink(o.phone, msg);
       if(u && confirm((ns==='enviado'?'Marcar como enviado.':ns==='concluido'?'Concluir o pedido.':'Cancelar o pedido.')+'\n\nAvisar o cliente pelo WhatsApp também?')) w = waPreopen(); else u = '';
     }
+    if((ns==='enviado'||ns==='concluido') && !o.saleId && onlineItems(o).some(i=>state.products.some(p=>p.id===i.productId))
+       && confirm('Este pedido ainda NÃO virou venda, então o estoque não foi baixado.\n\nCriar a venda e baixar o estoque agora?')){
+      const sv = onlineSaleFromOrder(o); if(sv) notify.ok('Venda criada e estoque baixado.');
+    }
     o.status = ns; render();
     try{ await syncCall('onlineorder_status',{id:o.id,status:o.status}); }
     catch(e){ o.status = old; notify.err(e.message); render(); if(w) try{ w.close(); }catch(_){} return; }
     if(u) waFill(w,u);
+  },
+  async onlineBaixa(t){
+    const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o||o.saleId) return;
+    if(!confirm('Criar a venda deste pedido e baixar os produtos do estoque?')) return;
+    const sv = onlineSaleFromOrder(o); if(sv){ notify.ok('Venda criada e estoque baixado.'); render(); }
   },
   async onlineToSale(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
