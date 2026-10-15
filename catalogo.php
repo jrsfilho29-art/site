@@ -199,6 +199,16 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'frete'){
 /* ---------- pedido feito pelo cliente no catálogo ---------- */
 if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
   header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
+  ob_start();
+  register_shutdown_function(function(){   /* qualquer erro fatal vira resposta JSON em vez de página de erro */
+    $e = error_get_last();
+    if($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)){
+      error_log('catalogo conta: '.$e['message'].' em '.$e['file'].':'.$e['line']);
+      while(ob_get_level()) @ob_end_clean();
+      http_response_code(500); header('Content-Type: application/json; charset=utf-8');
+      echo json_encode(['ok'=>false, 'error'=>'Não foi possível concluir agora. Tente novamente.']);
+    }
+  });
   $jerr = function($code, $msg){ http_response_code($code); echo json_encode(['ok'=>false, 'error'=>$msg]); exit; };
   $ho = strtolower((string)parse_url((string)($_SERVER['HTTP_ORIGIN'] ?? ''), PHP_URL_HOST));
   $hh = strtolower((string)parse_url('//'.($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
@@ -1079,7 +1089,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-b</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-c</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
