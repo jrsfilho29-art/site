@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-p';
+const APP_VERSION = '2026.10.14-q';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2674,6 +2674,29 @@ const ONLINE_ST = {novo:'Novo', atendimento:'Em atendimento', concluido:'Conclu�
 function onlineDigits(v){ let d=String(v||'').replace(/\D/g,''); if(d.length>11 && d.slice(0,2)==='55') d=d.slice(2); return d; }
 function onlineItems(o){ return (o.items&&o.items.length) ? o.items.map(i=>({productId:i.productId,name:i.name,qty:+i.qty||1,unitPrice:+i.unitPrice||0})) : [{productId:o.productId,name:o.productName,qty:o.qty||1,unitPrice:o.unitPrice||0}]; }
 function onlineNewCount(){ return ONLINE.orders.filter(o=>o.status==='novo').length; }
+/* clientes que se cadastraram ao comprar no catálogo viram clientes do programa (sem duplicar: confere CPF e telefone) */
+function importOnlineCustomers(){
+  if(!state.currentUser || !Array.isArray(state.customers)) return;
+  let done; try{ done = new Set(JSON.parse(localStorage.getItem('ess_cust_imp')||'[]')); }catch(e){ done = new Set(); }
+  const dg = v => String(v||'').replace(/\D/g,'');
+  let added = 0, touched = false, marked = false;
+  ONLINE.orders.slice().reverse().forEach(o=>{
+    const c = o.customer; if(!c || typeof c!=='object' || !Object.keys(c).length || done.has(o.id)) return;   /* pedidos antigos (sem cadastro) não viram clientes */
+    done.add(o.id); marked = true;
+    const cpf = dg(c.cpf), ph = onlineDigits(o.phone);
+    const ex = state.customers.find(x=> (cpf && dg(x.cpf)===cpf) || (ph && onlineDigits(x.phone)===ph));
+    const mc = String(c.zip||'').length===8 ? String(c.zip).slice(0,5)+'-'+String(c.zip).slice(5) : '';
+    if(ex){
+      const fill = (k,v)=>{ if(v && !String(ex[k]||'').trim()){ ex[k]=v; touched = true; } };
+      fill('cpf',c.cpf); fill('email',c.email); fill('zip',mc); fill('address',c.address); fill('number',c.number); fill('district',c.district); fill('city',c.city); fill('state',c.state);
+    }else{
+      state.customers.push({id:uid('cli'), code:'', name:o.customerName||'Cliente do catálogo', phone:maskPhone(ph), cpf:c.cpf||'', email:c.email||'', zip:mc, address:c.address||'', number:c.number||'', district:c.district||'', city:c.city||'', state:c.state||'', notes:'Cadastrado pelo catálogo online', createdAt:o.createdAt||new Date().toISOString()});
+      added++; touched = true;
+    }
+  });
+  if(marked){ try{ localStorage.setItem('ess_cust_imp', JSON.stringify(Array.from(done).slice(-1000))); }catch(e){} }
+  if(touched){ persist('customers'); syncSchedulePush(); if(added) notify.ok(added===1 ? 'Novo cliente cadastrado pelo catálogo.' : added+' novos clientes cadastrados pelo catálogo.'); }
+}
 async function fetchOnlineOrders(silent){
   if(!(typeof syncEnabled==='function' && syncEnabled())) return;
   try{
@@ -2682,6 +2705,7 @@ async function fetchOnlineOrders(silent){
     const fresh = (j.orders||[]).filter(o=>o.status==='novo' && !old.has(o.id));
     const first = !ONLINE.loaded;
     ONLINE.orders = j.orders||[]; ONLINE.loaded = true; ONLINE.err = '';
+    try{ importOnlineCustomers(); }catch(e){ console.error('Cadastro de clientes do catálogo falhou:', e); }
     if(fresh.length && !first){ playOrderSound(); notify.ok(fresh.length===1 ? 'Novo pedido online!' : fresh.length+' novos pedidos online!'); }
     const n = onlineNewCount();
     document.title = (n>0 ? '('+n+') ' : '') + document.title.replace(/^\(\d+\)\s*/,'');

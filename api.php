@@ -172,6 +172,7 @@ function ensureOnlineOrders($pdo){
   )'.($mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : ''));
   try{ $pdo->query('SELECT sale_id FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN sale_id VARCHAR(60)'); }catch(Throwable $e2){} }
   try{ $pdo->query('SELECT paid_at FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN paid_at VARCHAR(30)'); }catch(Throwable $e2){} }
+  try{ $pdo->query('SELECT customer FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN customer TEXT'); }catch(Throwable $e2){} }
   try{ $pdo->query('SELECT items, payment, total, seller_id, seller_name FROM online_orders LIMIT 1'); }
   catch(Throwable $e){
     foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0', 'seller_id VARCHAR(30)', 'seller_name VARCHAR(80)'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
@@ -188,7 +189,8 @@ try{
       'unitPrice'=>(float)$o['unit_price'], 'qty'=>(int)$o['qty'], 'customerName'=>s($o['customer_name']), 'phone'=>s($o['phone']),
       'note'=>s($o['note']), 'status'=>s($o['status']), 'payment'=>s($o['payment'] ?? ''),
       'paidAt'=>s($o['paid_at'] ?? ''), 'saleId'=>s($o['sale_id'] ?? ''), 'total'=>(float)($o['total'] ?? 0), 'sellerName'=>s($o['seller_name'] ?? ''), 'sellerId'=>s($o['seller_id'] ?? ''),
-      'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? '')
+      'items'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : []; })($o['items'] ?? ''),
+      'customer'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['customer'] ?? '')
     ], $r)]);
   }
   if($action === 'onlineorder_paid'){

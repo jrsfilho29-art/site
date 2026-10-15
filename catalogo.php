@@ -240,6 +240,13 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
       $total += $price * $q; $units += $q;
     }
   }catch(Throwable $ex){ $jerr(500, 'Não foi possível enviar o pedido agora. Tente pelo WhatsApp.'); }
+  /* dados de cadastro do cliente (viram um cliente no programa) */
+  $cin = is_array($in['customer'] ?? null) ? $in['customer'] : [];
+  $ccl = function($k, $n) use ($cin){ return mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string)($cin[$k] ?? '')))), 0, $n); };
+  $ccpf = preg_replace('/\D/', '', (string)($cin['cpf'] ?? '')); if(strlen($ccpf) !== 11) $ccpf = '';
+  $cemail = $ccl('email', 120); if($cemail !== '' && !filter_var($cemail, FILTER_VALIDATE_EMAIL)) $cemail = '';
+  $czip = preg_replace('/\D/', '', (string)($cin['cep'] ?? '')); if(strlen($czip) !== 8) $czip = '';
+  $custData = ['cpf'=>$ccpf, 'email'=>$cemail, 'zip'=>$czip, 'address'=>$ccl('street', 120), 'number'=>$ccl('number', 20), 'district'=>$ccl('district', 80), 'city'=>$ccl('city', 80), 'state'=>strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string)($cin['uf'] ?? '')), 0, 2))];
   /* entrega / frete (sempre recalculado aqui, nunca confiado ao navegador) */
   $shipCost = 0.0; $dl = '';
   $dv = is_array($in['delivery'] ?? null) ? $in['delivery'] : [];
@@ -271,14 +278,15 @@ if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['a'] ?? '') === 'pedido'){
     catch(Throwable $e){
       foreach(['items TEXT', 'payment VARCHAR(30)', 'total DECIMAL(12,2) NOT NULL DEFAULT 0', 'seller_id VARCHAR(30)', 'seller_name VARCHAR(80)'] as $col){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN '.$col); }catch(Throwable $e2){} }
     }
+    try{ $pdo->query('SELECT customer FROM online_orders LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_orders ADD COLUMN customer TEXT'); }catch(Throwable $e2){} }
     $ip = substr(hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? '').'|essencia'), 0, 32);
     $since = gmdate('Y-m-d\TH:i:s\Z', time() - 600);
     $c = $pdo->prepare('SELECT COUNT(*) FROM online_orders WHERE ip_hash = ? AND created_at > ?'); $c->execute([$ip, $since]);
     if((int)$c->fetchColumn() >= 5) $jerr(429, 'Muitos pedidos em pouco tempo. Tente novamente em alguns minutos.');
     $id = 'ped_'.bin2hex(random_bytes(8));
     $summary = count($items) === 1 ? $items[0]['name'] : $items[0]['name'].' + '.(count($items)-1).' item(ns)';
-    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total,seller_id,seller_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2), $sellerId, $sellerName]);
+    $pdo->prepare('INSERT INTO online_orders (id,created_at,product_id,product_name,unit_price,qty,customer_name,phone,note,status,ip_hash,items,payment,total,seller_id,seller_name,customer) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        ->execute([$id, gmdate('Y-m-d\TH:i:s\Z'), $items[0]['productId'], mb_substr($summary, 0, 250), $items[0]['unitPrice'], $units, $name, $phone, $note, 'novo', $ip, json_encode($items, JSON_UNESCAPED_UNICODE), $payment, round($total, 2), $sellerId, $sellerName, json_encode($custData, JSON_UNESCAPED_UNICODE)]);
     $resp = ['ok'=>true, 'id'=>$id, 'total'=>round($total, 2), 'shipping'=>round($shipCost, 2)];
     if($payment === 'PIX' && $PIX){
       $code = pix_payload($PIX, round($total, 2), strtoupper(substr($id, 4, 16)));
@@ -679,7 +687,9 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   .ct-tot{display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:16px;color:var(--plum);}
   .ct-tot b{font-size:20px;}
   .ct-sh{display:flex;justify-content:space-between;padding:4px 0 0;font-size:14px;color:var(--plum);}
-  #dl-box{margin-bottom:12px;}
+  #dl-box,#cd-box{margin-bottom:12px;}
+  #cd-box input{font:inherit;font-size:14px;width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin:0 0 8px;background:#fff;color:var(--plum);box-sizing:border-box;}
+  #cd-box .cd-h{font-size:11.5px;color:var(--muted,#6b6f85);margin:-2px 0 8px;line-height:1.35;}
   #dl-box input{font:inherit;font-size:14px;width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;margin:0 0 8px;background:#fff;color:var(--plum);box-sizing:border-box;}
   .dl-row{display:flex;gap:8px;}.dl-row input{flex:1;min-width:0;}
   .dl-btn{font:inherit;font-size:13px;font-weight:700;padding:0 14px;margin-bottom:8px;border:0;border-radius:10px;background:var(--plum);color:#fff;cursor:pointer;white-space:nowrap;}
@@ -892,7 +902,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <?php endforeach; endif; ?>
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-y</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-z</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -909,6 +919,17 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   <form class="of" id="ct-f" novalidate autocomplete="on">
     <label>Seu nome<input id="of-n" maxlength="120" autocomplete="name" placeholder="Como podemos te chamar?"></label>
     <label>Seu WhatsApp<input id="of-p" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="(11) 99999-9999"></label>
+    <div id="cd-box">
+      <div class="of-lbl">Seu cadastro</div>
+      <div class="cd-h">Salvamos seus dados para agilizar as próximas compras.</div>
+      <div class="dl-row"><input id="cd-cpf" inputmode="numeric" maxlength="14" placeholder="CPF (opcional)" autocomplete="off"><input id="cd-email" inputmode="email" maxlength="120" placeholder="E-mail (opcional)" autocomplete="email" autocapitalize="none"></div>
+      <div id="cd-addr">
+        <input id="cd-cep" inputmode="numeric" maxlength="9" placeholder="CEP (opcional)" autocomplete="off">
+        <input id="cd-street" maxlength="120" placeholder="Endereço (rua, avenida...)" autocomplete="off">
+        <div class="dl-row"><input id="cd-num" maxlength="20" placeholder="Nº" style="max-width:90px" autocomplete="off"><input id="cd-dist" maxlength="80" placeholder="Bairro" autocomplete="off"></div>
+        <div class="dl-row"><input id="cd-city" maxlength="80" placeholder="Cidade" autocomplete="off"><input id="cd-uf" maxlength="2" placeholder="UF" style="max-width:64px;text-transform:uppercase" autocomplete="off"></div>
+      </div>
+    </div>
     <div id="dl-box" style="display:none">
       <div class="of-lbl">Entrega</div>
       <div class="pay" id="dl-mode" style="grid-template-columns:1fr 1fr"><button type="button" data-dl="pickup" id="dl-pk">Retirar na loja</button><button type="button" data-dl="home">Receber em casa</button></div>
@@ -1044,12 +1065,14 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     });
     drawShip();
     $('of-s').disabled=!cart.length;
+    $('cd-addr').style.display=(SHIP&&dl.mode==='home')?'none':'block';
     var bs=$('pay').querySelectorAll('button');for(var k=0;k<bs.length;k++)bs[k].className=bs[k].getAttribute('data-pay')===pay?'on':'';
   }
   function openCart(){
     close();$('toast').className='toast';$('atoast').className='atoast';
     $('ct-main').style.display='block';$('ct-ok').style.display='none';
     $('of-n').value=$('of-n').value||ls('ess_c_n');$('of-p').value=$('of-p').value||ls('ess_c_p');
+    [['cd-cpf','ess_c_cpf'],['cd-email','ess_c_em'],['cd-cep','ess_c_cep'],['cd-street','ess_c_st'],['cd-num','ess_c_nu'],['cd-dist','ess_c_di'],['cd-city','ess_c_ci'],['cd-uf','ess_c_uf']].forEach(function(p){var el=$(p[0]);if(el&&!el.value)el.value=ls(p[1])||'';});
     pay=pay||ls('ess_c_pay');
     $('of-e').textContent='';drawCart();
     $('ct').className='ct on';document.body.style.overflow='hidden';
@@ -1101,6 +1124,12 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     if((t===lb&&(!window._lbd||window._lbd===lb))||(t.closest&&t.closest('.lb-x')&&t.id!=='ct-x'))close();
   });
   document.addEventListener('input',function(e){var er=$('of-e');if(er&&e.target.closest&&e.target.closest('#ct-f'))er.textContent='';if(e.target.id==='dl-cep'){var cv=e.target.value.replace(/\D/g,'').slice(0,8);e.target.value=cv.length>5?cv.slice(0,5)+'-'+cv.slice(5):cv;dl.q=null;dl.opts=[];drawShip();}if(e.target.id==='dl-city'||e.target.id==='dl-uf'){dl.q=null;dl.opts=[];drawShip();}if(e.target.id==='of-p'){var v=mask(e.target.value);if(v!==e.target.value)e.target.value=v;}});
+  document.addEventListener('input',function(e){
+    var t=e.target,v;
+    if(t.id==='cd-cpf'){v=t.value.replace(/\D/g,'').slice(0,11);t.value=v.length>9?v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9):v.length>6?v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6):v.length>3?v.slice(0,3)+'.'+v.slice(3):v;}
+    else if(t.id==='cd-cep'){v=t.value.replace(/\D/g,'').slice(0,8);t.value=v.length>5?v.slice(0,5)+'-'+v.slice(5):v;
+      if(v.length===8){fetch('https://brasilapi.com.br/api/cep/v2/'+v).then(function(r){return r.ok?r.json():null;}).then(function(j){if(!j)return;if(j.street&&!$('cd-street').value)$('cd-street').value=j.street;if(j.neighborhood&&!$('cd-dist').value)$('cd-dist').value=j.neighborhood;if(j.city&&!$('cd-city').value)$('cd-city').value=j.city;if(j.state&&!$('cd-uf').value)$('cd-uf').value=j.state;}).catch(function(){});}}
+  });
   document.addEventListener('submit',function(e){
     if(e.target.id!=='ct-f')return;e.preventDefault();
     var n=$('of-n').value.trim(),ph=$('of-p').value.replace(/\D/g,''),er=$('of-e'),btn=$('of-s');
@@ -1116,15 +1145,20 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
         if(!dv.street.trim()||!dv.number.trim()||!dv.city.trim()||dv.uf.trim().length!==2){er.textContent='Preencha rua, número, cidade e UF da entrega.';return;}
       }else dv={mode:'pickup'};
     }
+    var cpfD=$('cd-cpf').value.replace(/\D/g,''),emv=$('cd-email').value.trim();
+    if(cpfD&&cpfD.length!==11){er.textContent='CPF incompleto. Confira os 11 números ou deixe em branco.';$('cd-cpf').focus();return;}
+    if(emv&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emv)){er.textContent='E-mail inválido. Confira ou deixe em branco.';$('cd-email').focus();return;}
+    var cus={cpf:cpfD,email:emv,cep:$('cd-cep').value,street:$('cd-street').value,number:$('cd-num').value,district:$('cd-dist').value,city:$('cd-city').value,uf:$('cd-uf').value};
+    if(dv&&dv.mode==='home'){cus.cep=dv.cep;cus.street=dv.street;cus.number=dv.number;cus.district=dv.district;cus.city=dv.city;cus.uf=dv.uf;}
     if(!pay){er.textContent='Escolha a forma de pagamento.';return;}
     er.textContent='';btn.disabled=true;btn.textContent='Enviando...';
     var sent=cart.slice(),tot=grand(),home=dv&&dv.mode==='home';
-    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:sent.map(function(i){return {productId:i.id,qty:i.qty};}),name:n,phone:ph,payment:pay,seller:SELLER,note:$('of-o').value,website:$('of-h').value,delivery:dv})})
+    fetch('catalogo.php?a=pedido',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:sent.map(function(i){return {productId:i.id,qty:i.qty};}),name:n,phone:ph,payment:pay,seller:SELLER,note:$('of-o').value,website:$('of-h').value,delivery:dv,customer:cus})})
     .then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro ao enviar.'};});})
     .then(function(j){
       btn.disabled=false;btn.textContent='Enviar pedido para a loja';
       if(!j.ok){er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
-      ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);
+      ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);ls('ess_c_cpf',$('cd-cpf').value);ls('ess_c_em',emv);ls('ess_c_cep',cus.cep);ls('ess_c_st',cus.street);ls('ess_c_nu',cus.number);ls('ess_c_di',cus.district);ls('ess_c_ci',cus.city);ls('ess_c_uf',cus.uf);
       var nn=sent.reduce(function(a,i){return a+i.qty;},0);
       $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+(home&&dl.q&&dl.q.mode==='combine'?' + frete a combinar':'')+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+(j.pix?' para confirmar e combinar a entrega. Faça o pagamento abaixo:':' para combinar pagamento e entrega.');
       var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
