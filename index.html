@@ -186,6 +186,7 @@
   @media (max-width:860px){
     .mnav{display:block;padding:12px 12px 2px;}
     .dnav-only{display:none !important;}
+    .sidebar nav{display:none;}
     .main>.qnav{display:none !important;}
     .mn-g{margin-bottom:10px;}
     .mn-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--gold-soft);opacity:.85;margin:0 4px 6px;font-weight:600;}
@@ -197,6 +198,7 @@
     .mn-n{position:absolute;top:-6px;right:-4px;background:var(--gold);color:#17204A;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;border:1px solid var(--plum-dark);}
     .mn-b:last-child:nth-child(odd){grid-column:1 / -1;}
     .mn-g.fin .mn-grid{grid-template-columns:1fr;}
+    .mn-l{min-width:0;overflow-wrap:anywhere;}
   }
   .qnav{margin-bottom:14px !important;}
   .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
@@ -681,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-s';
+const APP_VERSION = '2026.10.15-t';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2482,13 +2484,14 @@ const MNAV_GROUPS = [
   ['Cadastros',[['clientes','users','Clientes'],['produtos','package','Produtos'],['estoque','warehouse','Estoque']]],
   ['Vendas',[['vendas','cart','Vendas'],['pedidos','clipboard','Pedidos'],['online','inbox','Pedidos online'],['caixa','wallet','Caixa'],['catalogo','book','Catálogo On']]],
   ['Financeiro',[['pagar','send','Contas a pagar'],['receber','download','Contas a receber']]],
+  ['Gestão',[['relatorios','chart','Relatórios'],['vendedores','users','Vendedores'],['aparencia','palette','Aparência'],['servidor','cloud','Servidor'],['usuarios','key','Usuários']]],
 ];
 function renderMobileNav(){
   const nOn = onlineNewCount()+(ONLINE.resets||[]).length;
   return `<div class="mnav">${MNAV_GROUPS.map(([g,items])=>{
     const its = items.filter(([id])=>canAccessTab(id)); if(!its.length) return '';
-    return `<div class="mn-g${g==='Financeiro'?' fin':''}"><div class="mn-t">${g}</div><div class="mn-grid">${its.map(([id,ic,label])=>`<button type="button" class="mn-b${state.tab===id?' on':''}" data-action="goTab" data-tab="${id}"><span class="mn-i">${icon(ic,16)}</span><span class="mn-l">${label}</span>${id==='online'&&nOn>0?`<span class="mn-n">${nOn}</span>`:''}</button>`).join('')}</div></div>`;
-  }).join('')}<div class="mn-t" style="margin-top:6px;">Gestão</div></div>`;
+    return `<div class="mn-g${(g==='Financeiro'||g==='Gestão')?' fin':''}"><div class="mn-t">${g}</div><div class="mn-grid">${its.map(([id,ic,label])=>`<button type="button" class="mn-b${state.tab===id?' on':''}" data-action="goTab" data-tab="${id}"><span class="mn-i">${icon(ic,16)}</span><span class="mn-l">${label}</span>${id==='online'&&nOn>0?`<span class="mn-n">${nOn}</span>`:''}${id==='servidor'?`<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}" style="margin-left:auto;"></span>`:''}</button>`).join('')}</div></div>`;
+  }).join('')}</div>`;
 }
 function renderSidebar(){
   const items = [
