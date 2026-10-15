@@ -661,7 +661,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-o';
+const APP_VERSION = '2026.10.15-p';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2419,10 +2419,6 @@ function renderQuickNav(){
   }).join('')}</div>`;
 }
 
-function heroClock(){ return `<span class="hclock" role="timer" aria-label="Relógio"><i class="hdot"></i><b id="dclock-t">${clockStr().slice(0,5)}</b><span class="hsep"></span><span class="hdate">${esc(clockDate())}</span></span>`; }
-function withHeroClock(html){
-  return html.replace(/(class="cx-hero"[^>]*>\s*<div[^>]*>\s*)(<h2[^>]*>[^<]*<\/h2>)/, (m,pre,h2)=>pre+'<div class="hhead">'+h2+heroClock()+'</div>');
-}
 function renderTopbar(){
   return `
   <div class="topbar">
@@ -2453,7 +2449,7 @@ function renderShell(){
     <div class="main">
       ${renderQuickNav()}
       ${renderTopbar()}
-      ${withHeroClock(renderTab())}
+      ${renderTab()}
     </div>
   </div>
   ${state.ui.modal ? renderModal() : ''}
