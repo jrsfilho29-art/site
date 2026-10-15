@@ -173,6 +173,11 @@
   .banner-plum{padding:18px 20px;background:linear-gradient(120deg,var(--plum),var(--plum-dark));border-radius:10px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 6px 18px rgba(58,30,48,.25);}
 
   /* ---------- top bar ---------- */
+  .apar-h{display:flex;align-items:center;gap:12px;width:100%;padding:16px 18px;background:none;border:0;cursor:pointer;font:inherit;color:var(--plum);}
+  .apar-h:hover{background:rgba(23,32,74,.04);}
+  .apar-ic{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--gold-soft);flex-shrink:0;}
+  .apar-ch{font-size:22px;font-weight:300;color:var(--gold-deep);width:24px;text-align:center;}
+  .apar-b{border-top:1px solid var(--line);padding-top:14px !important;}
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
   .qbtn{position:relative;display:inline-flex;align-items:center;flex-direction:column;justify-content:center;text-align:center;gap:6px;width:calc((100% - 54px)/10);min-width:78px;min-height:72px;padding:11px 4px;border-radius:14px;font:inherit;font-size:12px;line-height:1.15;font-weight:600;letter-spacing:0;cursor:pointer;
         background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
@@ -639,7 +644,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-k';
+const APP_VERSION = '2026.10.15-l';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -3032,6 +3037,7 @@ const actions_clientes = {
     const a = ONLINE.accts[onlineDigits(c.phone).slice(-10)]; if(!a){ notify.err('Este cliente não tem conta no catálogo.'); return; }
     await catalogPwReset(c.name, c.phone, a.username);
   },
+  toggleApar(t){ const g=t.dataset.g; state.ui.aparOpen = state.ui.aparOpen||{}; state.ui.aparOpen[g] = !state.ui.aparOpen[g]; render(); },
   async custEditUser(t){
     if(!isAdmin()) return;
     const c = state.customers.find(x=>x.id===t.dataset.id); if(!c) return;
@@ -5084,9 +5090,15 @@ function renderRelatorios(){
 function renderAparencia(){
   const sw = (list,cur,action,label,fallback)=>list.map(([c,n])=>{ const on=(cur||'').toUpperCase()===c.toUpperCase(); return `<button type="button" data-action="${action}" data-color="${c}" title="${n}" aria-label="${label} ${n}" style="display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:0;width:64px;font-size:11.5px;color:var(--muted);"><span style="width:38px;height:38px;border-radius:50%;background:${c||fallback};border:3px solid ${on?'var(--plum)':'var(--line)'};box-shadow:${on?'0 0 0 2px var(--tint)':'none'};"></span>${n}</button>`; }).join('');
   const p = state.prefs||{};
+  const op = g => !!(state.ui.aparOpen && state.ui.aparOpen[g]);
   return `
   <div class="cx-hero"><div><h2 class="serif">Aparência</h2><p>Personalize as cores do aplicativo neste aparelho</p></div></div>
-  <div class="grid grid-2 mb2" style="max-width:860px;">
+  <div class="card apar-g" style="max-width:860px;padding:0;margin-bottom:12px;overflow:hidden;">
+    <button type="button" class="apar-h" data-action="toggleApar" data-g="cores" aria-expanded="${op('cores')?'true':'false'}">
+      <span class="apar-ic">${icon('palette',18)}</span><span style="flex:1;text-align:left;"><b style="font-size:15px;">Cores do sistema</b><span class="muted" style="display:block;font-size:12px;font-weight:400;">Cabeçalho, fundo das telas e barra de menus</span></span>
+      <span class="apar-ch">${op('cores')?'−':'+'}</span>
+    </button>
+    ${op('cores')?`<div class="grid grid-2 apar-b" style="padding:4px 16px 16px;">
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Cor do cabeçalho</h3>
       <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor do destaque no topo de cada menu (cores escuras, para o texto branco ficar legível).</p>
@@ -5108,6 +5120,14 @@ function renderAparencia(){
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
         <input type="color" data-field="prefs.sideColor" value="${p.sideColor||'#0D1230'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
     </div>
+    </div>`:''}
+  </div>
+  <div class="card apar-g" style="max-width:860px;padding:0;margin-bottom:12px;overflow:hidden;">
+    <button type="button" class="apar-h" data-action="toggleApar" data-g="catalogo" aria-expanded="${op('catalogo')?'true':'false'}">
+      <span class="apar-ic">${icon('book',18)}</span><span style="flex:1;text-align:left;"><b style="font-size:15px;">Catálogo online</b><span class="muted" style="display:block;font-size:12px;font-weight:400;">Cabeçalho, botões e letra da página pública</span></span>
+      <span class="apar-ch">${op('catalogo')?'−':'+'}</span>
+    </button>
+    ${op('catalogo')?`<div class="grid grid-2 apar-b" style="padding:4px 16px 16px;">
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Cabeçalho do catálogo</h3>
       <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor do topo da página pública que seus clientes veem (seuperfume.net/catalogo.php). Fica salva no servidor, para todos os aparelhos.</p>
@@ -5125,6 +5145,19 @@ function renderAparencia(){
       ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta cor no servidor.</p>'}
     </div>
     <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Letra dos produtos</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Tipo de letra do <b>nome, marca, preço e descrição</b> dos produtos na página pública do catálogo. Fica salvo no servidor, para todos os aparelhos.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;">${CAT_FONTS.map(f=>`<button type="button" data-action="setCatFont" data-font="${f[0]}" style="text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;background:var(--bg-soft,transparent);color:inherit;border:2px solid ${(p.catFont||'')===f[0]?'var(--brand,#1DA851)':'var(--line,#ccc)'};font-family:${f[2].replace(/"/g,"'")};"><div style="font-size:15px;font-weight:600;">Perfume Essência</div><div style="font-size:13px;">R$ 189,90</div><div class="muted2" style="font-size:11px;font-family:inherit;">${f[1]}${(p.catFont||'')===f[0]?' ✓':''}</div></button>`).join('')}</div>
+      ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta opção no servidor.</p>'}
+    </div>`:''}
+  </div>
+  <div class="card apar-g" style="max-width:860px;padding:0;margin-bottom:12px;overflow:hidden;">
+    <button type="button" class="apar-h" data-action="toggleApar" data-g="marca" aria-expanded="${op('marca')?'true':'false'}">
+      <span class="apar-ic">${icon('edit',18)}</span><span style="flex:1;text-align:left;"><b style="font-size:15px;">Nome do programa</b><span class="muted" style="display:block;font-size:12px;font-weight:400;">Texto no topo do menu lateral</span></span>
+      <span class="apar-ch">${op('marca')?'−':'+'}</span>
+    </button>
+    ${op('marca')?`<div class="grid grid-2 apar-b" style="padding:4px 16px 16px;">
+    <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Nome do programa</h3>
       <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Texto que aparece no topo do menu lateral, acima de “Painel”. Pode mudar quando quiser; fica salvo neste aparelho.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
@@ -5133,12 +5166,8 @@ function renderAparencia(){
       </div>
       <button class="btn btn-ghost mt3" type="button" data-action="resetBrand">Restaurar padrão</button>
     </div>
-    <div class="card" style="padding:16px 18px;">
-      <h3 style="margin:0 0 4px;font-size:16px;">Letra dos produtos</h3>
-      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Tipo de letra do <b>nome, marca, preço e descrição</b> dos produtos na página pública do catálogo. Fica salvo no servidor, para todos os aparelhos.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;">${CAT_FONTS.map(f=>`<button type="button" data-action="setCatFont" data-font="${f[0]}" style="text-align:left;padding:10px 12px;border-radius:10px;cursor:pointer;background:var(--bg-soft,transparent);color:inherit;border:2px solid ${(p.catFont||'')===f[0]?'var(--brand,#1DA851)':'var(--line,#ccc)'};font-family:${f[2].replace(/"/g,"'")};"><div style="font-size:15px;font-weight:600;">Perfume Essência</div><div style="font-size:13px;">R$ 189,90</div><div class="muted2" style="font-size:11px;font-family:inherit;">${f[1]}${(p.catFont||'')===f[0]?' ✓':''}</div></button>`).join('')}</div>
-      ${isAdmin()?'':'<p class="muted2" style="font-size:11.5px;margin-top:8px;">Somente administradores salvam esta opção no servidor.</p>'}
-    </div>
+    </div>`:''}
+  </div>
   </div>`;
 }
 
