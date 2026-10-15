@@ -367,6 +367,21 @@ try{
     try{ $pdo->prepare('DELETE FROM online_tokens WHERE customer_id = ?')->execute([$row['id']]); }catch(Throwable $e){}
     out(200, ['ok'=>true, 'username'=>s($row['username'] ?? ''), 'password'=>$pw]);
   }
+  if($action === 'onlinecustomer_username'){
+    if($authRole !== 'admin') fail(403, 'Apenas o administrador pode alterar o login.');
+    $tail = substr(preg_replace('/\D/', '', (string)($req['phone'] ?? '')), -10);
+    $nu = strtolower(trim((string)($req['username'] ?? '')));
+    if(strlen($tail) < 10) fail(422, 'Telefone inválido.');
+    if(!preg_match('/^[a-z0-9._-]{3,30}$/', $nu)) fail(422, 'Login: de 3 a 30 letras minúsculas, números, ponto, traço ou sublinhado.');
+    $row = null;
+    try{ foreach(rows($pdo, 'SELECT * FROM online_customers WHERE pass_hash IS NOT NULL') as $r0){ if(substr(preg_replace('/\D/', '', (string)$r0['phone']), -10) === $tail){ $row = $r0; break; } } }catch(Throwable $e){}
+    if(!$row) fail(404, 'Este cliente não tem conta no catálogo.');
+    $q = $pdo->prepare('SELECT id FROM online_customers WHERE username = ? AND id <> ?'); $q->execute([$nu, $row['id']]);
+    if($q->fetch()) fail(409, 'Este login já está em uso por outro cliente.');
+    $pdo->prepare('UPDATE online_customers SET username = ? WHERE id = ?')->execute([$nu, $row['id']]);
+    try{ $pdo->prepare('DELETE FROM online_tokens WHERE customer_id = ?')->execute([$row['id']]); }catch(Throwable $e){}
+    out(200, ['ok'=>true, 'username'=>$nu]);
+  }
   if($action === 'onlinecustomers'){
     try{
       $r = rows($pdo, 'SELECT * FROM online_customers ORDER BY created_at DESC LIMIT 500');
