@@ -207,7 +207,9 @@
   .qbtn .qic svg{width:20px;height:20px;}
   .qbadge{position:absolute;top:5px;right:6px;margin:0;background:var(--gold);color:#17204A;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:2px;}
   .qbtn.on .qbadge{background:var(--plum-dark);color:var(--gold-soft);}
-  @media (max-width:640px){.qnav{gap:6px;}.qbtn{width:calc(25% - 5px);min-width:0;min-height:64px;padding:10px 4px;font-size:11.5px;border-radius:12px;}}
+  @media (max-width:860px){.main{display:flex;flex-direction:column;}.main>*{order:3;}.main>.topbar{order:1;}.main>.qnav{order:2;}}
+  @media (max-width:640px){.qnav{flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:0 -14px 12px !important;padding:2px 14px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}.qnav::-webkit-scrollbar{display:none;}
+    .qbtn{flex:0 0 auto;width:78px;min-width:78px;min-height:62px;padding:9px 4px;font-size:11px;border-radius:12px;gap:5px;}.qbtn .qic svg{width:18px;height:18px;}}
   .topbar{display:flex;align-items:center;gap:14px;padding:14px 0 20px;border-bottom:1px solid var(--line);margin-bottom:24px;}
   .topbar .crumb{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted2);font-weight:600;}
   .topbar .today-w{margin-left:auto;}
@@ -663,7 +665,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-q';
+const APP_VERSION = '2026.10.15-r';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2086,6 +2088,7 @@ function render(){
   const app = document.getElementById('app');
   try{
     app.innerHTML = state.currentUser ? renderShell() : renderLogin();
+    try{ const qa = app.querySelector('.qbtn.on'), qn = qa && qa.parentElement; if(qn && qn.scrollWidth>qn.clientWidth+4) qn.scrollLeft = Math.max(0, qa.offsetLeft - qn.clientWidth/2 + qa.offsetWidth/2); }catch(e){}
   }catch(err){
     console.error('Render error:', err);
     app.innerHTML = `
