@@ -193,12 +193,25 @@ try{
       'customer'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['customer'] ?? '')
     ], $r)]);
   }
+  if($action === 'onlinecustomer_reset'){
+    if($authRole !== 'admin') fail(403, 'Apenas o administrador pode redefinir senhas.');
+    try{ $pdo->query('SELECT reset_req FROM online_customers LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_customers ADD COLUMN reset_req VARCHAR(30)'); }catch(Throwable $e2){} }
+    $tail = substr(preg_replace('/\D/', '', (string)($req['phone'] ?? '')), -10);
+    if(strlen($tail) < 10) fail(422, 'Telefone inválido.');
+    $row = null;
+    try{ foreach(rows($pdo, 'SELECT * FROM online_customers WHERE pass_hash IS NOT NULL') as $r0){ if(substr(preg_replace('/\D/', '', (string)$r0['phone']), -10) === $tail){ $row = $r0; break; } } }catch(Throwable $e){}
+    if(!$row || empty($row['pass_hash'])) fail(404, 'Este cliente não tem conta no catálogo.');
+    $chars = 'abcdefghjkmnpqrstuvwxyz23456789'; $pw = ''; for($i = 0; $i < 8; $i++) $pw .= $chars[random_int(0, strlen($chars) - 1)];
+    $pdo->prepare('UPDATE online_customers SET pass_hash = ?, reset_req = ? WHERE id = ?')->execute([password_hash($pw, PASSWORD_DEFAULT), '', $row['id']]);
+    try{ $pdo->prepare('DELETE FROM online_tokens WHERE customer_id = ?')->execute([$row['id']]); }catch(Throwable $e){}
+    out(200, ['ok'=>true, 'username'=>s($row['username'] ?? ''), 'password'=>$pw]);
+  }
   if($action === 'onlinecustomers'){
     try{
       $r = rows($pdo, 'SELECT * FROM online_customers ORDER BY created_at DESC LIMIT 500');
     }catch(Throwable $e){ $r = []; }   // tabela só existe depois do primeiro cadastro
     out(200, ['ok'=>true, 'customers'=>array_map(fn($o)=>[
-      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'name'=>s($o['name']), 'phone'=>s($o['phone']), 'username'=>s($o['username'] ?? ''),
+      'id'=>$o['id'], 'createdAt'=>$o['created_at'], 'name'=>s($o['name']), 'phone'=>s($o['phone']), 'username'=>s($o['username'] ?? ''), 'resetReq'=>s($o['reset_req'] ?? ''),
       'data'=>(function($j){ $x = json_decode((string)$j, true); return is_array($x) ? $x : new stdClass(); })($o['data'] ?? '')
     ], $r)]);
   }

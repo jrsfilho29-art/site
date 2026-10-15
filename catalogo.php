@@ -304,7 +304,7 @@ function acct_tables($pdo){
   $mysql = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql');
   $eng = $mysql ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
   $pdo->exec('CREATE TABLE IF NOT EXISTS online_customers (id VARCHAR(40) NOT NULL PRIMARY KEY, created_at VARCHAR(30) NOT NULL, name VARCHAR(120), phone VARCHAR(30), data TEXT, ip_hash VARCHAR(40))'.$eng);
-  foreach(['username VARCHAR(40)', 'pass_hash VARCHAR(255)'] as $col){
+  foreach(['username VARCHAR(40)', 'pass_hash VARCHAR(255)', 'reset_req VARCHAR(30)'] as $col){
     $cn = explode(' ', $col)[0];
     try{ $pdo->query('SELECT '.$cn.' FROM online_customers LIMIT 1'); }catch(Throwable $e){ try{ $pdo->exec('ALTER TABLE online_customers ADD COLUMN '.$col); }catch(Throwable $e2){} }
   }
@@ -328,7 +328,7 @@ function acct_profile($row, $tok){
   $d = json_decode((string)($row['data'] ?? ''), true); if(!is_array($d)) $d = [];
   return ['token'=>$tok, 'name'=>(string)$row['name'], 'phone'=>(string)$row['phone'], 'username'=>(string)($row['username'] ?? ''), 'cpf'=>(string)($d['cpf'] ?? ''), 'email'=>(string)($d['email'] ?? '')];
 }
-if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair'], true) && $_SERVER['REQUEST_METHOD'] === 'POST'){
+if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair', 'esqueci'], true) && $_SERVER['REQUEST_METHOD'] === 'POST'){
   header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
   $jerr = function($code, $msg){ http_response_code($code); echo json_encode(['ok'=>false, 'error'=>$msg]); exit; };
   $ho = strtolower((string)parse_url((string)($_SERVER['HTTP_ORIGIN'] ?? ''), PHP_URL_HOST));
@@ -346,6 +346,18 @@ if(in_array(($_GET['a'] ?? ''), ['cadastro', 'login', 'sair'], true) && $_SERVER
       $t = (string)($in['token'] ?? '');
       if(preg_match('/^[a-f0-9]{48}$/', $t)) $pdo->prepare('DELETE FROM online_tokens WHERE token_hash = ?')->execute([hash('sha256', $t)]);
       echo json_encode(['ok'=>true]); exit;
+    }
+    if($act === 'esqueci'){
+      $q = $pdo->prepare('SELECT COUNT(*) FROM online_attempts WHERE ip_hash = ? AND created_at > ?'); $q->execute([$ip, $since]);
+      if((int)$q->fetchColumn() >= 10) $jerr(429, 'Muitas tentativas. Aguarde alguns minutos e tente de novo.');
+      $pdo->prepare('INSERT INTO online_attempts (ip_hash,created_at) VALUES (?,?)')->execute([$ip, gmdate('Y-m-d\TH:i:s\Z')]);
+      $ph = preg_replace('/\D/', '', (string)($in['phone'] ?? ''));
+      if(strlen($ph) < 10 || strlen($ph) > 13) $jerr(422, 'Informe o WhatsApp que você usou no cadastro.');
+      $tail = substr($ph, -10);
+      $q = $pdo->prepare('SELECT id, phone FROM online_customers WHERE pass_hash IS NOT NULL AND pass_hash <> \'\'');
+      $q->execute();
+      foreach($q->fetchAll() as $row){ if(substr(preg_replace('/\D/', '', (string)$row['phone']), -10) === $tail){ $pdo->prepare('UPDATE online_customers SET reset_req = ? WHERE id = ?')->execute([gmdate('Y-m-d\TH:i:s\Z'), $row['id']]); } }
+      echo json_encode(['ok'=>true]); exit;   /* resposta igual exista ou não o cadastro (não revela quem é cliente) */
     }
     if($act === 'login'){
       $q = $pdo->prepare('SELECT COUNT(*) FROM online_attempts WHERE ip_hash = ? AND created_at > ?'); $q->execute([$ip, $since]);
@@ -1058,7 +1070,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ai</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-aj</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1092,7 +1104,17 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   <input id="lg-p" type="password" maxlength="72" autocomplete="current-password" placeholder="Senha">
   <div class="of-e" id="lg-e" role="alert"></div>
   <button type="submit" class="lb-act lb-buy" id="lg-s" style="width:100%">Entrar</button>
+  <button type="button" class="of-b" id="go-forgot">Esqueci meu login / senha</button>
   <button type="button" class="of-b" id="go-reg">Ainda não tenho cadastro</button>
+</form>
+<form id="fg-f" novalidate style="display:none" data-wa="<?= e($WHATSAPP) ?>">
+  <div class="of-t" style="text-align:left">Esqueci meu login / senha</div>
+  <div class="cd-h">Informe o WhatsApp do seu cadastro. A loja recebe o pedido e entra em contato para te passar seu login e uma senha nova.</div>
+  <input id="fg-p" inputmode="tel" maxlength="16" autocomplete="tel" placeholder="WhatsApp do cadastro">
+  <div class="of-e" id="fg-e" role="alert"></div>
+  <button type="submit" class="lb-act lb-buy" id="fg-s" style="width:100%">Pedir ajuda para entrar</button>
+  <div id="fg-ok" style="display:none;text-align:center;margin-top:10px"><div class="of-t">Pedido enviado!</div><p style="margin:6px 0 10px;font-size:13.5px">A loja vai te chamar no WhatsApp. Se preferir, fale agora:</p><button type="button" class="lb-act lb-buy" id="fg-wa" style="width:100%">Falar com a loja no WhatsApp</button></div>
+  <button type="button" class="of-b" id="fg-back">Voltar para entrar</button>
 </form>
 <div id="ac-v" style="display:none;text-align:center"><div class="okpop-i"><svg viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-7"/></svg></div><div class="of-t" id="ac-t">Olá!</div><p id="ac-m" style="margin:6px 0 14px;font-size:14px"></p><button type="button" class="lb-act lb-buy" id="ac-close" style="width:100%">Continuar</button><button type="button" class="of-b" id="ac-out">Sair da conta</button></div>
 </div></div>
@@ -1318,7 +1340,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   window.gateSync=uiAcct;
   (function(){
     var cad=$('cad');if(!cad)return;
-    function view(v){$('cad-f').style.display=v==='reg'?'block':'none';$('lg-f').style.display=v==='login'?'block':'none';$('ac-v').style.display=v==='acct'?'block':'none';$('cd-e').textContent='';$('lg-e').textContent='';}
+    function view(v){$('cad-f').style.display=v==='reg'?'block':'none';$('lg-f').style.display=v==='login'?'block':'none';$('fg-f').style.display=v==='forgot'?'block':'none';if(v==='forgot'){$('fg-ok').style.display='none';$('fg-s').style.display='';$('fg-e').textContent='';}$('ac-v').style.display=v==='acct'?'block':'none';$('cd-e').textContent='';$('lg-e').textContent='';}
     function openCad(v){
       if(!v)v=ACCT?'acct':'reg';
       if(v==='acct'){$('ac-t').textContent='Olá, '+ACCT.name.split(' ')[0]+'!';$('ac-m').textContent='Você está logado como '+ACCT.username+'. Pode finalizar suas compras pelo carrinho.';}
@@ -1331,6 +1353,20 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     ['cad-x','ac-close'].forEach(function(i){$(i).addEventListener('click',closeCad);});
     $('go-login').addEventListener('click',function(){view('login');$('lg-u').focus();});
     $('go-reg').addEventListener('click',function(){openCad('reg');});
+    $('go-forgot').addEventListener('click',function(){view('forgot');$('fg-p').value=$('fg-p').value||ls('ess_c_p')||'';$('fg-p').focus();});
+    $('fg-back').addEventListener('click',function(){view('login');});
+    $('fg-p').addEventListener('input',function(e){var v=e.target.value.replace(/\D/g,'').slice(0,11);e.target.value=v.length>6?'('+v.slice(0,2)+') '+v.slice(2,v.length-4)+'-'+v.slice(-4):v.length>2?'('+v.slice(0,2)+') '+v.slice(2):v;$('fg-e').textContent='';});
+    $('fg-f').addEventListener('submit',function(e){
+      e.preventDefault();var er=$('fg-e'),btn=$('fg-s'),ph=$('fg-p').value.replace(/\D/g,'');
+      if(ph.length<10){er.textContent='Informe o WhatsApp que você usou no cadastro.';return;}
+      btn.disabled=true;btn.textContent='Enviando...';
+      fetch('catalogo.php?a=esqueci',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph})}).then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro de comunicação.'};});}).then(function(j){
+        btn.disabled=false;btn.textContent='Pedir ajuda para entrar';
+        if(!j.ok){er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
+        btn.style.display='none';$('fg-ok').style.display='block';if(!$('fg-f').getAttribute('data-wa'))$('fg-wa').style.display='none';
+      }).catch(function(){btn.disabled=false;btn.textContent='Pedir ajuda para entrar';er.textContent='Sem conexão. Tente novamente.';});
+    });
+    $('fg-wa').addEventListener('click',function(){var w=$('fg-f').getAttribute('data-wa');if(w&&typeof waGo==='function')waGo(w,'Olá! Esqueci meu login/senha do catálogo da Essência. Meu WhatsApp de cadastro: '+$('fg-p').value);});
     cad.addEventListener('click',function(e){if(e.target===cad)closeCad();});
     $('ac-out').addEventListener('click',function(){
       var t=ACCT&&ACCT.token;saveAcct(null);closeCad();
