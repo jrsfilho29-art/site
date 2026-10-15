@@ -183,12 +183,20 @@
   .qnav{margin-bottom:14px !important;}
   .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
   .hhead h2{margin:0 !important;}
+  .hclock{display:inline-flex;align-items:center;gap:12px;padding:7px 16px;border-radius:10px;background:linear-gradient(180deg,#141C44,#080C24);border:1px solid rgba(240,168,31,.5);box-shadow:0 2px 8px rgba(0,0,0,.3),inset 0 0 14px rgba(240,168,31,.12);}
+  .hclock b{font-family:'Inter',ui-monospace,Menlo,Consolas,monospace;font-size:20px;font-weight:700;line-height:1;color:var(--gold-soft);font-variant-numeric:tabular-nums;letter-spacing:.12em;text-shadow:0 0 10px rgba(240,168,31,.55);}
+  .hclock .hdot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:dcpulse 2s ease-in-out infinite;}
+  .hclock .hsep{width:1px;align-self:stretch;background:rgba(240,168,31,.35);}
+  .hdate{font-size:12.5px;color:#DDE0F5;white-space:nowrap;letter-spacing:.03em;}
+  .qnav{margin-bottom:14px !important;}
+  .hhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:2px;}
+  .hhead h2{margin:0 !important;}
   .hclock{display:inline-flex;align-items:center;gap:10px;}
   .hclock .dclock b{font-size:17px;padding:5px 12px;}
   .hdate{font-size:13px;color:#C9CDEA;white-space:nowrap;}
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
   .qbtn{position:relative;display:inline-flex;align-items:center;flex-direction:column;justify-content:center;text-align:center;gap:6px;width:calc((100% - 54px)/10);min-width:78px;min-height:72px;padding:11px 4px;border-radius:14px;font:inherit;font-size:12px;line-height:1.15;font-weight:600;letter-spacing:0;cursor:pointer;
-        background:linear-gradient(180deg,var(--plum),var(--plum-dark));color:var(--cream);border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
+        background:linear-gradient(180deg,color-mix(in srgb,var(--qbtn-a,#17204A) 86%,#fff),var(--qbtn-a,#0D1230));color:#fff;border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
   .qbtn .qic{display:inline-flex;color:var(--gold-soft);}
   .qbtn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(13,18,48,.35);border-color:rgba(255,255,255,.34);}
   .qbtn.on{background:linear-gradient(180deg,#D3AC68,var(--gold));color:var(--plum-dark);border-color:var(--gold-deep);font-weight:600;box-shadow:0 1px 2px rgba(173,131,66,.35);}
@@ -652,7 +660,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-m';
+const APP_VERSION = '2026.10.15-n';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2050,6 +2058,7 @@ function applyPrefs(){
   const sc = state.prefs && state.prefs.sideColor; if(sc && heroOk(sc)) rs.setProperty('--side-bg',sc); else rs.removeProperty('--side-bg');
   if(hc && heroOk(hc)){ rs.setProperty('--hero-a',hc); }
   else { rs.removeProperty('--hero-a'); }
+  const qb = state.prefs && state.prefs.qbtnColor; if(qb && heroOk(qb)) rs.setProperty('--qbtn-a',qb); else rs.removeProperty('--qbtn-a');
   const bg = state.prefs && state.prefs.bgColor;
   const bs = state.prefs && state.prefs.bgStyle, lg = (bs==='login' || bs==='loginsolid') && !!state.currentUser;
   document.body.classList.toggle('bg-login', lg && bs==='login');
@@ -2235,6 +2244,12 @@ function handleFieldInput(t){
     document.querySelectorAll('[data-action="setSide"]').forEach(btn=>{ const sp=btn.firstElementChild, on=(btn.dataset.color||'').toUpperCase()===String(val).toUpperCase(); if(sp){ sp.style.borderColor=on?'var(--plum)':'var(--line)'; sp.style.boxShadow=on?'0 0 0 2px var(--tint)':'none'; } });
     return;
   }
+  if(path==='prefs.qbtnColor'){
+    if(!heroOk(val)){ notify.err('Cor muito clara: o texto branco dos botões ficaria difícil de ler. Escolha uma cor escura.'); const el=document.querySelector('input[data-field="prefs.qbtnColor"]'); if(el) el.value=(state.prefs&&state.prefs.qbtnColor)||'#17204A'; return; }
+    state.prefs = state.prefs||{}; state.prefs.qbtnColor = val; persist('prefs'); applyPrefs();
+    document.querySelectorAll('[data-action="setQbtn"]').forEach(btn=>{ const sp=btn.firstElementChild, on=(btn.dataset.color||'').toUpperCase()===String(val).toUpperCase(); if(sp){ sp.style.borderColor=on?'var(--plum)':'var(--line)'; sp.style.boxShadow=on?'0 0 0 2px var(--tint)':'none'; } });
+    return;
+  }
   if(path==='prefs.catHeaderColor'){
     if(!heroOk(val)){ notify.err('Cor muito clara: o texto branco do topo do catálogo ficaria difícil de ler. Escolha uma cor escura.'); const el=document.querySelector('input[data-field="prefs.catHeaderColor"]'); if(el) el.value=(state.prefs&&state.prefs.catHeaderColor)||'#17204A'; return; }
     state.prefs = state.prefs||{}; state.prefs.catHeaderColor = val; persist('prefs'); syncSchedulePush();
@@ -2403,7 +2418,7 @@ function renderQuickNav(){
   }).join('')}</div>`;
 }
 
-function heroClock(){ return `<span class="hclock" role="timer" aria-label="Relógio"><span class="dclock"><b id="dclock-t">${clockStr().slice(0,5)}</b></span><span class="hdate">${esc(clockDate())}</span></span>`; }
+function heroClock(){ return `<span class="hclock" role="timer" aria-label="Relógio"><i class="hdot"></i><b id="dclock-t">${clockStr().slice(0,5)}</b><span class="hsep"></span><span class="hdate">${esc(clockDate())}</span></span>`; }
 function withHeroClock(html){
   return html.replace(/(class="cx-hero"[^>]*>\s*<div[^>]*>\s*)(<h2[^>]*>[^<]*<\/h2>)/, (m,pre,h2)=>pre+'<div class="hhead">'+h2+heroClock()+'</div>');
 }
@@ -2973,6 +2988,7 @@ const actions_online = {
   },
   setHero(t){ state.prefs = state.prefs||{}; state.prefs.heroColor = t.dataset.color||''; persist('prefs'); render(); },
   setBg(t){ state.prefs = state.prefs||{}; state.prefs.bgColor = t.dataset.color||''; state.prefs.bgStyle = ''; persist('prefs'); render(); },
+  setQbtn(t){ state.prefs = state.prefs||{}; state.prefs.qbtnColor = t.dataset.color||''; persist('prefs'); render(); },
   setSide(t){ state.prefs = state.prefs||{}; state.prefs.sideColor = t.dataset.color||''; persist('prefs'); render(); },
   resetBrand(){ state.prefs=state.prefs||{}; delete state.prefs.brandName; delete state.prefs.brandSub; persist('prefs'); render(); },
   setCatFont(t){ state.prefs = state.prefs||{}; state.prefs.catFont = t.dataset.font||''; persist('prefs'); syncSchedulePush(); render(); },
@@ -5129,6 +5145,13 @@ function renderAparencia(){
       <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.map(x=>x[0]===''?['','Padrão']:x),p.sideColor,'setSide','Menus','#0D1230')}</div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
         <input type="color" data-field="prefs.sideColor" value="${p.sideColor||'#0D1230'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
+    </div>
+    <div class="card" style="padding:16px 18px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Botões do menu</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor dos botões de atalho no topo (Clientes, Produtos, Estoque…). O botão da tela aberta continua dourado.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.map(x=>x[0]===''?['','Padrão']:x),p.qbtnColor,'setQbtn','Botões','#17204A')}</div>
+      <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
+        <input type="color" data-field="prefs.qbtnColor" value="${p.qbtnColor||'#17204A'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
     </div>
     </div>`:''}
   </div>
