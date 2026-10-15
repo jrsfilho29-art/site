@@ -683,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-v';
+const APP_VERSION = '2026.10.15-w';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -754,7 +754,9 @@ window.addEventListener('popstate', ()=>{ if(document.getElementById('catov')) c
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById('catov')) closeCatalogOverlay(false); });
 function openNewTab(url){ const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener noreferrer'; a.style.display='none'; document.body.appendChild(a); a.click(); a.remove(); }
 function catTrackTxt(){ try{ if(!/^https?:/.test(location.protocol)) return ''; return '\n\nAcompanhe seu pedido no catálogo: '+new URL('catalogo.php', location.href).href+' (entre na sua conta e toque em “Meus pedidos”).'; }catch(e){ return ''; } }
-function waLink(phone, text){ let d=String(phone||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return 'https://wa.me/'+d+'?text='+encodeURIComponent(text||''); }
+function waLink(phone, text){ let d=String(phone||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return 'https://wa.me/'+d+'?text='+encodeURIComponent(String(text||'').replace(/[\u00a0\u202f]/g,' ')); }
+function waPreopen(){ try{ return window.open('about:blank','_blank'); }catch(e){ return null; } }
+function waFill(w,u){ if(w && !w.closed){ try{ w.location.href = u; return; }catch(e){} } openNewTab(u); }
 function fiadoSales(){ return state.sales.filter(s=> s.status!=='cancelada' && (s.payments||[]).some(p=>p.method==='Fiado' && p.amount>0)); }
 function fiadoAmount(s){ return (s.payments||[]).filter(p=>p.method==='Fiado').reduce((a,p)=>a+p.amount,0); }
 
@@ -3019,13 +3021,14 @@ const actions_online = {
     const its = onlineItems(o), tot = o.total>0 ? o.total : its.reduce((s,i)=>s+i.qty*i.unitPrice,0);
     const u = waLink(o.phone, 'Olá, '+o.customerName+'! Recebemos o pagamento do seu pedido ('+its.map(i=>i.qty+'x '+i.name).join(', ')+') no valor de '+brl(tot)+'. Muito obrigado! Já estamos separando e combinando a entrega com você. 💛'+catTrackTxt());
     if(!u){ notify.err('Telefone do cliente inválido.'); return; }
+    const w = waPreopen();   /* abre a janela agora (no clique) para o navegador não bloquear; o link é preenchido depois */
     if(!o.paidAt){
       const old = o.paidAt; o.paidAt = new Date().toISOString(); render();
       try{ await syncCall('onlineorder_paid',{id:o.id,paid:true}); }
-      catch(e){ o.paidAt = old; notify.err(e.message||'Não foi possível marcar como pago.'); render(); return; }
+      catch(e){ o.paidAt = old; notify.err(e.message||'Não foi possível marcar como pago.'); render(); if(w) try{ w.close(); }catch(_){} return; }
       if(o.status==='novo') actions_online.onlineStatus({dataset:{id:o.id,s:'atendimento'}});
     }
-    openNewTab(u);
+    waFill(w,u);
   },
   async onlineUnpaid(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
@@ -3063,18 +3066,21 @@ const actions_online = {
   },
   async onlineStatus(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
-    const old = o.status; o.status = t.dataset.s; render();
-    try{ await syncCall('onlineorder_status',{id:o.id,status:o.status}); }
-    catch(e){ o.status = old; notify.err(e.message); render(); return; }
-    if((o.status==='enviado'||o.status==='concluido'||o.status==='cancelado') && old!==o.status){
-      const msg = o.status==='enviado'
+    const ns = t.dataset.s, old = o.status;
+    let w = null, u = '';
+    if((ns==='enviado'||ns==='concluido'||ns==='cancelado') && old!==ns){
+      const msg = ns==='enviado'
         ? 'Olá, '+o.customerName+'! Seu pedido foi enviado 🚚 e já está a caminho. Qualquer dúvida é só responder esta mensagem.'+catTrackTxt()
-        : o.status==='concluido'
+        : ns==='concluido'
         ? 'Olá, '+o.customerName+'! Seu pedido foi concluído. Muito obrigado pela preferência! 💛'+catTrackTxt()
         : 'Olá, '+o.customerName+'! Infelizmente seu pedido foi cancelado. Se tiver qualquer dúvida, é só responder esta mensagem.';
-      const u = waLink(o.phone, msg);
-      if(u && confirm((o.status==='enviado'?'Pedido marcado como enviado.':o.status==='concluido'?'Pedido concluído.':'Pedido cancelado.')+'\n\nAvisar o cliente pelo WhatsApp agora?')) openNewTab(u);
+      u = waLink(o.phone, msg);
+      if(u && confirm((ns==='enviado'?'Marcar como enviado.':ns==='concluido'?'Concluir o pedido.':'Cancelar o pedido.')+'\n\nAvisar o cliente pelo WhatsApp também?')) w = waPreopen(); else u = '';
     }
+    o.status = ns; render();
+    try{ await syncCall('onlineorder_status',{id:o.id,status:o.status}); }
+    catch(e){ o.status = old; notify.err(e.message); render(); if(w) try{ w.close(); }catch(_){} return; }
+    if(u) waFill(w,u);
   },
   async onlineToSale(t){
     const o = ONLINE.orders.find(x=>x.id===t.dataset.id); if(!o) return;
