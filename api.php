@@ -378,7 +378,10 @@ try{
     if(!$row) fail(404, 'Este cliente não tem conta no catálogo.');
     $q = $pdo->prepare('SELECT id FROM online_customers WHERE username = ? AND id <> ?'); $q->execute([$nu, $row['id']]);
     if($q->fetch()) fail(409, 'Este login já está em uso por outro cliente.');
+    $npw = (string)($req['password'] ?? '');
+    if($npw !== '' && (strlen($npw) < 6 || strlen($npw) > 72)) fail(422, 'A senha precisa ter de 6 a 72 caracteres.');
     $pdo->prepare('UPDATE online_customers SET username = ? WHERE id = ?')->execute([$nu, $row['id']]);
+    if($npw !== '') $pdo->prepare('UPDATE online_customers SET pass_hash = ?, reset_req = ? WHERE id = ?')->execute([password_hash($npw, PASSWORD_DEFAULT), '', $row['id']]);
     try{ $pdo->prepare('DELETE FROM online_tokens WHERE customer_id = ?')->execute([$row['id']]); }catch(Throwable $e){}
     out(200, ['ok'=>true, 'username'=>$nu]);
   }

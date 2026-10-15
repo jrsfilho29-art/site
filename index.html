@@ -624,7 +624,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-d';
+const APP_VERSION = '2026.10.15-e';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2701,7 +2701,7 @@ function renderClientes(){
           <td class="muted" style="white-space:nowrap;">${s?(d===0?'hoje':d===1?'ontem':'há '+d+' dias'):'nunca'}</td>
           <td style="text-align:right;white-space:nowrap;">
             ${wa?`<button class="icon-btn plum" data-action="whatsCliente" data-id="${c.id}" title="Chamar no WhatsApp">${icon('send')}</button>`:''}
-            ${(ONLINE.accts[onlineDigits(c.phone).slice(-10)]&&isAdmin())?`<button class="icon-btn ${ONLINE.accts[onlineDigits(c.phone).slice(-10)].resetReq?'danger-c':'plum'}" data-action="custResetPw" data-id="${c.id}" title="${ONLINE.accts[onlineDigits(c.phone).slice(-10)].resetReq?'Cliente pediu ajuda com a senha do catálogo — toque para gerar uma nova':'Login do catálogo: redefinir senha'}">${icon('lock')}</button><button class="icon-btn plum" data-action="custEditUser" data-id="${c.id}" title="Alterar o login do catálogo (${esc(ONLINE.accts[onlineDigits(c.phone).slice(-10)].username)})">${icon('edit')}</button>`:''}
+            ${(ONLINE.accts[onlineDigits(c.phone).slice(-10)]&&isAdmin())?`<button class="icon-btn ${ONLINE.accts[onlineDigits(c.phone).slice(-10)].resetReq?'danger-c':'plum'}" data-action="custResetPw" data-id="${c.id}" title="${ONLINE.accts[onlineDigits(c.phone).slice(-10)].resetReq?'Cliente pediu ajuda com a senha do catálogo — toque para gerar uma nova':'Login do catálogo: redefinir senha'}">${icon('lock')}</button><button class="icon-btn plum" data-action="custEditUser" data-id="${c.id}" title="Alterar login e senha do catálogo (${esc(ONLINE.accts[onlineDigits(c.phone).slice(-10)].username)})">${icon('edit')}</button>`:''}
             <button class="icon-btn plum" data-action="viewCustomer" data-id="${c.id}" title="Histórico de compras">${icon('chart')}</button>
             <button class="icon-btn plum" data-action="editCliente" data-id="${c.id}">${icon('edit')}</button>
             <button class="icon-btn danger-c" data-action="deleteCliente" data-id="${c.id}">${icon('trash')}</button>
@@ -3027,12 +3027,16 @@ const actions_clientes = {
     if(!isAdmin()) return;
     const c = state.customers.find(x=>x.id===t.dataset.id); if(!c) return;
     const a = ONLINE.accts[onlineDigits(c.phone).slice(-10)]; if(!a){ notify.err('Este cliente não tem conta no catálogo.'); return; }
-    const nu = prompt('Novo login do catálogo para '+c.name+'\n\nLogin atual: '+a.username+'\n(3 a 30 letras minúsculas, números, ponto, traço ou sublinhado)', a.username);
+    const nu = prompt('Login do catálogo de '+c.name+'\n\nLogin atual: '+a.username+'\nDigite o novo login (ou deixe como está):\n(3 a 30 letras minúsculas, números, ponto, traço ou sublinhado)', a.username);
     if(nu===null) return;
+    const pw = prompt('Nova senha para '+c.name+' (mínimo 6 caracteres).\n\nDeixe em branco para manter a senha atual:', '');
+    if(pw===null) return;
     try{
-      const j = await syncCall('onlinecustomer_username',{phone:c.phone, username:nu});
-      a.username = j.username; render(); notify.ok('Login alterado para '+j.username+'. A senha continua a mesma.');
-    }catch(e){ notify.err(e.message||'Não foi possível alterar o login.'); }
+      const j = await syncCall('onlinecustomer_username',{phone:c.phone, username:nu, password:pw});
+      a.username = j.username; a.resetReq = pw ? '' : a.resetReq;
+      if(pw) ONLINE.resets = (ONLINE.resets||[]).filter(r=>onlineDigits(r.phone).slice(-10)!==onlineDigits(c.phone).slice(-10));
+      render(); notify.ok(pw ? 'Login e senha atualizados. Cliente: '+j.username : 'Login alterado para '+j.username+'. A senha continua a mesma.');
+    }catch(e){ notify.err(e.message||'Não foi possível alterar.'); }
   },
   editCliente(t){ const c = state.customers.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'cliente', data:{...c}}; render(); },
   deleteCliente(t){
