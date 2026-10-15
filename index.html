@@ -440,6 +440,10 @@
   #catov .catov-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:#17204A;color:#fff;font-size:13px;font-weight:700;}
   #catov .catov-bar button{border:none;background:#F0A81F;color:#17204A;font:inherit;font-size:13px;font-weight:800;padding:8px 14px;border-radius:999px;cursor:pointer;}
   #catov iframe{flex:1 1 auto;width:100%;border:0;background:#fff;}
+  .dclock{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 20px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 0 18px rgba(0,0,0,.25);}
+  .dclock b{font-family:'SF Mono','Cascadia Mono','Roboto Mono',Consolas,'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:.06em;line-height:1.1;color:#FBD98A;text-shadow:0 0 12px rgba(240,168,31,.45);font-variant-numeric:tabular-nums;}
+  .dclock span{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.72);}
+  @media (max-width:640px){.dclock{width:100%;box-sizing:border-box;padding:8px 14px;}.dclock b{font-size:30px;}}
   /* ===== Catálogo On ===== */
   .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:var(--hero-a,#0D1230);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
@@ -610,7 +614,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-u';
+const APP_VERSION = '2026.10.14-v';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2413,6 +2417,10 @@ function renderTab(){
 }
 
 /* ================= dashboard ================= */
+/* relógio digital do Painel (atualiza a cada segundo) */
+function clockStr(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}); }
+function clockDate(){ return new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).replace(/\./g,''); }
+setInterval(function(){ const t=document.getElementById('dclock-t'); if(!t) return; const v=clockStr(); if(t.textContent!==v) t.textContent=v; const d=document.getElementById('dclock-d'); if(d){ const dv=clockDate(); if(d.textContent!==dv) d.textContent=dv; } }, 1000);
 function renderDashboard(){
   const activeSales = state.sales.filter(s=>s.status!=='cancelada');
   const today = todayISO();
@@ -2466,6 +2474,7 @@ function renderDashboard(){
         <div class="cx-stat${lowStock.length>0?' hot':''}"><b>${lowStock.length}</b><span>produto(s) em alerta</span></div>
       </div>
     </div>
+    <div class="dclock" role="timer" aria-label="Relógio"><b id="dclock-t">${clockStr()}</b><span id="dclock-d">${clockDate()}</span></div>
     <div class="flex gap flex-wrap" style="align-items:center;">
     <button class="btn btn-gold" data-action="goTab" data-tab="vendas">${icon('cart')} Nova venda</button>
     <button class="btn btn-ghost" data-action="goTab" data-tab="produtos">${icon('package')} Cadastrar produto</button>
