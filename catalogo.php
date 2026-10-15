@@ -16,7 +16,12 @@ require $dbFile;
 if(defined('CATALOG_WHATSAPP') && $WHATSAPP === '') $WHATSAPP = (string)CATALOG_WHATSAPP;
 function e($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
-try { $pdo = db(); } catch(Throwable $ex){ plain(503, 'Catálogo indisponível no momento.'); }
+$pdo = null;
+for($__t = 0; $__t < 3 && !$pdo; $__t++){ try { $pdo = db(); } catch(Throwable $ex){ usleep(250000); } }   /* o MySQL da hospedagem às vezes recusa a 1ª conexão: tenta de novo */
+if(!$pdo){
+  if($_SERVER['REQUEST_METHOD'] === 'POST'){ http_response_code(503); header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store'); echo json_encode(['ok'=>false,'error'=>'Servidor ocupado. Tente novamente em instantes.']); exit; }
+  plain(503, 'Catálogo indisponível no momento.');
+}
 if($WHATSAPP === ''){ try{ $__m = $pdo->prepare('SELECT v FROM meta WHERE k = ?'); $__m->execute(['whatsapp']); $WHATSAPP = (string)($__m->fetchColumn() ?: ''); }catch(Throwable $__e){} }
 $WHATSAPP = preg_replace('/\D/', '', (string)$WHATSAPP);
 if($WHATSAPP !== '' && strlen($WHATSAPP) <= 11) $WHATSAPP = '55'.$WHATSAPP;   /* DDI do Brasil */
@@ -1074,7 +1079,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-a</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-b</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1392,7 +1397,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       else if(t.id==='cd-user'){t.value=t.value.toLowerCase().replace(/[^a-z0-9._-]/g,'').slice(0,30);}
       $('cd-e').textContent='';$('lg-e').textContent='';
     });
-    function post(a,d){return fetch('catalogo.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro de comunicação.'};});});}
+    function post(a,d,n){n=n||0;return fetch('catalogo.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json().catch(function(){return null;});}).catch(function(){return null;}).then(function(j){if(j)return j;if(n<2)return new Promise(function(ok){setTimeout(ok,700);}).then(function(){return post(a,d,n+1);});return {ok:false,error:'Erro de comunicação. Tente novamente.'};});}
     function done(pf){
       saveAcct(pf);wipeForm();
       openCad('acct');
