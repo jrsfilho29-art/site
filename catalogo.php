@@ -1089,7 +1089,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-d</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-e</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1114,7 +1114,6 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
   <input id="cd-h" name="contato_extra2" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0">
   <div class="of-e" id="cd-e" role="alert"></div>
   <button type="submit" class="lb-act lb-buy" id="cd-s" style="width:100%">Criar meu cadastro</button>
-  <button type="button" class="of-b" id="go-login">Já tenho cadastro — entrar</button>
 </form>
 <form id="lg-f" novalidate autocomplete="on" style="display:none">
   <div class="of-t" style="text-align:left">Entrar</div>
@@ -1377,7 +1376,6 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     window.openCad=openCad;
     $('cad-open').addEventListener('click',function(){openCad();});
     ['cad-x','ac-close'].forEach(function(i){$(i).addEventListener('click',closeCad);});
-    $('go-login').addEventListener('click',function(){view('login');$('lg-u').focus();});
     $('go-reg').addEventListener('click',function(){openCad('reg');});
     $('go-forgot').addEventListener('click',function(){view('forgot');$('fg-p').focus();});
     $('fg-back').addEventListener('click',function(){view('login');});
