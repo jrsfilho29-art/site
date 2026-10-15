@@ -1074,7 +1074,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
     <div class="noresult" id="noresult">Nenhum perfume encontrado.</div>
   </div>
 </div>
-  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.14-ak</span></footer>
+  <footer>Atualizado em <?= date('d/m/Y') ?> · preços e disponibilidade sujeitos a alteração. <span style="opacity:.55">· v2026.10.15-a</span></footer>
 <div class="lb" id="lb" aria-hidden="true"><div class="lb-box" id="lb-box" role="dialog" aria-modal="true"><button class="lb-x" type="button" aria-label="Fechar">&times;</button><div class="lb-img"><img id="lb-i" alt=""></div><div class="lb-info" id="lb-info"><div class="lb-brand" id="lb-b"></div><div class="lb-name" id="lb-n"></div><div class="lb-price" id="lb-p"></div>
 <div class="lb-desc" id="lb-d"></div>
 <div class="lb-acts"><button type="button" class="lb-act lb-add" id="lb-add">Adicionar ao carrinho</button>
@@ -1084,7 +1084,7 @@ echo '<style>.cb-buy,.lb-buy,#of-s,#ct-paid,.lb-add{background:'.$__bc.'!importa
 <button type="button" class="cfab" id="cfab" style="display:none" aria-label="Abrir carrinho"><span class="cfab-i">&#128722;</span><span id="cfab-n">0</span><span class="cfab-t" id="cfab-t"></span></button>
 <div class="okpop" id="cad" role="dialog" aria-modal="true" aria-labelledby="cad-t"><div class="okpop-b cad-b">
 <button class="lb-x" type="button" id="cad-x" aria-label="Fechar">&times;</button>
-<form id="cad-f" novalidate autocomplete="on">
+<form id="cad-f" novalidate autocomplete="off">
   <div class="of-t" style="text-align:left" id="cad-t">Cadastre-se</div>
   <div class="cd-h">Crie seu login e senha para comprar e acompanhar suas compras.</div>
   <input id="cd-n" maxlength="120" autocomplete="name" placeholder="Nome completo">
@@ -1279,7 +1279,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   function openCart(){
     close();$('toast').className='toast';$('atoast').className='atoast';
     $('ct-main').style.display='block';$('ct-ok').style.display='none';
-    $('of-n').value=$('of-n').value||ls('ess_c_n');$('of-p').value=$('of-p').value||ls('ess_c_p');
+    $('of-n').value=$('of-n').value||(ACCT?ACCT.name:'');$('of-p').value=$('of-p').value||(ACCT?ACCT.phone:'');
     pay=pay||ls('ess_c_pay');
     $('of-e').textContent='';drawCart();
     $('ct').className='ct on';document.body.style.overflow='hidden';
@@ -1345,10 +1345,16 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
   (function(){
     var cad=$('cad');if(!cad)return;
     function view(v){$('cad-f').style.display=v==='reg'?'block':'none';$('lg-f').style.display=v==='login'?'block':'none';$('fg-f').style.display=v==='forgot'?'block':'none';if(v==='forgot'){$('fg-ok').style.display='none';$('fg-s').style.display='';$('fg-e').textContent='';}$('ac-v').style.display=v==='acct'?'block':'none';$('cd-e').textContent='';$('lg-e').textContent='';}
+    /* os dados do formulário NÃO ficam guardados no aparelho: limpa os campos e apaga qualquer rastro de versões antigas */
+    function wipeForm(){
+      ['cd-n','cd-p','cd-user','cd-pw','cd-pw2','cd-cpf','cd-email','cd-cep','cd-street','cd-num','cd-dist','cd-city','cd-uf','lg-u','lg-p','fg-p'].forEach(function(id){var el=$(id);if(el)el.value='';});
+      ['ess_c_n','ess_c_p','ess_c_cpf','ess_c_em','ess_c_cep','ess_c_st','ess_c_nu','ess_c_di','ess_c_ci','ess_c_uf'].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+    }
+    wipeForm();
     function openCad(v){
       if(!v)v=ACCT?'acct':'reg';
       if(v==='acct'){$('ac-t').textContent='Olá, '+ACCT.name.split(' ')[0]+'!';$('ac-m').textContent='Você está logado como '+ACCT.username+'. Pode finalizar suas compras pelo carrinho.';}
-      if(v==='reg')[['cd-n','ess_c_n'],['cd-p','ess_c_p'],['cd-cpf','ess_c_cpf'],['cd-email','ess_c_em'],['cd-cep','ess_c_cep'],['cd-street','ess_c_st'],['cd-num','ess_c_nu'],['cd-dist','ess_c_di'],['cd-city','ess_c_ci'],['cd-uf','ess_c_uf']].forEach(function(p){var el=$(p[0]);if(el&&!el.value)el.value=ls(p[1])||'';});
+      if(v==='reg')wipeForm();
       view(v);cad.className='okpop on';document.body.style.overflow='hidden';
     }
     function closeCad(){cad.className='okpop';if($('ct').className.indexOf('on')<0)document.body.style.overflow='';}
@@ -1357,7 +1363,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     ['cad-x','ac-close'].forEach(function(i){$(i).addEventListener('click',closeCad);});
     $('go-login').addEventListener('click',function(){view('login');$('lg-u').focus();});
     $('go-reg').addEventListener('click',function(){openCad('reg');});
-    $('go-forgot').addEventListener('click',function(){view('forgot');$('fg-p').value=$('fg-p').value||ls('ess_c_p')||'';$('fg-p').focus();});
+    $('go-forgot').addEventListener('click',function(){view('forgot');$('fg-p').focus();});
     $('fg-back').addEventListener('click',function(){view('login');});
     $('fg-p').addEventListener('input',function(e){var v=e.target.value.replace(/\D/g,'').slice(0,11);e.target.value=v.length>6?'('+v.slice(0,2)+') '+v.slice(2,v.length-4)+'-'+v.slice(-4):v.length>2?'('+v.slice(0,2)+') '+v.slice(2):v;$('fg-e').textContent='';});
     $('fg-f').addEventListener('submit',function(e){
@@ -1388,7 +1394,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     });
     function post(a,d){return fetch('catalogo.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json().catch(function(){return {ok:false,error:'Erro de comunicação.'};});});}
     function done(pf){
-      saveAcct(pf);ls('ess_c_n',pf.name);ls('ess_c_p',pf.phone);
+      saveAcct(pf);wipeForm();
       openCad('acct');
       if($('ct').className.indexOf('on')>=0){drawCart();}
     }
@@ -1407,7 +1413,7 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
       post('cadastro',d).then(function(j){
         btn.disabled=false;btn.textContent='Criar meu cadastro';
         if(!j.ok){er.textContent=j.error||'Não foi possível salvar. Tente novamente.';return;}
-        ls('ess_c_cpf',$('cd-cpf').value);ls('ess_c_em',em);ls('ess_c_cep',d.cep);ls('ess_c_st',d.street);ls('ess_c_nu',d.number);ls('ess_c_di',d.district);ls('ess_c_ci',d.city);ls('ess_c_uf',d.uf);
+        wipeForm();
         $('cd-pw').value='';$('cd-pw2').value='';
         done(j.profile);
       }).catch(function(){btn.disabled=false;btn.textContent='Criar meu cadastro';er.textContent='Sem conexão. Tente novamente.';});
@@ -1452,7 +1458,6 @@ document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName=
     .then(function(j){
       btn.disabled=false;btn.textContent='Enviar pedido para a loja';
       if(!j.ok){if(window.gateSync&&/Entre ou cadastre-se/.test(j.error||'')){window.acctClear();window.gateSync();return;}er.textContent=j.error||'Não foi possível enviar. Tente novamente.';return;}
-      ls('ess_c_n',n);ls('ess_c_p',$('of-p').value);
       var nn=sent.reduce(function(a,i){return a+i.qty;},0);
       $('ct-okm').textContent='Obrigado, '+n.split(' ')[0]+'! Recebemos seu pedido ('+nn+(nn===1?' item':' itens')+', '+brl(tot)+(home&&dl.q&&dl.q.mode==='combine'?' + frete a combinar':'')+', pagamento: '+pay+'). '+(SELLERN?SELLERN:'A loja')+' vai falar com você pelo WhatsApp '+$('of-p').value+(j.pix?' para confirmar e combinar a entrega. Faça o pagamento abaixo:':' para combinar pagamento e entrega.');
       var ow=$('ct-ow');if(WA){ow.href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Acabei de enviar um pedido pelo catálogo em nome de '+n+'.');ow.style.display='block';}else ow.style.display='none';
