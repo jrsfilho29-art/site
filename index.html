@@ -624,7 +624,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-a';
+const APP_VERSION = '2026.10.15-b';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2434,7 +2434,7 @@ function renderSidebar(){
       ${items.filter(([id])=>canAccessTab(id)).map(([id,ic,label])=>{
         return `
         <div class="navitem ${state.tab===id?'active':''}" data-action="goTab" data-tab="${id}">
-          <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='online'&&onlineNewCount()>0 ? `<span class="navbadge">${onlineNewCount()}</span>` : ''}${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
+          <span class="navicon">${icon(ic,16)}</span><span>${label}</span>${id==='online'&&(onlineNewCount()+(ONLINE.resets||[]).length)>0 ? `<span class="navbadge">${onlineNewCount()+(ONLINE.resets||[]).length}</span>` : ''}${id==='servidor' ? `<span class="syncdot ${syncStatus().cls}" title="${esc(syncStatus().label)}"></span>` : ''}
         </div>`;
       }).join('')}
     </nav>
@@ -2736,7 +2736,7 @@ const actions_extras = {
 
 
 /* ===== Pedidos online (clientes escolhem no catálogo; chegam pelo servidor) ===== */
-const ONLINE = {orders:[], loaded:false, err:'', lastNew:0, accts:{}};
+const ONLINE = {orders:[], loaded:false, err:'', lastNew:0, accts:{}, resets:[]};
 /* sinal sonoro de pedido novo (precisa de um toque/clique na página para o navegador liberar o som) */
 const SND = {ctx:null};
 function sndUnlock(){ try{ if(!SND.ctx){ const AC = window.AudioContext||window.webkitAudioContext; if(AC) SND.ctx = new AC(); } if(SND.ctx && SND.ctx.state==='suspended') SND.ctx.resume(); }catch(e){} }
@@ -2794,6 +2794,7 @@ function noteCatalogAccts(list){
     if(x.resetReq && !seen.has(x.id+'|'+x.resetReq)){ seen.add(x.id+'|'+x.resetReq); newReq.push(x.name); }
   });
   ONLINE.accts = m;
+  ONLINE.resets = (list||[]).filter(x=>x.username && x.resetReq).map(x=>({id:x.id, name:x.name, phone:x.phone, username:x.username, at:x.resetReq}));
   if(newReq.length){ try{ localStorage.setItem('ess_reset_seen', JSON.stringify(Array.from(seen).slice(-300))); }catch(e){} notify.ok(newReq.length===1 ? newReq[0]+' pediu ajuda com login/senha do catálogo (veja em Clientes).' : newReq.length+' clientes pediram ajuda com login/senha do catálogo (veja em Clientes).'); }
 }
 async function fetchOnlineOrders(silent){
@@ -2817,6 +2818,30 @@ function onlineAgo(iso){
   if(m<1) return 'agora'; if(m<60) return 'há '+m+' min'; const h=Math.round(m/60); if(h<24) return 'há '+h+' h';
   return new Date(t).toLocaleDateString('pt-BR')+' '+new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
+/* pedidos de nova senha feitos no catálogo ("Esqueci meu login/senha"): ficam visíveis até o administrador gerar a senha */
+async function catalogPwReset(name, phone, username){
+  if(!confirm('Gerar uma NOVA senha para '+name+' (login: '+username+')?\n\nA senha atual deixa de funcionar e o cliente é desconectado dos aparelhos.')) return;
+  try{
+    const j = await syncCall('onlinecustomer_reset',{phone});
+    ONLINE.resets = (ONLINE.resets||[]).filter(a=>onlineDigits(a.phone).slice(-10)!==onlineDigits(phone).slice(-10));
+    const ac = ONLINE.accts[onlineDigits(phone).slice(-10)]; if(ac) ac.resetReq = '';
+    render();
+    const msg = 'Olá, '+String(name).split(' ')[0]+'! Seus dados de acesso ao catálogo:\nLogin: '+j.username+'\nSenha: '+j.password+'\nVocê pode usar essa senha para entrar.';
+    if(confirm('Nova senha gerada!\n\nLogin: '+j.username+'\nSenha: '+j.password+'\n\nAnote agora: ela não aparece de novo.\n\nOK = abrir o WhatsApp com a mensagem pronta para o cliente.\nCancelar = só fechar.')){
+      const w = waLink(phone, msg); if(w) window.open(w, '_blank', 'noopener');
+    }
+  }catch(e){ notify.err(e.message||'Não foi possível redefinir a senha.'); }
+}
+function resetRequestsCard(){
+  const l = ONLINE.resets||[]; if(!l.length) return '';
+  return `<div class="card mb3" style="border-left:4px solid var(--danger);padding:14px 16px;">
+    <div class="klabel mb2">${icon('key',14)} Pedidos de nova senha do catálogo (${l.length})</div>
+    ${l.map(x=>`<div class="flex-between flex-wrap" style="gap:10px;padding:8px 0;border-top:1px dashed var(--line);align-items:center;">
+      <div><b>${esc(x.name)}</b> <span class="muted">· ${esc(maskPhone(x.phone))} · login <b>${esc(x.username)}</b></span><div class="muted2" style="font-size:11.5px;">pediu ${esc(onlineAgo(x.at))}</div></div>
+      ${isAdmin()?`<button class="btn btn-gold" style="padding:6px 12px;font-size:12.5px;" data-action="resetCatPw" data-id="${esc(x.id)}">${icon('key',13)} Gerar nova senha</button>`:'<span class="muted2" style="font-size:12px;">Só o administrador gera a senha</span>'}
+    </div>`).join('')}
+  </div>`;
+}
 function renderOnline(){
   const flt = state.ui.onlineFilter || 'novo';
   if(syncEnabled() && !ONLINE.loaded && !ONLINE.loading && !ONLINE.err){ ONLINE.loading=true; fetchOnlineOrders(false).finally(()=>{ONLINE.loading=false;}); }
@@ -2826,7 +2851,7 @@ function renderOnline(){
   const head = `<div class="cx-hero"><div><h2 class="serif">Pedidos online</h2><p>Escolhas feitas pelos clientes no catálogo online</p>${heroStats('online')}</div>
     <div class="flex gap flex-wrap"><button class="btn btn-ghost" data-action="toggleOnlineSound" title="Som de aviso quando chegar pedido novo (testa o som ao ligar)">${icon(soundOn()?'bell':'bellOff')} Som: ${soundOn()?'ligado':'desligado'}</button><button class="btn btn-ghost" data-action="refreshOnline">${icon('refresh')} Atualizar</button></div></div>`;
   if(!syncEnabled()){
-    return head + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
+    return head + resetRequestsCard() + `<div class="card">${emptyState(icon('cloud',28),'Servidor não ativado','Os pedidos chegam pelo servidor. Entre pelo seu site (seuperfume.net) e ative a sincronização no menu Servidor.')}</div>`;
   }
   const body = !ONLINE.loaded && !ONLINE.err ? `<div class="card muted">Carregando pedidos…</div>`
     : ONLINE.err ? `<div class="card" style="color:var(--danger);">${esc(ONLINE.err)}</div>`
@@ -2862,7 +2887,7 @@ function renderOnline(){
             ${open?`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="concluido">Concluir</button><button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="cancelado">Cancelar</button>`:`<button class="btn btn-ghost" data-action="onlineStatus" data-id="${esc(o.id)}" data-s="novo">Reabrir</button>`}
           </div></div>`;
       }).join('')}</div>`;
-  return head + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
+  return head + resetRequestsCard() + `<div class="fchips mb2">${chips.map(([k,l])=>`<button type="button" class="fchip ${flt===k?'on':''} ${k==='novo'&&cnt(k)>0?'alert':''}" data-action="setOnlineFilter" data-f="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>` + body;
 }
 const actions_online = {
   async onlineDelete(t){
@@ -2982,19 +3007,16 @@ const actions_online = {
 
 const actions_clientes = {
   newCliente(){ state.ui.modal = {type:'cliente', data:{id:null,code:nextCustomerCode(),name:'',phone:'',email:'',cpf:'',address:'',number:'',district:'',city:'',state:'',zip:'',notes:''}}; render(); },
+  async resetCatPw(t){
+    if(!isAdmin()) return;
+    const x = (ONLINE.resets||[]).find(a=>a.id===t.dataset.id); if(!x) return;
+    await catalogPwReset(x.name, x.phone, x.username);
+  },
   async custResetPw(t){
     if(!isAdmin()) return;
     const c = state.customers.find(x=>x.id===t.dataset.id); if(!c) return;
     const a = ONLINE.accts[onlineDigits(c.phone).slice(-10)]; if(!a){ notify.err('Este cliente não tem conta no catálogo.'); return; }
-    if(!confirm('Gerar uma NOVA senha para '+c.name+' (login: '+a.username+')?\n\nA senha atual deixa de funcionar e o cliente é desconectado dos aparelhos.')) return;
-    try{
-      const j = await syncCall('onlinecustomer_reset',{phone:c.phone});
-      a.resetReq = ''; render();
-      const msg = 'Olá, '+String(c.name).split(' ')[0]+'! Seus dados de acesso ao catálogo da Essência:\nLogin: '+j.username+'\nSenha: '+j.password+'\nVocê pode usar essa senha para entrar.';
-      if(confirm('Nova senha gerada!\n\nLogin: '+j.username+'\nSenha: '+j.password+'\n\nAnote agora: ela não aparece de novo.\n\nOK = abrir o WhatsApp com a mensagem pronta para o cliente.\nCancelar = só fechar.')){
-        const w = waLink(c.phone, msg); if(w) window.open(w, '_blank', 'noopener');
-      }
-    }catch(e){ notify.err(e.message||'Não foi possível redefinir a senha.'); }
+    await catalogPwReset(c.name, c.phone, a.username);
   },
   editCliente(t){ const c = state.customers.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'cliente', data:{...c}}; render(); },
   deleteCliente(t){
@@ -5472,9 +5494,10 @@ function acctTotals(kind){
 }
 function acctAlertStrip(){
   const parts = [];
+  if((ONLINE.resets||[]).length) parts.push(`<a data-action="goTab" data-tab="online" style="cursor:pointer;"><b>${ONLINE.resets.length}</b> cliente(s) pediram <span class="badge-danger">nova senha do catálogo</span></a>`);
   if(isAdmin()){ const p = acctTotals('pagar'); if(p.nLate+p.nToday>0) parts.push(`<a data-action="goTab" data-tab="pagar" style="cursor:pointer;"><b>${p.nLate+p.nToday}</b> conta(s) a pagar ${p.nLate?`<span class="badge-danger">${p.nLate} vencida(s)</span>`:''} ${p.nToday?`<span class="badge-warn">${p.nToday} vence(m) hoje</span>`:''} · ${brl(p.late+p.today)}</a>`); }
   const r = acctTotals('receber'); if(r.nLate+r.nToday>0) parts.push(`<a data-action="goTab" data-tab="receber" style="cursor:pointer;"><b>${r.nLate+r.nToday}</b> conta(s) a receber ${r.nLate?`<span class="badge-danger">${r.nLate} vencida(s)</span>`:''} ${r.nToday?`<span class="badge-warn">${r.nToday} vence(m) hoje</span>`:''} · ${brl(r.late+r.today)}</a>`);
-  return parts.length ? `<div class="card mb3" style="padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;border-left:4px solid var(--gold);"><span class="klabel">${icon('alert',14)} Atenção às contas</span>${parts.join('')}</div>` : '';
+  return parts.length ? `<div class="card mb3" style="padding:12px 16px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;border-left:4px solid var(--gold);"><span class="klabel">${icon('alert',14)} Atenção</span>${parts.join('')}</div>` : '';
 }
 function renderContas(kind){
   const K = ACCT[kind]; const t = todayISO();
