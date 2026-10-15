@@ -436,6 +436,10 @@
   .cx-hero .segbar button{background:transparent;border-color:rgba(255,255,255,.28);color:#D7DAF0;}
   .cx-hero .segbar button:hover{background:rgba(255,255,255,.14);}
   .cx-hero .segbar button.on{background:var(--gold);border-color:var(--gold);color:#141A3C;}
+  #catov{position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column;}
+  #catov .catov-bar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:#17204A;color:#fff;font-size:13px;font-weight:700;}
+  #catov .catov-bar button{border:none;background:#F0A81F;color:#17204A;font:inherit;font-size:13px;font-weight:800;padding:8px 14px;border-radius:999px;cursor:pointer;}
+  #catov iframe{flex:1 1 auto;width:100%;border:0;background:#fff;}
   /* ===== Catálogo On ===== */
   .cx-hero{position:relative;border-radius:16px;padding:20px 22px;margin-bottom:16px;color:#fff;background:var(--hero-a,#0D1230);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
   .cx-hero h2{margin:0 0 2px;font-size:26px;color:#fff;}
@@ -606,7 +610,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-t';
+const APP_VERSION = '2026.10.14-u';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -658,6 +662,23 @@ function customerStats(){
   return m;
 }
 function daysSince(iso){ if(!iso) return null; return Math.floor((Date.now()-new Date(iso).getTime())/86400000); }
+/* celular: abre o catálogo por cima do programa, com botão para fechar sem sair do sistema (no computador continua abrindo em nova aba) */
+function isPhoneAccess(){ try{ return window.matchMedia('(max-width: 820px)').matches || /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent||''); }catch(e){ return false; } }
+function closeCatalogOverlay(fromPop){
+  const el = document.getElementById('catov'); if(!el) return;
+  el.remove(); document.body.style.overflow = '';
+  if(!fromPop && history.state && history.state.catov){ try{ history.back(); }catch(e){} }
+}
+function showCatalogOverlay(url){
+  closeCatalogOverlay(true);
+  const el = document.createElement('div'); el.id = 'catov';
+  el.innerHTML = '<div class="catov-bar"><span>Catálogo da loja</span><button type="button" id="catov-x">&times; Fechar catálogo</button></div><iframe title="Catálogo" src="'+url.replace(/"/g,'&quot;')+'" allow="clipboard-write"></iframe>';
+  document.body.appendChild(el); document.body.style.overflow = 'hidden';
+  document.getElementById('catov-x').addEventListener('click', ()=>closeCatalogOverlay(false));
+  try{ history.pushState({catov:1}, ''); }catch(e){}
+}
+window.addEventListener('popstate', ()=>{ if(document.getElementById('catov')) closeCatalogOverlay(true); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && document.getElementById('catov')) closeCatalogOverlay(false); });
 function openNewTab(url){ const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener noreferrer'; a.style.display='none'; document.body.appendChild(a); a.click(); a.remove(); }
 function waLink(phone, text){ let d=String(phone||'').replace(/\D/g,''); if(d.length<10) return ''; if(d.length<=11) d='55'+d; return 'https://wa.me/'+d+'?text='+encodeURIComponent(text||''); }
 function fiadoSales(){ return state.sales.filter(s=> s.status!=='cancelada' && (s.payments||[]).some(p=>p.method==='Fiado' && p.amount>0)); }
@@ -3290,7 +3311,8 @@ const actions_produtos = {
   },
   openCatalogPage(){
     /* abre a página pública atual do site (catalogo.php, com carrinho e pedido online), numa nova aba */
-    openNewTab(catalogPublicUrl('') + '?v=' + encodeURIComponent(APP_VERSION));
+    const cu = catalogPublicUrl('') + '?v=' + encodeURIComponent(APP_VERSION);
+    if(isPhoneAccess()) showCatalogOverlay(cu); else openNewTab(cu);
   },
   async exportCatalogPage(){
     let list = state.ui.catalogOnlyAvailable ? state.products.filter(p=>p.stock>0) : state.products;
