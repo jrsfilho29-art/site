@@ -606,7 +606,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.14-o';
+const APP_VERSION = '2026.10.14-p';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -1967,6 +1967,7 @@ function render(){
   const selStart = active && typeof active.selectionStart==='number' ? active.selectionStart : null;
   const selEnd = active && typeof active.selectionEnd==='number' ? active.selectionEnd : null;
   const scrollY = window.scrollY;
+  const _mb0 = document.querySelector('.modal-box'), modalTop = _mb0 ? _mb0.scrollTop : null;   /* janelas (editar produto etc.) são recriadas a cada tecla: guarda a rolagem interna */
 
   const app = document.getElementById('app');
   try{
@@ -2000,7 +2001,7 @@ function render(){
       el = Array.prototype.slice.call(app.querySelectorAll('[data-field]')).filter(function(x){ return x.dataset.field===activeField; })[0] || null;
     }
     if(el){
-      el.focus();
+      try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); }
       if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd);}catch(e){} }
       else if(el.tagName==='INPUT' && el.type==='number'){
         /* campos numéricos não expõem a posição do cursor: sem isso ele voltava para o início a cada tecla */
@@ -2009,6 +2010,7 @@ function render(){
     }
   }
   window.scrollTo(0, scrollY);
+  if(modalTop!=null){ const mb = document.querySelector('.modal-box'); if(mb) mb.scrollTop = modalTop; }
 }
 
 let listenersAttached = false;
