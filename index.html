@@ -323,6 +323,7 @@
   .role-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;}
   .role-badge.admin{background:var(--tint-warm,#FDF0D2);color:var(--gold-deep);}
   .role-badge.user{background:var(--tint);color:var(--plum);}
+  .role-badge.full{background:#17204A;color:var(--gold-soft);}
   .pcode{color:var(--gold-deep);font-weight:600;margin-right:7px;font-variant-numeric:tabular-nums;letter-spacing:.2px;}
   .sthumb{display:inline-block;flex-shrink:0;border-radius:6px;border:1px solid var(--line);background:#fff;object-fit:contain;vertical-align:middle;}
   .sthumb.none{display:inline-flex;align-items:center;justify-content:center;color:var(--muted2,#9aa0c0);background:var(--tint);}
@@ -685,13 +686,21 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.16-c';
+const APP_VERSION = '2026.10.16-d';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
-const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
+const ROLE_LABEL = { admin:'Administrador', user:'Usuário', full:'Administrador Full Access' };
 const ADMIN_TABS = ['relatorios','servidor','usuarios','pagar'];
 const ADMIN_ACTIONS = new Set(['deleteAcct','custResetPw','custEditUser','onlineDelete','cancelSale','cancelOrder','deleteCliente','deleteProduto','deleteSelectedProducts','deleteCategory','deleteSubcategory','applyInventory','openCategoriesManager','exportBackup','resetSalesOrders','clearOnlineOrders','exportDataSQL','newUsuario','submitNewUser','editUserName','submitEditUser','deleteUser','openResetPw','syncConnect','syncTest','syncPushNow','syncPullNow','syncForcePush','syncDisconnect','setServidorSubView']);
 function roleOf(u){ return (u && u.role==='user') ? 'user' : 'admin'; }
+function isFull(u){ return !!u && u.role==='full'; }
+/* Full Access (dono): único perfil que vê preço de custo, markup, margem e lucro. Se ainda não existir nenhum, todo administrador vê (para ninguém ficar sem acesso). */
+function canCost(){ const u = typeof state!=='undefined' ? state.currentUser : null; if(!u || !isAdmin(u)) return false; return isFull(u) || !state.users.some(isFull); }
+function ensureFull(){
+  if(typeof state==='undefined' || !state.users) return;
+  let ch=false; state.users.forEach(u=>{ if(!isFull(u) && (/^joca$/i.test(String(u.name||'').trim()) || /^joca$/i.test(String(u.username||'').trim()))){ u.role='full'; ch=true; } });
+  if(ch){ persist('users'); }
+}
 function isAdmin(u){ u = u || (typeof state!=='undefined' ? state.currentUser : null); return !!u && roleOf(u)==='admin'; }
 function canAccessTab(tab){ return isAdmin() || ADMIN_TABS.indexOf(tab)<0; }
 function adminCount(){ return state.users.filter(u=>roleOf(u)==='admin').length; }
@@ -1029,14 +1038,16 @@ async function downloadCSV(filename, rows){
 }
 
 /* ================= exportar produtos (CSV / Excel / HTML) ================= */
-const PRODUCT_EXPORT_HEADERS = ['Código','Nome','Categoria','Subgrupo','Marca','Volume','Fornecedor','Preço de Custo','Preço de Venda','Markup (%)','Estoque','Estoque Mínimo','Estoque Máximo','Descrição','Imagem (URL)'];
+const PRODUCT_EXPORT_HEADERS_ALL = ['Código','Nome','Categoria','Subgrupo','Marca','Volume','Fornecedor','Preço de Custo','Preço de Venda','Markup (%)','Estoque','Estoque Mínimo','Estoque Máximo','Descrição','Imagem (URL)'];
+function pexHeaders(){ return canCost() ? PRODUCT_EXPORT_HEADERS_ALL : PRODUCT_EXPORT_HEADERS_ALL.filter((h,i)=>i!==7 && i!==9); }
 function productExportRow(p){
-  return [
+  const row = [
     p.sku||'', p.name||'', p.category||'', p.subcategory||'', p.brand||'', p.volume||'', p.supplier||'',
     (p.costPrice||0).toFixed(2).replace('.',','), (p.salePrice||0).toFixed(2).replace('.',','), (p.markup||0).toFixed(2).replace('.',','),
     p.stock||0, p.minStock||0, p.maxStock!=null?p.maxStock:'', p.description||'',
     (p.image && /^https?:\/\//i.test(p.image)) ? p.image : ''
   ];
+  return canCost() ? row : row.filter((c,i)=>i!==7 && i!==9);
 }
 function currentProductExportList(){
   const q = (state.ui.productQuery||'').toLowerCase();
@@ -1049,7 +1060,7 @@ function currentProductExportList(){
 }
 
 async function exportProductsCSV(list){
-  const rows = [PRODUCT_EXPORT_HEADERS, ...list.map(productExportRow)];
+  const rows = [pexHeaders(), ...list.map(productExportRow)];
   await downloadCSV('produtos-'+todayISO()+'.csv', rows);
 }
 
@@ -1061,7 +1072,7 @@ async function exportProductsHTML(list){
     cells.pop();
     return `<tr><td>${imgCell}</td>${cells.map(c=>`<td>${esc(String(c))}</td>`).join('')}</tr>`;
   }).join('\n');
-  const headers = ['Imagem', ...PRODUCT_EXPORT_HEADERS.slice(0,-1)];
+  const headers = ['Imagem', ...pexHeaders().slice(0,-1)];
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Produtos - Essência</title></head><body>
 <table border="1">
 <tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>
@@ -1076,7 +1087,7 @@ async function exportProductsXLSX(list){
   let XLSX;
   try{ XLSX = await loadXLSX(); }
   catch(err){ notify.err(err.message); return; }
-  const rows = [PRODUCT_EXPORT_HEADERS, ...list.map(productExportRow)];
+  const rows = [pexHeaders(), ...list.map(productExportRow)];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
@@ -2099,7 +2110,7 @@ function applyPrefs(){
 }
 let _sessTab = null;
 function render(){
-  applyPrefs();
+  applyPrefs(); ensureFull();
   if(state.currentUser && !canAccessTab(state.tab)) state.tab = 'dashboard';
   document.body.classList.toggle('role-user', !!state.currentUser && !isAdmin());
   if(state.currentUser && _sessTab!==state.tab){ _sessTab = state.tab; sessionSave(state.currentUser, state.tab); }
@@ -2587,7 +2598,7 @@ function renderDashboard(){
     ['Vendas hoje', salesToday.length, brl(revenueToday), icon('cart')],
     ['Produtos cadastrados', state.products.length, state.products.filter(p=>p.stock>0).length+' com estoque disponível', icon('package')],
     ['Clientes', state.customers.length, 'cadastrados', icon('users')],
-    ['Valor do estoque (custo)', brl(stockValue), lowStock.length+' produto(s) em alerta', icon('warehouse')],
+    [canCost()?'Valor do estoque (custo)':'Valor do estoque (venda)', brl(canCost()?stockValue:state.products.reduce((a,p)=>a+p.stock*(p.salePrice||0),0)), lowStock.length+' produto(s) em alerta', icon('warehouse')],
     ['Pedidos online novos', onlNew, onlProg+' em andamento · '+onlToday+' hoje', icon('inbox')],
     ['Online em aberto', brl(onlOpenVal), onlOpen.length+' pedido(s) a atender · '+brl(onlDoneVal)+' concluído(s)', icon('book')],
   ];
@@ -2720,8 +2731,8 @@ function renderPainelExtras(activeSales, monthSales, monthRevenue){
       <div class="klabel mb2">Resumo do mês</div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;">
         <div><div class="muted2" style="font-size:12px;">Receita</div><div class="serif" style="font-size:19px;color:var(--plum);">${brl(monthRevenue)}</div></div>
-        <div><div class="muted2" style="font-size:12px;">Lucro estimado</div><div class="serif ${profit>=0?'ok-c':'danger-c'}" style="font-size:19px;">${brl(profit)}</div></div>
-        <div><div class="muted2" style="font-size:12px;">Margem</div><div class="serif" style="font-size:19px;color:var(--plum);">${margin.toFixed(1)}%</div></div>
+        ${canCost()?`<div><div class="muted2" style="font-size:12px;">Lucro estimado</div><div class="serif ${profit>=0?'ok-c':'danger-c'}" style="font-size:19px;">${brl(profit)}</div></div>
+        <div><div class="muted2" style="font-size:12px;">Margem</div><div class="serif" style="font-size:19px;color:var(--plum);">${margin.toFixed(1)}%</div></div>`:''}
         <div><div class="muted2" style="font-size:12px;">Vendas</div><div class="serif" style="font-size:19px;color:var(--plum);">${monthSales.length}</div></div>
       </div>
       <p class="muted2" style="font-size:11.5px;margin-top:10px;">Lucro = receita menos o custo cadastrado dos produtos vendidos${monthDisc?` (descontos de ${brl(monthDisc)} já incluídos na receita)`:''}.</p>
@@ -3222,7 +3233,7 @@ function renderProductCard(p, sel){
   const min = p.minStock||0, zero = p.stock<=0, low = !zero && p.stock<=min;
   const cap = Math.max(min*3, 10, p.stock);
   const pct = zero ? 0 : Math.max(6, Math.min(100, Math.round(p.stock/cap*100)));
-  const margin = (p.costPrice>0 && p.salePrice>0) ? Math.round((p.salePrice-p.costPrice)/p.salePrice*100) : null;
+  const margin = (canCost() && p.costPrice>0 && p.salePrice>0) ? Math.round((p.salePrice-p.costPrice)/p.salePrice*100) : null;
   const tag = zero ? '<span class="pc-tag zero">Sem estoque</span>' : low ? `<span class="pc-tag low">Repor · ${p.stock} un.</span>` : `<span class="pc-tag ok">${p.stock} un.</span>`;
   return `
       <div class="pc${sel.includes(p.id)?' selected':''}${p.active===false?' inactive':''}">
@@ -3691,7 +3702,7 @@ function renderEstoquePosicao(){
   return `
   <div class="grid grid-3 mb3">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Produtos em estoque</div><div class="serif" style="font-size:24px;color:var(--plum);">${distinctInStock}</div><div class="muted2" style="font-size:11px;margin-top:3px;">de ${state.products.length} cadastrado(s)</div></div>
-    <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor em estoque (custo)</div><div class="serif" style="font-size:24px;color:var(--plum);">${brl(totalCost)}</div></div>
+    ${canCost()?`<div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor em estoque (custo)</div><div class="serif" style="font-size:24px;color:var(--plum);">${brl(totalCost)}</div></div>`:''}
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor em estoque (venda)</div><div class="serif" style="font-size:24px;color:var(--plum);">${brl(totalSale)}</div></div>
   </div>
   ${state.products.length===0 ? emptyState(icon('warehouse',26),'Estoque vazio','Cadastre produtos para que o estoque seja organizado automaticamente.') : `
@@ -3755,7 +3766,7 @@ function invSummaryHTML(){
       ${box('Contados', st.counted+' de '+st.total, pct+'% concluído')}
       ${box('Pendentes', st.pending, '')}
       ${box('Divergências', `<span class="${st.diverg?'danger-c':''}">${st.diverg}</span>`, 'diferem do sistema')}
-      ${box('Diferença líquida', (st.net>0?'+':'')+st.net+' un.', 'a custo: '+brl(st.netValue))}
+      ${box('Diferença líquida', (st.net>0?'+':'')+st.net+' un.', canCost()?'a custo: '+brl(st.netValue):'')}
     </div>
     <div style="height:6px;background:var(--tint);border-radius:4px;overflow:hidden;margin-bottom:14px;"><div style="height:100%;width:${pct}%;background:var(--gold);"></div></div>`;
 }
@@ -4303,12 +4314,13 @@ const actions_vendas = {
   },
   async exportStockCSV(){
     if(!state.products.length){ notify.err('Nenhum produto cadastrado.'); return; }
-    const rows=[['SKU','Produto','Marca','Categoria','Subgrupo','Volume','Fornecedor','Estoque','Minimo','Maximo','Custo Unit','Venda Unit','Markup %','Valor Custo Total','Valor Venda Total']];
+    const cc = canCost();
+    const rows=[['SKU','Produto','Marca','Categoria','Subgrupo','Volume','Fornecedor','Estoque','Minimo','Maximo',...(cc?['Custo Unit']:[]),'Venda Unit',...(cc?['Markup %','Valor Custo Total']:[]),'Valor Venda Total']];
     state.products.forEach(p=> rows.push([
       p.sku||'', p.name, p.brand||'', p.category||'', p.subcategory||'', p.volume||'', p.supplier||'', p.stock, p.minStock||0, p.maxStock!=null?p.maxStock:'',
-      (p.costPrice||0).toFixed(2).replace('.',','), (p.salePrice||0).toFixed(2).replace('.',','),
-      (p.markup||0).toFixed(2).replace('.',','),
-      (p.stock*(p.costPrice||0)).toFixed(2).replace('.',','), (p.stock*(p.salePrice||0)).toFixed(2).replace('.',',')
+      ...(cc?[(p.costPrice||0).toFixed(2).replace('.',',')]:[]), (p.salePrice||0).toFixed(2).replace('.',','),
+      ...(cc?[(p.markup||0).toFixed(2).replace('.',','), (p.stock*(p.costPrice||0)).toFixed(2).replace('.',',')]:[]),
+      (p.stock*(p.salePrice||0)).toFixed(2).replace('.',',')
     ]));
     await downloadCSV('estoque-'+todayISO()+'.csv', rows);
     notify.ok('Relatório de estoque exportado.');
@@ -4316,11 +4328,11 @@ const actions_vendas = {
   async exportPurchaseList(){
     const low = state.products.filter(p=>p.stock<=(p.minStock||0));
     if(!low.length){ notify.ok('Nenhum produto precisa de reposição no momento.'); return; }
-    const rows=[['SKU','Produto','Marca','Fornecedor','Estoque Atual','Minimo','Sugestao Compra','Custo Unit','Custo Estimado']];
+    const cc = canCost(); const rows=[['SKU','Produto','Marca','Fornecedor','Estoque Atual','Minimo','Sugestao Compra',...(cc?['Custo Unit','Custo Estimado']:[])]];
     low.forEach(p=>{
       const sug = Math.max(1, (p.minStock||0)*2 - p.stock);
       rows.push([p.sku||'', p.name, p.brand||'', p.supplier||'', p.stock, p.minStock||0, sug,
-        (p.costPrice||0).toFixed(2).replace('.',','), (sug*(p.costPrice||0)).toFixed(2).replace('.',',')]);
+        ...(cc?[(p.costPrice||0).toFixed(2).replace('.',','), (sug*(p.costPrice||0)).toFixed(2).replace('.',',')]:[])]);
     });
     await downloadCSV('lista-de-compras-'+todayISO()+'.csv', rows);
     notify.ok('Lista de compras gerada com '+low.length+' item(ns).');
@@ -4662,7 +4674,7 @@ function heroStats(kind){
   let a = [];
   if(kind==='clientes'){ a = [st(state.customers.length,'cadastrados'), st(state.customers.filter(c=>waPhone(c.phone)).length,'com WhatsApp'), st(state.customers.filter(c=>!waPhone(c.phone)).length,'sem telefone')]; }
   else if(kind==='produtos'){ const low = state.products.filter(p=>p.stock<=(p.minStock||0)).length; a = [st(state.products.length,'produtos'), st(state.products.filter(p=>p.stock>0).length,'com estoque'), st(low,'em alerta',low>0)]; }
-  else if(kind==='estoque'){ const un = state.products.reduce((t,p)=>t+(+p.stock||0),0), low = state.products.filter(p=>p.stock<=(p.minStock||0)).length; a = [st(un,'unidades'), st(brl(state.products.reduce((t,p)=>t+p.stock*p.costPrice,0)),'valor (custo)'), st(low,'em alerta',low>0)]; }
+  else if(kind==='estoque'){ const un = state.products.reduce((t,p)=>t+(+p.stock||0),0), low = state.products.filter(p=>p.stock<=(p.minStock||0)).length; a = [st(un,'unidades'), (canCost()?st(brl(state.products.reduce((t,p)=>t+p.stock*p.costPrice,0)),'valor (custo)'):st(brl(state.products.reduce((t,p)=>t+p.stock*(p.salePrice||0),0)),'valor (venda)')), st(low,'em alerta',low>0)]; }
   else if(kind==='vendas'){ const t = todayISO(), d = state.sales.filter(x=>x.status!=='cancelada' && localDay(x.date)===t); a = [st(d.length,'vendas hoje'), st(brl(d.reduce((q,x)=>q+x.total,0)),'faturado hoje'), st(state.sales.length,'no histórico')]; }
   else if(kind==='pedidos'){ const pend = state.orders.filter(o=>o.status==='Pendente').length; a = [st(state.orders.length,'pedidos'), st(pend,'pendentes',pend>0)]; }
   else if(kind==='online'){ const n = (typeof onlineNewCount==='function')?onlineNewCount():0; a = [st(n,'novo(s)',n>0), st(ONLINE.orders.length,'recebidos')]; }
@@ -5121,23 +5133,24 @@ function relTables(T, from, to){
   const disc = sales.reduce((a,s)=>a+(s.discount||0),0), profit = revenue-cost-disc-sales.reduce((a,s)=>a+(s.shipping||0),0);
   const T_ = [];
   const want = k => (T==='geral' && k!=='vendedor') || T===k;
-  if(want('lucro')) T_.push({key:'lucro', title:'Lucratividade', head:['Vendas','Receita','Custo','Descontos','Lucro líquido','Margem'], rows:[[sales.length, 'R$ '+f2(revenue), 'R$ '+f2(cost), 'R$ '+f2(disc), 'R$ '+f2(profit), revenue>0?pc(profit/revenue*100):'0,0%']]});
+  if(want('lucro') && canCost()) T_.push({key:'lucro', title:'Lucratividade', head:['Vendas','Receita','Custo','Descontos','Lucro líquido','Margem'], rows:[[sales.length, 'R$ '+f2(revenue), 'R$ '+f2(cost), 'R$ '+f2(disc), 'R$ '+f2(profit), revenue>0?pc(profit/revenue*100):'0,0%']]});
   if(want('vendedor')){ const sr=sellersByPeriod(sales); T_.push({key:'vendedor', title:'Vendas por vendedor e comissão', head:['Vendedor','Vendas','Total vendido','% do total','% comissão','Comissão a pagar'], rows:sr.map(o=>[o.name,o.n,'R$ '+f2(o.total),pc(o.share),pc(o.pct),'R$ '+f2(o.comm)]), foot:sr.length?['Total',sr.reduce((a,o)=>a+o.n,0),'R$ '+f2(sr.reduce((a,o)=>a+o.total,0)),'100%','','R$ '+f2(sr.reduce((a,o)=>a+o.comm,0))]:null}); }
-  if(want('produto')) T_.push({key:'produto', title:'Vendas por produto', head:['Código','Produto','Qtd. vendida','Receita','Custo','Lucro'], rows:Object.entries(prod).sort((a,b)=>b[1].qty-a[1].qty).map(([n,v])=>[v.sku,n,v.qty,'R$ '+f2(v.rev),'R$ '+f2(v.cost),'R$ '+f2(v.rev-v.cost)])});
+  if(want('produto')) T_.push({key:'produto', title:'Vendas por produto', head:canCost()?['Código','Produto','Qtd. vendida','Receita','Custo','Lucro']:['Código','Produto','Qtd. vendida','Receita'], rows:Object.entries(prod).sort((a,b)=>b[1].qty-a[1].qty).map(([n,v])=>canCost()?[v.sku,n,v.qty,'R$ '+f2(v.rev),'R$ '+f2(v.cost),'R$ '+f2(v.rev-v.cost)]:[v.sku,n,v.qty,'R$ '+f2(v.rev)])});
   if(want('categoria')) T_.push({key:'categoria', title:'Vendas por categoria', head:['Categoria','Qtd. vendida','Receita','% da receita'], rows:Object.entries(cat).sort((a,b)=>b[1].rev-a[1].rev).map(([n,v])=>[n,v.qty,'R$ '+f2(v.rev),pc(revenue>0?v.rev/revenue*100:0)])});
   if(want('cliente')) T_.push({key:'cliente', title:'Melhores clientes', head:['Cliente','Compras','Total'], rows:Object.entries(cust).sort((a,b)=>b[1].total-a[1].total).slice(0,T==='cliente'?50:10).map(([n,v])=>[n,v.n,'R$ '+f2(v.total)])});
   if(want('pagamento')){ const tot=Object.values(meth).reduce((a,b)=>a+b,0); T_.push({key:'pagamento', title:'Formas de pagamento', head:['Forma','Total recebido','% do total'], rows:Object.entries(meth).sort((a,b)=>b[1]-a[1]).map(([n,v])=>[n,'R$ '+f2(v),pc(tot>0?v/tot*100:0)])}); }
   if(want('dia')) T_.push({key:'dia', title:'Vendas por dia', head:['Dia','Total vendido'], rows:Object.keys(day).sort().map(k=>[k.split('-').reverse().join('/'),'R$ '+f2(day[k])])});
   if(want('estoque')){
     const sv=state.products.reduce((a,p)=>a+p.stock*p.costPrice,0), ss=state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
-    T_.push({key:'estoque', title:'Estoque', head:['Valor (custo)','Valor (venda)','Produtos'], rows:[['R$ '+f2(sv),'R$ '+f2(ss),state.products.length]]});
+    T_.push({key:'estoque', title:'Estoque', head:canCost()?['Valor (custo)','Valor (venda)','Produtos']:['Valor (venda)','Produtos'], rows:[canCost()?['R$ '+f2(sv),'R$ '+f2(ss),state.products.length]:['R$ '+f2(ss),state.products.length]]});
     const low=state.products.filter(p=>p.stock<=(p.minStock||0));
     T_.push({key:'estoque', title:'Produtos em alerta de estoque', head:['Código','Produto','Estoque','Mínimo'], rows:low.map(p=>[p.sku||'',p.name,p.stock,p.minStock||0])});
   }
   return {tables:T_, count:sales.length};
 }
 const REL_TYPES = [['geral','Relatório geral (completo)'],['lucro','Lucratividade'],['vendedor','Vendas por vendedor e comissão'],['produto','Vendas por produto'],['categoria','Vendas por categoria'],['cliente','Melhores clientes'],['pagamento','Formas de pagamento'],['dia','Vendas por dia'],['estoque','Estoque']];
-function relType(){ const t = state.ui.relType||'geral'; return REL_TYPES.some(r=>r[0]===t) ? t : 'geral'; }
+function relTypes(){ return REL_TYPES.filter(r=>r[0]!=='lucro' || canCost()); }
+function relType(){ const t = state.ui.relType||'geral'; return relTypes().some(r=>r[0]===t) ? t : 'geral'; }
 function renderRelatorios(){
   const T = relType(), show = k => T==='geral' || T===k;
   const from = state.ui.relFrom, to = state.ui.relTo;
@@ -5168,16 +5181,16 @@ function renderRelatorios(){
   const stockValueSale = state.products.reduce((a,p)=>a+p.stock*p.salePrice,0);
 
   return `
-  <div class="cx-hero"><div><h2 class="serif">Relatórios</h2><p>Lucratividade, vendas, pagamentos e estoque</p></div></div>
+  <div class="cx-hero"><div><h2 class="serif">Relatórios</h2><p>${canCost()?'Lucratividade, vendas':'Vendas'}, pagamentos e estoque</p></div></div>
   <div class="flex gap flex-wrap mb3" style="align-items:end;">
     <label class="field" style="margin-bottom:0;min-width:210px;"><span class="lbl">Tipo de relatório</span>
-      <select data-field="ui.relType">${REL_TYPES.filter(r=>r[0]!=='vendedor').map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
+      <select data-field="ui.relType">${relTypes().filter(r=>r[0]!=='vendedor').map(r=>`<option value="${r[0]}" ${T===r[0]?'selected':''}>${r[1]}</option>`).join('')}</select></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">De</span><input type="date" data-field="ui.relFrom" value="${from}"></label>
     <label class="field" style="margin-bottom:0;"><span class="lbl">Até</span><input type="date" data-field="ui.relTo" value="${to}"></label>
     <button class="btn btn-gold" data-action="printRelatorio">${icon('printer')} Imprimir relatório</button>
     <button class="btn btn-ghost" data-action="exportRelatorio">${icon('download')} Exportar CSV</button>
   </div>
-  ${show('lucro')?`<h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
+  ${show('lucro') && canCost()?`<h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Lucratividade</h3>
   <div class="grid mb3" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Receita</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(revenue)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Custo</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(cost)}</div></div>
@@ -5201,15 +5214,15 @@ function renderRelatorios(){
   <div class="table-wrap mb3">
     ${topProducts.length===0 ? `<div style="padding:24px;text-align:center;color:var(--muted2);font-size:14px;">Sem vendas no período selecionado.</div>` : `
     <table>
-      <thead><tr><th>Cód.</th><th>Produto</th><th style="text-align:right;">Qtd. vendida</th><th style="text-align:right;">Receita</th><th style="text-align:right;">Lucro</th></tr></thead>
+      <thead><tr><th>Cód.</th><th>Produto</th><th style="text-align:right;">Qtd. vendida</th><th style="text-align:right;">Receita</th>${canCost()?'<th style="text-align:right;">Lucro</th>':''}</tr></thead>
       <tbody>${topProducts.map(([name,v])=>`
-        <tr><td class="muted">${esc(v.sku||'')}</td><td>${esc(name)}</td><td style="text-align:right;">${v.qty}</td><td style="text-align:right;">${brl(v.revenue)}</td><td style="text-align:right;">${brl(v.revenue-v.cost)}</td></tr>
+        <tr><td class="muted">${esc(v.sku||'')}</td><td>${esc(name)}</td><td style="text-align:right;">${v.qty}</td><td style="text-align:right;">${brl(v.revenue)}</td>${canCost()?`<td style="text-align:right;">${brl(v.revenue-v.cost)}</td>`:''}</tr>
       `).join('')}</tbody>
     </table>`}
   </div>`:''}
   ${show('estoque')?`  <h3 class="serif plum" style="font-size:18px;margin-bottom:12px;">Estoque</h3>
   <div class="grid grid-3 mb2">
-    <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor do estoque (custo)</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(stockValueCost)}</div></div>
+    ${canCost()?`<div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor do estoque (custo)</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(stockValueCost)}</div></div>`:''}
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Valor do estoque (venda)</div><div class="serif" style="font-size:20px;color:var(--plum);">${brl(stockValueSale)}</div></div>
     <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Produtos em alerta</div><div class="serif" style="font-size:20px;" class="${lowStock.length?'danger-c':'plum'}">${lowStock.length}</div></div>
   </div>
@@ -5324,7 +5337,8 @@ function renderUsuarios(){
     <button class="btn btn-gold" data-action="newUsuario">${icon('plus')} Novo usuário</button>
   </div>
   <div class="grid grid-2 mb2" style="max-width:860px;">
-    ${roleCard('admin','Administrador',['Acesso a tudo, inclusive Relatórios, Servidor e Usuários','Cria e gerencia usuários','Cancela vendas e pedidos, exclui cadastros, aplica inventário e faz backup'])}
+    ${roleCard('full','Administrador Full Access',['Tudo do Administrador, mais preço de custo, markup, margem e lucro','Único perfil que vê esses valores','Só ele altera ou exclui outro Full Access'])}
+    ${roleCard('admin','Administrador',['Acesso a tudo, inclusive Relatórios, Servidor e Usuários','Não vê preço de custo, markup, margem nem lucro','Cancela vendas e pedidos, exclui cadastros, aplica inventário e faz backup'])}
     ${roleCard('user','Usuário',['Vendas, Caixa, Pedidos, Clientes, Produtos, Estoque e Catálogo','Pode contar o estoque, mas não aplicar o ajuste','Não vê Relatórios, Servidor e Usuários, e não cancela nem exclui'])}
   </div>
   <div class="table-wrap">
@@ -5335,7 +5349,7 @@ function renderUsuarios(){
         <tr>
           <td>${esc(u.name)} ${u.id===state.currentUser.id? '<span class="gold-c" style="font-size:11px;">(você)</span>':''}</td>
           <td class="muted">${esc(u.username)}</td>
-          <td><span class="role-badge ${roleOf(u)}">${ROLE_LABEL[roleOf(u)]}</span></td>
+          <td><span class="role-badge ${isFull(u)?'full':roleOf(u)}">${ROLE_LABEL[isFull(u)?'full':roleOf(u)]}</span></td>
           <td style="text-align:right;white-space:nowrap;">
             <button class="icon-btn plum" data-action="editUserName" data-id="${u.id}" title="Editar nome e perfil">${icon('edit')}</button>
             <button class="icon-btn plum" data-action="openResetPw" data-id="${u.id}" title="Redefinir senha">${icon('key')}</button>
@@ -5565,16 +5579,18 @@ const actions_usuarios = {
     if(m.password.length<4){ m.error='A senha deve ter ao menos 4 caracteres.'; render(); return; }
     if(m.password!==m.confirm){ m.error='As senhas não conferem.'; m.confirm=''; render(); return; }
     if(state.users.some(u=>u.username.toLowerCase()===m.username.trim().toLowerCase())){ m.error='Esse usuário já existe.'; render(); return; }
-    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: await makeVerifier(m.password), createdAt:new Date().toISOString(), role: m.role==='admin'?'admin':'user' };
+    const newUser = { id:uid('user'), name:m.name.trim(), username:m.username.trim(), passwordHash: await makeVerifier(m.password), createdAt:new Date().toISOString(), role: (m.role==='full' && canCost()) ? 'full' : (m.role==='admin' ? 'admin' : (m.role==='full' ? 'admin' : 'user')) };
     state.users.push(newUser); persist('users');
     state.ui.modal = null; render();
   },
-  editUserName(t){ const u = state.users.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'editUser', data:{id:u.id,name:u.name,role:roleOf(u)}}; render(); },
+  editUserName(t){ const u = state.users.find(x=>x.id===t.dataset.id); if(isFull(u) && !isFull(state.currentUser)){ notify.err('Somente o Administrador Full Access pode alterar este perfil.'); return; } state.ui.modal = {type:'editUser', data:{id:u.id,name:u.name,role:isFull(u)?'full':roleOf(u)}}; render(); },
   openMyPassword(){ const u = state.currentUser; state.ui.modal = {type:'resetPw', userId:u.id, userName:u.name, self:true, cur:'', pw:'', pw2:''}; render(); },
-  openResetPw(t){ const u = state.users.find(x=>x.id===t.dataset.id); state.ui.modal = {type:'resetPw', userId:u.id, userName:u.name, pw:'', pw2:''}; render(); },
+  openResetPw(t){ const u = state.users.find(x=>x.id===t.dataset.id); if(isFull(u) && !isFull(state.currentUser)){ notify.err('Somente o Administrador Full Access pode redefinir a senha deste perfil.'); return; } state.ui.modal = {type:'resetPw', userId:u.id, userName:u.name, pw:'', pw2:''}; render(); },
   deleteUser(t){
     if(t.dataset.id===state.currentUser.id){ notify.err('Você não pode excluir a própria conta enquanto está conectado.'); return; }
     const target = state.users.find(u=>u.id===t.dataset.id);
+    if(isFull(target) && !isFull(state.currentUser)){ notify.err('Somente o Administrador Full Access pode excluir este perfil.'); return; }
+    if(isFull(target) && state.users.filter(isFull).length<=1){ notify.err('Precisa existir ao menos um Administrador Full Access.'); return; }
     if(target && roleOf(target)==='admin' && adminCount()<=1){ notify.err('Precisa existir ao menos um administrador.'); return; }
     if(!confirm('Excluir este usuário?')) return;
     state.users = state.users.filter(u=>u.id!==t.dataset.id); persist('users'); render();
@@ -5582,7 +5598,10 @@ const actions_usuarios = {
   submitEditUser(){
     const d = state.ui.modal.data;
     if(!d.name || !d.name.trim()){ notify.err('Informe o nome.'); return; }
-    const cur = state.users.find(u=>u.id===d.id); const newRole = d.role==='user' ? 'user' : 'admin';
+    const cur = state.users.find(u=>u.id===d.id);
+    if(isFull(cur) && !isFull(state.currentUser)){ notify.err('Somente o Administrador Full Access pode alterar este perfil.'); return; }
+    const newRole = d.role==='user' ? 'user' : (d.role==='full' && canCost() ? 'full' : (isFull(cur) ? 'full' : 'admin'));
+    if(isFull(cur) && newRole!=='full' && state.users.filter(isFull).length<=1){ notify.err('Precisa existir ao menos um Administrador Full Access.'); return; }
     if(cur && roleOf(cur)==='admin' && newRole==='user' && adminCount()<=1){ notify.err('Precisa existir ao menos um administrador.'); return; }
     state.users = state.users.map(u=> u.id===d.id ? {...u, name:d.name.trim(), role:newRole} : u); persist('users');
     if(state.currentUser && state.currentUser.id===d.id) state.currentUser = state.users.find(u=>u.id===d.id);
@@ -6229,12 +6248,14 @@ function renderProdutoModal(d){
       <label class="field"><span class="lbl">Volume (ml)</span><input data-field="ui.modal.data.volume" value="${esc(d.volume||'')}"></label>
     </div>
     <label class="field"><span class="lbl">Fornecedor</span><input data-field="ui.modal.data.supplier" value="${esc(d.supplier||'')}"></label>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;">
+    ${canCost()?`    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;">
       <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" value="${esc(d.costPrice)}"></label>
       <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" data-field="ui.modal.data.markup" value="${esc(d.markup)}"><span class="hint">sobre o custo</span></label>
       <label class="field"><span class="lbl">Margem desejada (%)</span><input type="number" step="0.1" max="99.9" data-field="ui.modal.data.margin" value="${esc(d.margin!==undefined ? d.margin : ((parseFloat(d.costPrice)>0 && parseFloat(d.salePrice)>0) ? Math.round((d.salePrice-d.costPrice)/d.salePrice*10000)/100 : ''))}"><span class="hint">sobre a venda</span></label>
       <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
-    </div>
+    </div>`:`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+      <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
+    </div>`}
     <div class="grid grid-2" style="align-items:end;">
       <label class="field"><span class="lbl">Preço promocional (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.promoPrice" value="${esc(d.promoPrice||'')}" placeholder="vazio = sem promoção"><span class="hint">${(parseFloat(d.promoPrice)||0)>0 && (parseFloat(d.promoPrice)||0)>=(parseFloat(d.salePrice)||0) ? '<b class="danger-c">Precisa ser menor que o preço de venda.</b>' : 'Aparece riscado no catálogo, com o desconto em %.'}</span></label>
       <div style="display:flex;flex-direction:column;gap:8px;padding-bottom:20px;">
@@ -6287,7 +6308,8 @@ function roleSelectHTML(field, value, disabled){
   return `<label class="field"><span class="lbl">Perfil</span>
     <select data-field="${field}" ${disabled?'disabled':''}>
       <option value="user" ${value==='user'?'selected':''}>Usuário (operação do dia a dia)</option>
-      <option value="admin" ${value==='admin'?'selected':''}>Administrador (acesso total)</option>
+      <option value="admin" ${value==='admin'?'selected':''}>Administrador (acesso total, sem custo/lucro)</option>
+      ${canCost()?`<option value="full" ${value==='full'?'selected':''}>Administrador Full Access (vê custo, markup e lucro)</option>`:''}
     </select>${disabled?'<span class="hint">É o único administrador: não pode virar usuário.</span>':''}</label>`;
 }
 function renderNewUserModal(m){
@@ -6311,7 +6333,7 @@ function renderEditUserModal(d){
   const lastAdmin = roleOf(d)==='admin' && adminCount()<=1;
   const body = `
     <label class="field"><span class="lbl">Nome</span><input id="edituser-name" data-field="ui.modal.data.name" value="${esc(d.name)}" data-enter-action="submitEditUser"></label>
-    ${roleSelectHTML('ui.modal.data.role', roleOf(d), lastAdmin)}
+    ${roleSelectHTML('ui.modal.data.role', (d.role==='full'?'full':roleOf(d)), lastAdmin)}
     <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:16px;">
       <button class="btn btn-ghost" data-action="closeModal">Cancelar</button>
       <button class="btn btn-gold" data-action="submitEditUser">${icon('save')} Salvar</button>
