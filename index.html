@@ -683,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-y';
+const APP_VERSION = '2026.10.15-z';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2076,7 +2076,7 @@ const CAT_FONTS = [['','Padrão','Segoe UI, sans-serif'],['georgia','Clássica (
 const BTN_PRESETS = [['','Cor do cabeçalho'],['#1D4ED8','Azul'],['#D32F2F','Vermelho'],['#F2C200','Amarelo'],['#1B8A3A','Verde'],['#111111','Preto']];
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#E3EDFF','Azul claro'],['#FDE3E3','Vermelho claro'],['#FFF6C2','Amarelo claro'],['#E0F5E6','Verde claro'],['#E9E9EE','Cinza']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
-const HERO_PRESETS = [['','Padrão'],['#1A3FBF','Azul'],['#B3202A','Vermelho'],['#9A7B00','Amarelo'],['#1B7A2F','Verde'],['#111111','Preto']];
+const HERO_PRESETS = [['','Padrão'],['#1A3FBF','Azul'],['#B3202A','Vermelho'],['#A58800','Amarelo'],['#1B7A2F','Verde'],['#111111','Preto']];
 function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) <= 130; }   /* só cores escuras: o texto do cabeçalho é branco */
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
