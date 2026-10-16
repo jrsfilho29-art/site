@@ -685,7 +685,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.16-b';
+const APP_VERSION = '2026.10.16-c';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2245,14 +2245,20 @@ function productPriceSync(which){
   const num = v => { const n = parseFloat(String(v==null?'':v).replace(',','.')); return isNaN(n) ? 0 : n; };
   const has = v => String(v==null?'':v).trim()!=='';
   const cost = num(d.costPrice), r2 = n => Math.round(n*100)/100;
+  /* margem = lucro sobre o preço de venda; markup = acréscimo sobre o custo */
+  const fromSale = ()=>{ const v=num(d.salePrice); if(has(d.salePrice) && cost>0){ d.markup = r2((v-cost)/cost*100); d.margin = v>0 ? r2((v-cost)/v*100) : ''; } };
   if(which==='costPrice'){
-    if(has(d.markup)) d.salePrice = r2(cost*(1+num(d.markup)/100));
-    else if(has(d.salePrice) && cost>0) d.markup = r2((num(d.salePrice)-cost)/cost*100);
+    if(has(d.markup)){ d.salePrice = r2(cost*(1+num(d.markup)/100)); fromSale(); }
+    else if(has(d.margin) && num(d.margin)<100){ d.salePrice = r2(cost/(1-num(d.margin)/100)); fromSale(); }
+    else fromSale();
   }else if(which==='markup'){
-    if(has(d.markup)) d.salePrice = r2(cost*(1+num(d.markup)/100));
+    if(has(d.markup)){ d.salePrice = r2(cost*(1+num(d.markup)/100)); fromSale(); }
+    else d.margin = '';
+  }else if(which==='margin'){
+    if(has(d.margin) && num(d.margin)<100){ d.salePrice = r2(cost/(1-num(d.margin)/100)); if(cost>0) d.markup = r2((num(d.salePrice)-cost)/cost*100); }
+    else if(!has(d.margin)) d.markup = '';
   }else if(which==='salePrice'){
-    if(has(d.salePrice) && cost>0) d.markup = r2((num(d.salePrice)-cost)/cost*100);
-    else if(!has(d.salePrice)) d.markup = '';
+    if(has(d.salePrice) && cost>0) fromSale(); else if(!has(d.salePrice)){ d.markup=''; d.margin=''; }
   }
 }
 function handleFieldInput(t){
@@ -2296,7 +2302,7 @@ function handleFieldInput(t){
     return;
   }
   setPath(state, path, val);
-  { const mm = /^ui\.modal\.data\.(costPrice|markup|salePrice)$/.exec(path); if(mm && state.ui.modal && state.ui.modal.type==='produto') productPriceSync(mm[1]); }
+  { const mm = /^ui\.modal\.data\.(costPrice|markup|margin|salePrice)$/.exec(path); if(mm && state.ui.modal && state.ui.modal.type==='produto') productPriceSync(mm[1]); }
   /* login: não recria a tela a cada tecla (no celular isso reiniciava o teclado e alternava entre letras e números) */
   if(path.indexOf('ui.login.')===0) return;
   if(t.dataset.mask==='cep'){ const dg = val.replace(/\D/g,''); if(dg.length===8){ lookupCep(dg); return; } else if(state.ui.modal && state.ui.modal.cepMsg){ state.ui.modal.cepMsg=''; } }
@@ -3645,7 +3651,7 @@ const actions_produtos = {
   submitProduto(){
     const d = state.ui.modal.data;
     if(!d.name || !d.name.trim()){ notify.err('Informe o nome do produto.'); return; }
-    const clean = {...d,
+    const clean = {...d, margin: undefined,
       costPrice: Math.max(0, parseFloat(d.costPrice)||0),
       salePrice: Math.max(0, parseFloat(d.salePrice)||0),
       markup: (()=>{ const c=parseFloat(d.costPrice)||0, v=parseFloat(d.salePrice)||0; return (c>0 && v>0) ? Math.round((v-c)/c*10000)/100 : (parseFloat(d.markup)||0); })(),   /* markup sempre coerente com custo e venda (pode ser negativo se vender abaixo do custo) */
@@ -6223,9 +6229,10 @@ function renderProdutoModal(d){
       <label class="field"><span class="lbl">Volume (ml)</span><input data-field="ui.modal.data.volume" value="${esc(d.volume||'')}"></label>
     </div>
     <label class="field"><span class="lbl">Fornecedor</span><input data-field="ui.modal.data.supplier" value="${esc(d.supplier||'')}"></label>
-    <div class="grid grid-3">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;">
       <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" value="${esc(d.costPrice)}"></label>
-      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" data-field="ui.modal.data.markup" value="${esc(d.markup)}"></label>
+      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" data-field="ui.modal.data.markup" value="${esc(d.markup)}"><span class="hint">sobre o custo</span></label>
+      <label class="field"><span class="lbl">Margem desejada (%)</span><input type="number" step="0.1" max="99.9" data-field="ui.modal.data.margin" value="${esc(d.margin!==undefined ? d.margin : ((parseFloat(d.costPrice)>0 && parseFloat(d.salePrice)>0) ? Math.round((d.salePrice-d.costPrice)/d.salePrice*10000)/100 : ''))}"><span class="hint">sobre a venda</span></label>
       <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
     </div>
     <div class="grid grid-2" style="align-items:end;">
