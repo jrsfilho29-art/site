@@ -683,7 +683,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-x';
+const APP_VERSION = '2026.10.15-y';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2073,10 +2073,10 @@ function persist(key){
 
 /* ================= render engine ================= */
 const CAT_FONTS = [['','Padrão','Segoe UI, sans-serif'],['georgia','Clássica (Georgia)','Georgia, serif'],['playfair','Playfair Display','"Playfair Display", Georgia, serif'],['cormorant','Cormorant Garamond','"Cormorant Garamond", Georgia, serif'],['poppins','Poppins','Poppins, "Segoe UI", sans-serif'],['montserrat','Montserrat','Montserrat, "Segoe UI", sans-serif'],['lora','Lora','Lora, Georgia, serif'],['raleway','Raleway','Raleway, "Segoe UI", sans-serif']];
-const BTN_PRESETS = [['','Cor do cabeçalho'],['#1DA851','Verde'],['#17204A','Marinho'],['#0B6EF3','Azul'],['#7B2CBF','Roxo'],['#C2185B','Pink'],['#E53935','Vermelho'],['#F0A81F','Dourado'],['#EF6C00','Laranja'],['#00897B','Turquesa'],['#37474F','Grafite'],['#6D4C41','Marrom'],['#111111','Preto']];
-const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#FBF7F1','Creme'],['#EAF4F1','Menta'],['#F6ECF3','Rosa'],['#EEF3FA','Azul claro'],['#FFF6DC','Areia'],['#E9E9EE','Cinza'],['#F3EEFA','Lavanda'],['#E8E3F6','Lilás'],['#FDE8E4','Pêssego'],['#FBE4EC','Rosa bebê'],['#E3F1FB','Azul bebê'],['#DDEFE5','Verde claro'],['#EEF5DC','Pistache'],['#FCF3C9','Amarelo claro'],['#F2E8DC','Bege'],['#DADDE6','Cinza azulado']];
+const BTN_PRESETS = [['','Cor do cabeçalho'],['#1D4ED8','Azul'],['#D32F2F','Vermelho'],['#F2C200','Amarelo'],['#1B8A3A','Verde'],['#111111','Preto']];
+const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#E3EDFF','Azul claro'],['#FDE3E3','Vermelho claro'],['#FFF6C2','Amarelo claro'],['#E0F5E6','Verde claro'],['#E9E9EE','Cinza']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
-const HERO_PRESETS = [['','Padrão'],['#17204A','Azul do login'],['#0D1230','Azul noite'],['#0B2A5B','Azul marinho'],['#123F8C','Azul royal'],['#1D5FBF','Azul'],['#0E6BA8','Azul oceano'],['#1B7FA8','Azul petróleo'],['#2F80ED','Azul claro'],['#1E3A8A','Índigo'],['#3B1F5C','Roxo'],['#5B2A86','Violeta'],['#7A1F5C','Magenta'],['#4A1230','Vinho'],['#7A1F2B','Vermelho'],['#8A3B12','Terracota'],['#5A2A0E','Marrom'],['#0F3B33','Verde floresta'],['#14532D','Verde'],['#0F766E','Verde água'],['#1F2937','Grafite'],['#111111','Preto']];
+const HERO_PRESETS = [['','Padrão'],['#1A3FBF','Azul'],['#B3202A','Vermelho'],['#9A7B00','Amarelo'],['#1B7A2F','Verde'],['#111111','Preto']];
 function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) <= 130; }   /* só cores escuras: o texto do cabeçalho é branco */
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
