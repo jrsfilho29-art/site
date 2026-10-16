@@ -217,6 +217,8 @@
   .qnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}
   .qbtn{position:relative;display:inline-flex;align-items:center;flex-direction:column;justify-content:center;text-align:center;gap:6px;width:calc((100% - 54px)/10);min-width:78px;min-height:72px;padding:11px 4px;border-radius:14px;font:inherit;font-size:12px;line-height:1.15;font-weight:600;letter-spacing:0;cursor:pointer;
         background:linear-gradient(180deg,color-mix(in srgb,var(--qbtn-a,#17204A) 86%,#fff),var(--qbtn-a,#0D1230));color:#fff;border:1px solid rgba(255,255,255,.18);box-shadow:0 1px 3px rgba(13,18,48,.25);transition:transform .12s ease,box-shadow .12s ease,background-color .15s ease;}
+  body.hero-gold .cx-hero, body.hero-gold .cx-hero *:not(.btn):not(button){color:#141A3C !important;}
+  body.qbtn-gold .qbtn:not(.on), body.qbtn-gold .qbtn:not(.on) .qic{color:#141A3C;}
   .qbtn .qic{display:inline-flex;color:var(--gold-soft);}
   .qbtn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(13,18,48,.35);border-color:rgba(255,255,255,.34);}
   .qbtn.on{background:linear-gradient(180deg,#D3AC68,var(--gold));color:var(--plum-dark);border-color:var(--gold-deep);font-weight:600;box-shadow:0 1px 2px rgba(173,131,66,.35);}
@@ -683,7 +685,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-z';
+const APP_VERSION = '2026.10.15-za';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -2076,15 +2078,18 @@ const CAT_FONTS = [['','Padrão','Segoe UI, sans-serif'],['georgia','Clássica (
 const BTN_PRESETS = [['','Cor do cabeçalho'],['#1D4ED8','Azul'],['#D32F2F','Vermelho'],['#F2C200','Amarelo'],['#1B8A3A','Verde'],['#111111','Preto']];
 const BG_PRESETS = [['','Padrão'],['#FFFFFF','Branco'],['#E3EDFF','Azul claro'],['#FDE3E3','Vermelho claro'],['#FFF6C2','Amarelo claro'],['#E0F5E6','Verde claro'],['#E9E9EE','Cinza']];
 function bgOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) >= 150; }   /* só cores claras: o texto do app é escuro */
-const HERO_PRESETS = [['','Padrão'],['#1A3FBF','Azul'],['#B3202A','Vermelho'],['#A58800','Amarelo'],['#1B7A2F','Verde'],['#111111','Preto']];
+const HERO_PRESETS = [['','Padrão'],['#1A3FBF','Azul'],['#B3202A','Vermelho'],['#A58800','Amarelo escuro'],['#1B7A2F','Verde'],['#111111','Preto']];
+const GOLD_BRAND='#F0A81F';
+function goldOk(hex){ return String(hex||'').toUpperCase()===GOLD_BRAND; }
 function heroOk(hex){ const m=/^#([0-9a-f]{6})$/i.exec(String(hex||'')); if(!m) return false; const n=parseInt(m[1],16), r=n>>16&255, g=n>>8&255, b=n&255; return (0.299*r+0.587*g+0.114*b) <= 130; }   /* só cores escuras: o texto do cabeçalho é branco */
 function heroMix(hex,t){ const n=parseInt(hex.slice(1),16); const f=v=>Math.round(v+(255-v)*t); return '#'+[n>>16&255,n>>8&255,n&255].map(f).map(v=>v.toString(16).padStart(2,'0')).join(''); }
 function applyPrefs(){
   const hc = state.prefs && state.prefs.heroColor, rs = document.documentElement.style;
   const sc = state.prefs && state.prefs.sideColor; if(sc && heroOk(sc)) rs.setProperty('--side-bg',sc); else rs.removeProperty('--side-bg');
-  if(hc && heroOk(hc)){ rs.setProperty('--hero-a',hc); }
+  if(hc && (heroOk(hc)||goldOk(hc))){ rs.setProperty('--hero-a',hc); }
   else { rs.removeProperty('--hero-a'); }
-  const qb = state.prefs && state.prefs.qbtnColor; if(qb && heroOk(qb)) rs.setProperty('--qbtn-a',qb); else rs.removeProperty('--qbtn-a');
+  const qb = state.prefs && state.prefs.qbtnColor; if(qb && (heroOk(qb)||goldOk(qb))) rs.setProperty('--qbtn-a',qb); else rs.removeProperty('--qbtn-a');
+  document.body.classList.toggle('hero-gold', !!hc && goldOk(hc)); document.body.classList.toggle('qbtn-gold', !!qb && goldOk(qb));
   const bg = state.prefs && state.prefs.bgColor;
   const bs = state.prefs && state.prefs.bgStyle, lg = (bs==='login' || bs==='loginsolid') && !!state.currentUser;
   document.body.classList.toggle('bg-login', lg && bs==='login');
@@ -5228,7 +5233,7 @@ function renderAparencia(){
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Cor do cabeçalho</h3>
       <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor do destaque no topo de cada menu (cores escuras, para o texto branco ficar legível).</p>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS,p.heroColor,'setHero','Cabeçalho','#0D1230')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.concat([[GOLD_BRAND,'Amarelo (dourado)']]),p.heroColor,'setHero','Cabeçalho','#0D1230')}</div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
         <input type="color" data-field="prefs.heroColor" value="${p.heroColor||'#0D1230'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
     </div>
@@ -5249,7 +5254,7 @@ function renderAparencia(){
     <div class="card" style="padding:16px 18px;">
       <h3 style="margin:0 0 4px;font-size:16px;">Botões do menu</h3>
       <p class="muted" style="margin:0 0 12px;font-size:12.5px;">Cor dos botões de atalho no topo (Clientes, Produtos, Estoque…). O botão da tela aberta continua dourado.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.map(x=>x[0]===''?['','Padrão']:x),p.qbtnColor,'setQbtn','Botões','#17204A')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">${sw(HERO_PRESETS.map(x=>x[0]===''?['','Padrão']:x).concat([[GOLD_BRAND,'Amarelo (dourado)']]),p.qbtnColor,'setQbtn','Botões','#17204A')}</div>
       <label class="muted2" style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;">Outra cor (escura)
         <input type="color" data-field="prefs.qbtnColor" value="${p.qbtnColor||'#17204A'}" style="width:34px;height:28px;padding:2px;border-radius:6px;cursor:pointer;"></label>
     </div>
