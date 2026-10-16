@@ -685,7 +685,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.15-za';
+const APP_VERSION = '2026.10.16-a';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário' };
@@ -3648,7 +3648,7 @@ const actions_produtos = {
     const clean = {...d,
       costPrice: Math.max(0, parseFloat(d.costPrice)||0),
       salePrice: Math.max(0, parseFloat(d.salePrice)||0),
-      markup: Math.max(0, parseFloat(d.markup)||0),
+      markup: (()=>{ const c=parseFloat(d.costPrice)||0, v=parseFloat(d.salePrice)||0; return (c>0 && v>0) ? Math.round((v-c)/c*10000)/100 : (parseFloat(d.markup)||0); })(),   /* markup sempre coerente com custo e venda (pode ser negativo se vender abaixo do custo) */
       promoPrice: (()=>{ const v=parseFloat(d.promoPrice)||0, sp=parseFloat(d.salePrice)||0; return (v>0 && v<sp) ? +v.toFixed(2) : 0; })(),
       isNew: !!d.isNew,
       lastUnits: !!d.lastUnits,
@@ -6225,7 +6225,7 @@ function renderProdutoModal(d){
     <label class="field"><span class="lbl">Fornecedor</span><input data-field="ui.modal.data.supplier" value="${esc(d.supplier||'')}"></label>
     <div class="grid grid-3">
       <label class="field"><span class="lbl">Preço de custo (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.costPrice" value="${esc(d.costPrice)}"></label>
-      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" min="0" data-field="ui.modal.data.markup" value="${esc(d.markup)}"></label>
+      <label class="field"><span class="lbl">Markup (%)</span><input type="number" step="0.1" data-field="ui.modal.data.markup" value="${esc(d.markup)}"></label>
       <label class="field"><span class="lbl">Preço de venda (R$)</span><input type="number" step="0.01" min="0" data-field="ui.modal.data.salePrice" value="${esc(d.salePrice)}"></label>
     </div>
     <div class="grid grid-2" style="align-items:end;">
