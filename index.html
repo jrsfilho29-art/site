@@ -686,7 +686,7 @@ const LS = {
 };
 /* Sessão: mantém o usuário logado ao atualizar a página (F5). Vale 30 dias sem uso; "Sair" encerra. */
 const SESSION_DAYS = 30;
-const APP_VERSION = '2026.10.16-d';
+const APP_VERSION = '2026.10.16-e';
 /* Perfis: 'admin' (Administrador) tem acesso total; 'user' (Usuário) opera o dia a dia da loja.
    Contas antigas, sem perfil, contam como administrador. */
 const ROLE_LABEL = { admin:'Administrador', user:'Usuário', full:'Administrador Full Access' };
@@ -3356,9 +3356,10 @@ function renderProdutos(){
   <div class="fbar2">
     <div class="fsec">
       <div class="fcap">Tipo</div>
-      <div class="ftabs" role="tablist">
-        <button type="button" class="ftab ${!catFilter?'on':''}" data-action="filterProductCategory" data-cat="">Todos <span class="n">${state.products.length}</span></button>
-        ${state.categories.map(c=>`<button type="button" class="ftab ${catFilter===c.name?'on':''}" data-action="filterProductCategory" data-cat="${esc(c.name)}">${esc(c.name)} <span class="n">${state.products.filter(p=>(p.category||'')===c.name).length}</span></button>`).join('')}
+      <div class="ftiles">
+        ${(()=>{ const tones=['#7B2CBF','#0B6EF3','#C2185B','#1B8A3A','#EF6C00','#00897B','#6D4C41','#37474F'];
+          const tile=(k,l,n,col)=>`<button type="button" class="ftile ${(catFilter||'')===k?'on':''}" style="--tone:${col}" data-action="filterProductCategory" data-cat="${esc(k)}"><span class="fn">${n}</span><span class="fl">${esc(l)}</span></button>`;
+          return tile('','Todos',state.products.length,'#17204A') + state.categories.map((c,i)=>tile(c.name,c.name,state.products.filter(p=>(p.category||'')===c.name).length,tones[i%tones.length])).join(''); })()}
       </div>
     </div>
     <div class="fsec">
@@ -3375,9 +3376,9 @@ function renderProdutos(){
     ${catFilter && subOptions.length>0 ? `
     <div class="fsec">
       <div class="fcap">Subgrupo</div>
-      <div class="fchips">
-        <button type="button" class="fchip ${!subFilter?'on':''}" data-action="filterProductSubcategory" data-sub="">Todos</button>
-        ${subOptions.map(sc=>`<button type="button" class="fchip ${subFilter===sc.name?'on':''}" data-action="filterProductSubcategory" data-sub="${esc(sc.name)}">${esc(sc.name)}</button>`).join('')}
+      <div class="ftiles">
+        <button type="button" class="ftile ${!subFilter?'on':''}" style="--tone:#17204A" data-action="filterProductSubcategory" data-sub=""><span class="fn">${state.products.filter(p=>(p.category||'')===catFilter).length}</span><span class="fl">Todos</span></button>
+        ${subOptions.map(sc=>`<button type="button" class="ftile ${subFilter===sc.name?'on':''}" style="--tone:#7A80A3" data-action="filterProductSubcategory" data-sub="${esc(sc.name)}"><span class="fn">${state.products.filter(p=>(p.category||'')===catFilter && (p.subcategory||'')===sc.name).length}</span><span class="fl">${esc(sc.name)}</span></button>`).join('')}
       </div>
     </div>` : ''}
   </div>
